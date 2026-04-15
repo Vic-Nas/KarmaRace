@@ -1,0 +1,1 @@
+# flagup/models/flagup.py
