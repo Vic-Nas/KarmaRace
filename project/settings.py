@@ -10,25 +10,25 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
+import dj_database_url
+import environ
+env = environ.Env()
+environ.Env.read_env('.env')
+
+import os
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR  'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+SECRET_KEY = env('SECRET_KEY')
+DEBUG = env.bool('DEBUG', default=False)
+HOSTS=env('HOSTS').split(',')
+DOMAIN=HOSTS[0]
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
+ALLOWED_HOSTS = HOSTS
+CSRF_TRUSTED_ORIGINS = [f'https://{host}' for host in HOSTS]
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-icx4#6!v5+s*$k+ddfhw(@n6a3j@*njed8!y^s(vgyjbf=yiqd'
-
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
-
-ALLOWED_HOSTS = []
-
-
-# Application definition
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'karma',
 ]
 
 MIDDLEWARE = [
@@ -54,13 +55,15 @@ ROOT_URLCONF = 'project.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'project' / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
+                'django.template.context_processors.debug',
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'accounts.context_processors.global_settings',
             ],
         },
     },
@@ -73,15 +76,11 @@ WSGI_APPLICATION = 'project.wsgi.application'
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR  'db.sqlite3',
-    }
+    'default': dj_database_url.config(
+        default=os.environ.get('DATABASE_URL', f'sqlite:///{BASE_DIR / "db.sqlite3"}')
+    )
 }
 
-
-# Password validation
-# https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -115,3 +114,21 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
+
+STATICFILES_DIRS = [BASE_DIR / 'project' / 'static' / 'manual']
+STATIC_ROOT = BASE_DIR / 'project' / 'static' / 'cache'
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
+# Ads
+ADSENSE_CLIENT_ID = env('ADSENSE_CLIENT_ID')
+ADSENSE_SLOTS     = env('ADSENSE_SLOTS').split(',')
+
+# Stripe
+STRIPE_SECRET_KEY     = env('STRIPE_SECRET_KEY')
+STRIPE_PRICE_ID       = env('STRIPE_PRICE_ID')
+STRIPE_WEBHOOK_SECRET = env('STRIPE_WEBHOOK_SECRET')
+
+# Resend
+RESEND_API_KEY        = os.environ.get('RESEND_API_KEY')
+RESEND_FROM_EMAIL     = os.environ.get('RESEND_FROM_EMAIL', f'noreply@{DOMAIN}')
+RESEND_WEBHOOK_SECRET = os.environ.get('RESEND_WEBHOOK_SECRET', '')
