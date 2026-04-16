@@ -1,1 +1,0 @@
-# verification/adapters/account.py

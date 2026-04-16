@@ -1,1 +1,0 @@
-# flagup/views/send.py

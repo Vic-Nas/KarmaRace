@@ -1,1 +1,0 @@
-# tasks/services/ratio.py

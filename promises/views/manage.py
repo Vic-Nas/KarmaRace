@@ -1,1 +1,0 @@
-# promises/views/manage.py

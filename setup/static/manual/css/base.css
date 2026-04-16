@@ -1,0 +1,23 @@
+/* Basic CSS variables and reset */
+:root {
+  --color-primary: #4f46e5;
+  --color-bg: #f9fafb;
+  --color-text: #222;
+  --radius: 6px;
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 32px;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: system-ui, sans-serif;
+  line-height: 1.6;
+  background: var(--color-bg);
+  color: var(--color-text);
+  margin: 0;
+}

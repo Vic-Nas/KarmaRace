@@ -1,1 +1,0 @@
-# projects/services/lifecycle.py

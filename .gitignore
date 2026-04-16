@@ -13,11 +13,11 @@ venv/
 .venv/
 
 # Static collected files
-project/static/cache/*
-!project/static/cache/.gitkeep
+ setup/static/cache/*
+! setup/static/cache/.gitkeep
 
 # Media
-project/media/
+ setup/media/
 
 # Django
 *.log

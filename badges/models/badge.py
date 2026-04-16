@@ -1,1 +1,0 @@
-# badges/models/badge.py

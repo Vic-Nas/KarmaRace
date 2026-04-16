@@ -1,1 +1,0 @@
-# appreciations/services/aggregate.py

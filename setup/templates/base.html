@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>KarmaHunt</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5/dist/css/bootstrap.min.css">
+</head>
+<body>
+<nav class="navbar navbar-expand-lg navbar-light bg-light px-4">
+  <a class="navbar-brand" href="/">KarmaHunt</a>
+  <div class="ms-auto">
+    {% if user.is_authenticated %}
+      <span class="me-3 text-muted">{{ user.username }}</span>
+      <a href="{% url 'logout' %}" class="btn btn-sm btn-outline-secondary">Log out</a>
+    {% else %}
+      <a href="{% url 'login' %}" class="btn btn-sm btn-outline-primary me-2">Log in</a>
+      <a href="{% url 'signup' %}" class="btn btn-sm btn-primary">Sign up</a>
+    {% endif %}
+  </div>
+</nav>
+<div class="container mt-4">
+  {% block content %}{% endblock %}
+</div>
+</body>
+</html>

@@ -1,1 +1,0 @@
-# docs/views/entry.py
