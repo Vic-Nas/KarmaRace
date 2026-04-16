@@ -13,8 +13,8 @@ venv/
 .venv/
 
 # Static collected files
- setup/static/cache/*
-! setup/static/cache/.gitkeep
+setup/static/cache/*
+!setup/static/cache/.gitkeep
 
 # Media
  setup/media/
@@ -37,3 +37,4 @@ temp/
 *.temp
 
 *.md
+!README.md
