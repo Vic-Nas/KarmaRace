@@ -56,6 +56,10 @@ INSTALLED_APPS = [
 SITE_ID = 1
 AUTHENTICATION_BACKENDS = ['allauth.account.auth_backends.AuthenticationBackend']
 
+ACCOUNT_EMAIL_REQUIRED = True
+ACCOUNT_USERNAME_REQUIRED = False
+SOCIALACCOUNT_ONLY = True
+
 ACCOUNT_EMAIL_VERIFICATION = 'none'
 LOGIN_REDIRECT_URL = '/feed/'
 LOGOUT_REDIRECT_URL = '/'
@@ -86,7 +90,6 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
-                'accounts.context_processors.global_settings',
             ],
         },
     },
@@ -141,6 +144,19 @@ STATIC_URL = 'static/'
 STATICFILES_DIRS = [BASE_DIR / 'setup' / 'static' / 'manual']
 STATIC_ROOT = BASE_DIR / 'setup' / 'static' / 'cache'
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
+# Google
+GOOGLE_CLIENT_ID = env('GOOGLE_CLIENT_ID')
+GOOGLE_CLIENT_SECRET = env('GOOGLE_CLIENT_SECRET')
+SOCIALACCOUNT_PROVIDERS = {
+    'google': {
+        'APP': {
+            'client_id': GOOGLE_CLIENT_ID,
+            'secret': GOOGLE_CLIENT_SECRET,
+        },
+        'SCOPE': ['profile', 'email'],
+    }
+}
 
 # Ads
 ADSENSE_CLIENT_ID = env('ADSENSE_CLIENT_ID')

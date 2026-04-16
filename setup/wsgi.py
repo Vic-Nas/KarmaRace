@@ -1,5 +1,5 @@
 """
-WSGI config for project KarmaHunt.
+WSGI config for project KarmaRace.
 
 It exposes the WSGI callable as a module-level variable named ``application``.
 

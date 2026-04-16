@@ -1,5 +1,5 @@
 """
-ASGI config for project KarmaHunt.
+ASGI config for project KarmaRace.
 
 It exposes the ASGI callable as a module-level variable named ``application``.
 
