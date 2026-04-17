@@ -23,6 +23,24 @@ class Task(models.Model):
     archived_by    = models.ManyToManyField(User, blank=True, related_name='archived_tasks')
     created_at     = models.DateTimeField(auto_now_add=True)
 
+    @property
+    def target_url(self):
+        """Return a user-facing destination URL for this task."""
+        target = (self.target_id or '').strip()
+        if not target:
+            return ''
+
+        if self.type in (self.Type.GITHUB_STAR, self.Type.GITHUB_FORK):
+            return f'https://github.com/{target}'
+
+        if self.type == self.Type.PH_COMMENT:
+            return f'https://www.producthunt.com/products/{target}'
+
+        if self.type == self.Type.WEBHOOK:
+            return target
+
+        return ''
+
     def __str__(self):
         return f'{self.owner.username} — {self.type}'
 

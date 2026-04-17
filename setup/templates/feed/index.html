@@ -46,7 +46,13 @@
   <p>No more tasks to test right now.</p>
 
 {% else %}
-  <h1>{{ task.get_type_display }}</h1>
+  <h1>
+    {% if task.target_url %}
+      <a href="{{ task.target_url }}" target="_blank" rel="noopener noreferrer">{{ task.get_type_display }}</a>
+    {% else %}
+      {{ task.get_type_display }}
+    {% endif %}
+  </h1>
   <p>{{ task.description }}</p>
   <p><strong>Target:</strong> {{ task.target_id }}</p>
   <p><strong>Reward:</strong> {{ task_reward }} karma {% if task.id in completed_task_ids %}✓{% endif %}</p>
