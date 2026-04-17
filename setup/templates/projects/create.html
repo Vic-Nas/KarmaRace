@@ -1,0 +1,54 @@
+{# setup/templates/projects/create.html #}
+{% extends "base.html" %}
+
+{% block content %}
+<h1>New Project</h1>
+
+{% if activation_error %}
+  <div class="activation-error">
+    {% if activation_error == 'no_tasks' %}
+      <p>
+        Project saved as <strong>Inactive</strong> — you need to add at least one
+        visible task before it can go Active.
+      </p>
+    {% elif activation_error == 'hide_or_upgrade' %}
+      <p>
+        Project saved as <strong>Inactive</strong> — you have one or more unhidden
+        Webhook tasks, which require a Pro account to keep Active.
+        Either hide those tasks or <a href="{% url 'billing_upgrade' %}">upgrade to Pro</a>.
+      </p>
+    {% else %}
+      <p>Project saved as <strong>Inactive</strong> — it could not be activated ({{ activation_error }}).</p>
+    {% endif %}
+    <p><a href="{% url 'project_detail' project.pk %}">Go to your project →</a></p>
+  </div>
+{% else %}
+
+<form method="post">
+  {% csrf_token %}
+
+  {% if form.non_field_errors %}
+    <ul class="errorlist">
+      {% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
+    </ul>
+  {% endif %}
+
+  {% for field in form %}
+    <div class="field{% if field.errors %} field--error{% endif %}">
+      {{ field.label_tag }}
+      {{ field }}
+      {% if field.help_text %}<p class="help">{{ field.help_text }}</p>{% endif %}
+      {% for error in field.errors %}<p class="error">{{ error }}</p>{% endfor %}
+    </div>
+  {% endfor %}
+
+  <p class="activate-note">
+    You can only activate if you have at least one visible task and no unhidden
+    Webhook tasks (unless you're Pro).
+  </p>
+
+  <button type="submit">Save Project</button>
+</form>
+
+{% endif %}
+{% endblock %}

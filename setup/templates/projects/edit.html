@@ -1,0 +1,44 @@
+{# setup/templates/projects/edit.html #}
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Edit — {{ project.name }}</h1>
+<p>Status: <strong>{{ project.state }}</strong></p>
+
+{% if activation_error %}
+  <div class="activation-error">
+    {% if activation_error == 'no_tasks' %}
+      <p>
+        Saved as <strong>Inactive</strong> — add at least one visible task before activating.
+      </p>
+    {% elif activation_error == 'hide_or_upgrade' %}
+      <p>
+        Saved as <strong>Inactive</strong> — unhidden Webhook tasks require Pro.
+        Hide them or <a href="{% url 'billing_upgrade' %}">upgrade</a>.
+      </p>
+    {% else %}
+      <p>Saved as <strong>Inactive</strong> — could not activate ({{ activation_error }}).</p>
+    {% endif %}
+  </div>
+{% endif %}
+
+<form method="post">
+  {% csrf_token %}
+
+  {% for field in form %}
+    <div class="field{% if field.errors %} field--error{% endif %}">
+      {{ field.label_tag }}
+      {{ field }}
+      {% if field.help_text %}<p class="help">{{ field.help_text }}</p>{% endif %}
+      {% for error in field.errors %}<p class="error">{{ error }}</p>{% endfor %}
+    </div>
+  {% endfor %}
+
+  <p class="activate-note">
+    Unchecking Active will immediately deactivate your project and hide it from the feed.
+  </p>
+
+  <button type="submit">Save Changes</button>
+  <a href="{% url 'project_detail' project.pk %}">Cancel</a>
+</form>
+{% endblock %}

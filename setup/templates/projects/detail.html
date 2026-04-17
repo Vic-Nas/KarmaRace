@@ -1,0 +1,45 @@
+{# projects/templates/projects/detail.html #}
+{% extends "base.html" %}
+
+{% block content %}
+<h1>{{ project.name }}</h1>
+<p><a href="{{ project.url }}" target="_blank" rel="noopener">{{ project.url }}</a></p>
+<p>{{ project.description }}</p>
+<p>Status: <strong>{{ project.state }}</strong></p>
+
+<p>
+  <a href="{% url 'project_edit' project.pk %}">Edit project</a>
+</p>
+
+<h2>Tasks</h2>
+
+{% if tasks %}
+  <ul>
+    {% for task in tasks %}
+      <li>
+        <strong>{{ task.get_type_display }}</strong>
+        {% if task.hidden %}
+          — <span class="badge badge--hidden">Hidden</span>
+          {% comment %}
+            hidden=True can mean either owner-hidden or system-hidden after a
+            health check failure. The owner can un-hide manually from their
+            dashboard (re-check endpoint). We surface the flag here without
+            distinguishing the cause; a later iteration can add a
+            `health_failed` boolean to the Task model if needed.
+          {% endcomment %}
+        {% endif %}
+        {% if task.is_deleted %}
+          — <span class="badge badge--deleted">Deleted</span>
+        {% endif %}
+        <br>
+        <small>{{ task.description }}</small>
+      </li>
+    {% endfor %}
+  </ul>
+{% else %}
+  <p>No tasks yet. Add tasks so your project can go Active.</p>
+{% endif %}
+
+{# Task creation form will be added in the tasks app iteration. #}
+
+{% endblock %}
