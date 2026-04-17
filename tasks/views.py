@@ -2,35 +2,34 @@
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
 
-from projects.models import Project
 from .forms import TaskForm
 from .models import Task
 from .services import on_task_created, on_task_unhidden, soft_delete_task, is_task_configuration_valid
 
 
 @login_required
-def task_create(request, project_slug):
-    project = get_object_or_404(Project, slug=project_slug, owner=request.user)
+def task_create(request):
+    form = TaskForm(request.POST or None)
 
-    if request.method == 'POST':
-        form = TaskForm(request.POST)
-        if form.is_valid():
-            task = form.save(commit=False)
-            task.project = project
-            task.save()
-            on_task_created(task)
-            return redirect('project_detail', slug=project.slug)
-        # Fall through to detail view re-render with errors
-        from projects.views import project_detail_with_task_form
-        return project_detail_with_task_form(request, project, form)
+    if request.method == 'POST' and form.is_valid():
+        task = form.save(commit=False)
+        task.owner = request.user
+        if task.type != Task.Type.WEBHOOK:
+            task.webhook_secret = ''
+        task.save()
+        on_task_created(task)
+        return redirect('feed')
 
-    return redirect('project_detail', slug=project.slug)
+    return render(request, 'tasks/edit.html', {
+        'task': None,
+        'form': form,
+        'is_create': True,
+    })
 
 
 @login_required
-def task_edit(request, project_slug, task_pk):
-    project = get_object_or_404(Project, slug=project_slug, owner=request.user)
-    task = get_object_or_404(Task, pk=task_pk, project=project, is_deleted=False)
+def task_edit(request, task_pk):
+    task = get_object_or_404(Task, pk=task_pk, owner=request.user, is_deleted=False)
 
     was_hidden = task.hidden
     form = TaskForm(request.POST or None, instance=task)
@@ -51,22 +50,19 @@ def task_edit(request, project_slug, task_pk):
                 task.hidden = True
                 task.save(update_fields=['hidden'])
 
-        from projects.services import set_project_state
-        set_project_state(project)
-        return redirect('project_detail', slug=project.slug)
+        return redirect('feed')
 
     return render(request, 'tasks/edit.html', {
-        'project': project,
         'task': task,
         'form': form,
+        'is_create': False,
     })
 
 
 @login_required
-def task_delete(request, project_slug, task_pk):
-    project = get_object_or_404(Project, slug=project_slug, owner=request.user)
-    task = get_object_or_404(Task, pk=task_pk, project=project, is_deleted=False)
+def task_delete(request, task_pk):
+    task = get_object_or_404(Task, pk=task_pk, owner=request.user, is_deleted=False)
 
     if request.method == 'POST':
         soft_delete_task(task)
-    return redirect('project_detail', slug=project.slug)
+    return redirect('feed')

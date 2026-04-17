@@ -1,8 +1,7 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h1>Edit Task</h1>
-<p class="text-muted">Project: {{ project.name }}</p>
+<h1>{% if is_create %}New Task{% else %}Edit Task{% endif %}</h1>
 
 <form method="post">
   {% csrf_token %}
@@ -36,7 +35,7 @@
   {% endif %}
 
   <button type="submit" class="btn btn-primary">Save Task</button>
-  <a href="{% url 'project_detail' project.slug %}" class="btn btn-outline-secondary">Cancel</a>
+  <a href="{% url 'feed' %}" class="btn btn-outline-secondary">Cancel</a>
 </form>
 
 <script>

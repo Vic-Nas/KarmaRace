@@ -82,18 +82,18 @@ def notify_task_health_failed(task_id: int):
     from notifications.services import notify
 
     try:
-        task = Task.objects.select_related('project__owner').get(pk=task_id)
+        task = Task.objects.select_related('owner').get(pk=task_id)
     except Task.DoesNotExist:
         logger.error('notify_task_health_failed: task %s not found', task_id)
         return
 
     notify(
-        user=task.project.owner,
+        user=task.owner,
         event=Notification.Event.TASK_HEALTH_FAILED,
         payload={
-            'task_id':    task.pk,
-            'task_type':  task.type,
-            'target_id':  task.target_id,
-            'project_id': task.project_id,
+            'task_id': task.pk,
+            'task_type': task.type,
+            'target_id': task.target_id,
+            'owner_id': task.owner_id,
         },
     )

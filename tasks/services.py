@@ -217,10 +217,7 @@ def soft_delete_task(task):
     Soft-delete a task:
     - Sets is_deleted=True.
     - Auto-fails all PENDING completions for this task.
-    - Re-evaluates the parent project state (may go INACTIVE if no tasks remain).
     """
-    from projects.services import set_project_state
-
     task.is_deleted = True
     task.save(update_fields=['is_deleted'])
 
@@ -228,8 +225,6 @@ def soft_delete_task(task):
         task=task,
         state=TaskCompletion.State.PENDING,
     ).update(state=TaskCompletion.State.FAILED)
-
-    set_project_state(task.project)
 
 
 # ---------------------------------------------------------------------------
@@ -239,21 +234,12 @@ def soft_delete_task(task):
 def on_task_created(task):
     """
     Called after a new task is saved.
-    - Clears project.archived_by (new task unarchive rule).
     - Runs upfront validity checks appropriate to the task type.
-    - Re-evaluates project state.
     """
-    from projects.services import set_project_state
-
-    # Unarchive: new task makes the project worth revisiting for all users.
-    task.project.archived_by.clear()
-
     # Upfront validity checks: invalid tasks are auto-hidden.
     if not is_task_configuration_valid(task):
         task.hidden = True
         task.save(update_fields=['hidden'])
-
-    set_project_state(task.project)
 
 
 def is_task_configuration_valid(task) -> bool:
@@ -362,21 +348,16 @@ def _check_webhook_domain_reachable(task) -> bool:
 def on_task_unhidden(task):
     """
     Called when a task's hidden flag is set back to False.
-    Selectively removes the project from archived_by for users who have NOT
-    already confirmed this task — giving them a reason to revisit.
-    Then re-evaluates project state (may go ACTIVE again).
+    Unarchives this task for users who have not already confirmed it.
     """
-    from projects.services import set_project_state
-
     completed_user_ids = TaskCompletion.objects.filter(
         task=task,
         state=TaskCompletion.State.CONFIRMED,
     ).values_list('tester_id', flat=True)
 
-    users_to_unarchive = task.project.archived_by.exclude(id__in=completed_user_ids)
-    task.project.archived_by.remove(*users_to_unarchive)
-
-    set_project_state(task.project)
+    users_to_unarchive = task.archived_by.exclude(id__in=completed_user_ids)
+    if users_to_unarchive:
+        task.archived_by.remove(*users_to_unarchive)
 
 
 # ---------------------------------------------------------------------------
@@ -466,16 +447,3 @@ def _github_headers() -> dict:
         headers['Authorization'] = f'Bearer {token}'
     return headers
 
-
-# ---------------------------------------------------------------------------
-# Task locking (used by projects/services.py)
-# ---------------------------------------------------------------------------
-def lock_tasks(project):
-    """
-    Locks all tasks for a project (e.g., when project is set to INACTIVE).
-    Sets hidden=True for all non-deleted tasks.
-    """
-    tasks = project.tasks.filter(is_deleted=False, hidden=False)
-    for task in tasks:
-        task.hidden = True
-        task.save(update_fields=["hidden"])

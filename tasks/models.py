@@ -1,7 +1,6 @@
 # tasks/models.py
 from django.db import models
 from accounts.models import User
-from projects.models import Project
 
 
 class Task(models.Model):
@@ -12,7 +11,7 @@ class Task(models.Model):
         PH_COMMENT  = 'PH_COMMENT'
         WEBHOOK     = 'WEBHOOK'
 
-    project        = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='tasks')
+    owner          = models.ForeignKey(User, on_delete=models.CASCADE, related_name='owned_tasks')
     type           = models.CharField(max_length=20, choices=Type.choices)
     description    = models.TextField()
     target_id      = models.CharField(max_length=500)
@@ -21,10 +20,11 @@ class Task(models.Model):
     tried_count    = models.PositiveIntegerField(default=0)
     is_deleted     = models.BooleanField(default=False)
     hidden         = models.BooleanField(default=False)
+    archived_by    = models.ManyToManyField(User, blank=True, related_name='archived_tasks')
     created_at     = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f'{self.project.name} — {self.type}'
+        return f'{self.owner.username} — {self.type}'
 
 
 class TaskCompletion(models.Model):
