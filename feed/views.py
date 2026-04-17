@@ -13,7 +13,8 @@ def _feed_queryset(user):
     Excludes projects owned by the viewing user.
     Excludes projects the viewing user has already archived (Done'd).
     """
-    from django.db.models import Sum
+    from django.db.models import Sum, Value
+    from django.db.models.functions import Coalesce
 
     qs = Project.objects.filter(state=Project.State.ACTIVE)
 
@@ -22,7 +23,7 @@ def _feed_queryset(user):
         qs = qs.exclude(archived_by=user)
 
     qs = qs.annotate(
-        owner_balance=Sum('owner__karma_transactions__delta')
+        owner_balance=Coalesce(Sum('owner__karma_transactions__delta'), Value(0))
     ).order_by('-owner_balance', 'created_at')
 
     return qs
@@ -80,13 +81,30 @@ def feed(request):
 
     # Show only live tasks to the tester.
     tasks = (
-        project.tasks.filter(is_deleted=False, hidden=False)
+        list(project.tasks.filter(is_deleted=False, hidden=False))
         if project else []
     )
 
+    # Build karma_rewards dict from PlatformConfig
+    from accounts.models import PlatformConfig
+    reward_keys = {
+        'GITHUB_STAR': 'karma_reward_github_star',
+        'GITHUB_FORK': 'karma_reward_github_fork',
+        'PH_COMMENT':  'karma_reward_ph',
+        'WEBHOOK':     'karma_reward_webhook',
+    }
+    configs = PlatformConfig.objects.filter(key__in=reward_keys.values())
+    config_map = {c.key: c.value for c in configs}
+    karma_rewards = {task_type: config_map.get(cfg_key, '?') for task_type, cfg_key in reward_keys.items()}
+
+    tasks_with_rewards = [
+        {'task': t, 'reward': karma_rewards.get(t.type, '?')}
+        for t in tasks
+    ]
+
     return render(request, 'feed/index.html', {
         'project':           project,
-        'tasks':             tasks,
+        'tasks_with_rewards': tasks_with_rewards,
         'completed_task_ids': completed_task_ids,
         'has_completion':    has_completion,
         'feed_empty':        project is None,

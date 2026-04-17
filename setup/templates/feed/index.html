@@ -11,15 +11,15 @@
   <h1>{{ project.name }}</h1>
   <p><a href="{{ project.url }}" target="_blank" rel="noopener">{{ project.url }}</a></p>
   <p>{{ project.description }}</p>
-  <p>by {{ project.owner.get_full_name|default:project.owner.username }}</p>
+  <p>by {{ project.owner.username }}</p>
+
 
   <h2>Tasks</h2>
   <ul>
-    {% for task in tasks %}
+    {% for item in tasks_with_rewards %}
       <li>
-        {{ task.get_type_display }}
-        — {{ task.karma_reward }} karma
-        {% if task.id in completed_task_ids %}✓{% endif %}
+        {{ item.task.get_type_display }} — {{ item.reward }} karma
+        {% if item.task.id in completed_task_ids %}✓{% endif %}
       </li>
     {% empty %}
       <li>No tasks yet.</li>

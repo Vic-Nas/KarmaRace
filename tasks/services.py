@@ -448,3 +448,17 @@ def _github_headers() -> dict:
     if token:
         headers['Authorization'] = f'Bearer {token}'
     return headers
+
+
+# ---------------------------------------------------------------------------
+# Task locking (used by projects/services.py)
+# ---------------------------------------------------------------------------
+def lock_tasks(project):
+    """
+    Locks all tasks for a project (e.g., when project is set to INACTIVE).
+    Sets hidden=True for all non-deleted tasks.
+    """
+    tasks = project.tasks.filter(is_deleted=False, hidden=False)
+    for task in tasks:
+        task.hidden = True
+        task.save(update_fields=["hidden"])

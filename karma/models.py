@@ -6,7 +6,6 @@ from accounts.models import User
 class KarmaTransaction(models.Model):
 
     class Reason(models.TextChoices):
-        WELCOME_GRANT    = 'WELCOME_GRANT'
         TASK_EARNED      = 'TASK_EARNED'
         TASK_COST        = 'TASK_COST'
         FLAG_UP_SENT     = 'FLAG_UP_SENT'
