@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Edit Task</h1>
+<p class="text-muted">Project: {{ project.name }}</p>
+
+<form method="post">
+  {% csrf_token %}
+
+  <div class="mb-3">
+    <label for="id_type" class="form-label">Type</label>
+    {{ form.type }}
+  </div>
+
+  <div class="mb-3">
+    <label for="id_target_id" class="form-label">Target</label>
+    {{ form.target_id }}
+    <div class="form-text">GitHub: <code>owner/repo</code> &nbsp;·&nbsp; Product Hunt: post ID &nbsp;·&nbsp; Webhook: full URL</div>
+  </div>
+
+  <div class="mb-3" id="webhook-secret-row" style="display:none">
+    <label for="id_webhook_secret" class="form-label">Webhook secret <span class="text-muted">(optional)</span></label>
+    {{ form.webhook_secret }}
+  </div>
+
+  <div class="mb-3">
+    <label for="id_description" class="form-label">Instructions for testers</label>
+    {{ form.description }}
+  </div>
+
+  {% if form.errors %}
+    <div class="alert alert-danger">
+      {% for field in form %}{% for e in field.errors %}<div>{{ field.label }}: {{ e }}</div>{% endfor %}{% endfor %}
+      {% for e in form.non_field_errors %}<div>{{ e }}</div>{% endfor %}
+    </div>
+  {% endif %}
+
+  <button type="submit" class="btn btn-primary">Save Task</button>
+  <a href="{% url 'project_detail' project.slug %}" class="btn btn-outline-secondary">Cancel</a>
+</form>
+
+<script>
+  const typeSelect = document.getElementById('id_type');
+  const secretRow = document.getElementById('webhook-secret-row');
+  function toggleSecret() {
+    secretRow.style.display = typeSelect.value === 'WEBHOOK' ? '' : 'none';
+  }
+  typeSelect.addEventListener('change', toggleSecret);
+  toggleSecret();
+</script>
+{% endblock %}

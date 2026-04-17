@@ -9,17 +9,42 @@
   </span>
 </div>
 
-{% if project.url %}
-  <p><a href="{{ project.url }}" target="_blank" rel="noopener">{{ project.url }}</a></p>
-{% else %}
-  <p class="text-muted fst-italic">No URL yet — <a href="{% url 'project_edit' project.pk %}">add one</a></p>
-{% endif %}
+<div class="card mb-3">
+  <div class="card-body">
+    <h2 class="h6 mb-3">Quick Settings</h2>
+    <div class="row g-3">
+      <div class="col-md-7">
+        <form method="post" action="{% url 'project_update_url' project.slug %}" class="d-flex gap-2 align-items-start">
+          {% csrf_token %}
+          <div class="flex-grow-1">
+            <label for="id_url" class="form-label">Project URL</label>
+            {{ url_form.url }}
+          </div>
+          <button type="submit" class="btn btn-outline-primary mt-4">Save URL</button>
+        </form>
+      </div>
+      <div class="col-md-5">
+        <form method="post" action="{% url 'project_update_state' project.slug %}" class="d-flex gap-2 align-items-end">
+          {% csrf_token %}
+          <div class="flex-grow-1">
+            <label for="id_state" class="form-label">State</label>
+            {{ state_form.state }}
+          </div>
+          <button type="submit" class="btn btn-primary">Save State</button>
+        </form>
+      </div>
+    </div>
+    {% if project.url %}
+      <p class="mb-0 mt-3 small text-muted">Current: <a href="{{ project.url }}" target="_blank" rel="noopener">{{ project.url }}</a></p>
+    {% endif %}
+  </div>
+</div>
 
 {% if project.description %}
   <p>{{ project.description }}</p>
 {% endif %}
 
-<a href="{% url 'project_edit' project.pk %}" class="btn btn-sm btn-outline-secondary mb-4">Edit project details</a>
+<a href="{% url 'project_edit' project.slug %}" class="btn btn-sm btn-outline-secondary mb-4">Advanced Edit</a>
 
 <hr>
 
@@ -33,6 +58,13 @@
           <strong>{{ task.get_type_display }}</strong>
           <span class="text-muted small ms-2">{{ task.target_id }}</span><br>
           <small class="text-muted">{{ task.description }}</small>
+          <div class="mt-2 d-flex gap-2">
+            <a href="{% url 'task_edit' project.slug task.pk %}" class="btn btn-sm btn-outline-secondary">Edit</a>
+            <form method="post" action="{% url 'task_delete' project.slug task.pk %}" onsubmit="return confirm('Delete this task?')">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+            </form>
+          </div>
         </div>
         <div class="d-flex gap-1 flex-shrink-0 ms-2">
           {% if task.hidden %}<span class="badge bg-warning text-dark">Hidden</span>{% endif %}
@@ -46,7 +78,7 @@
 {% endif %}
 
 <h3 class="h6 mb-3">Add a task</h3>
-<form method="post" action="{% url 'task_create' project.pk %}">
+<form method="post" action="{% url 'task_create' project.slug %}">
   {% csrf_token %}
 
   <div class="mb-3">

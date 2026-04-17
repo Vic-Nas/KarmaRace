@@ -28,3 +28,19 @@ class ProjectEditForm(forms.ModelForm):
             'url': forms.URLInput(attrs={'class': 'form-control', 'placeholder': 'https://...'}),
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
         }
+
+
+class ProjectUrlForm(forms.ModelForm):
+    class Meta:
+        model = Project
+        fields = ['url']
+        widgets = {
+            'url': forms.URLInput(attrs={'class': 'form-control', 'placeholder': 'https://...'}),
+        }
+
+
+class ProjectStateForm(forms.Form):
+    state = forms.ChoiceField(
+        choices=Project.State.choices,
+        widget=forms.Select(attrs={'class': 'form-select'}),
+    )

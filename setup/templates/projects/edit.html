@@ -16,6 +16,11 @@
         Saved as <strong>Inactive</strong> — unhidden Webhook tasks require Pro.
         Hide them or <a href="{% url 'billing_upgrade' %}">upgrade</a>.
       </p>
+    {% elif activation_error == 'invalid_tasks' %}
+      <p>
+        Saved as <strong>Inactive</strong> — at least one visible task has an invalid target.
+        Fix or hide invalid tasks, then activate again.
+      </p>
     {% else %}
       <p>Saved as <strong>Inactive</strong> — could not activate ({{ activation_error }}).</p>
     {% endif %}
@@ -39,6 +44,6 @@
   </p>
 
   <button type="submit">Save Changes</button>
-  <a href="{% url 'project_detail' project.pk %}">Cancel</a>
+  <a href="{% url 'project_detail' project.slug %}">Cancel</a>
 </form>
 {% endblock %}

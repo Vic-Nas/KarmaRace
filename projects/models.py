@@ -1,5 +1,6 @@
 # projects/models.py
 from django.db import models
+from django.utils.text import slugify
 from accounts.models import User
 
 
@@ -11,6 +12,7 @@ class Project(models.Model):
 
     owner                = models.ForeignKey(User, on_delete=models.CASCADE, related_name='projects')
     name                 = models.CharField(max_length=120)
+    slug                 = models.SlugField(max_length=140, unique=True, blank=True)
     url                  = models.URLField()
     description          = models.TextField(max_length=500)
     state                = models.CharField(max_length=10, choices=State.choices, default=State.INACTIVE)
@@ -21,3 +23,15 @@ class Project(models.Model):
 
     def __str__(self):
         return self.name
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            base_slug = slugify(self.name)[:120] or 'project'
+            slug = base_slug
+            counter = 2
+            while Project.objects.filter(slug=slug).exclude(pk=self.pk).exists():
+                suffix = f'-{counter}'
+                slug = f'{base_slug[:140 - len(suffix)]}{suffix}'
+                counter += 1
+            self.slug = slug
+        super().save(*args, **kwargs)

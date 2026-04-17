@@ -10,6 +10,10 @@ def can_activate(project) -> tuple[bool, str]:
     Free users may not activate a project that has an unhidden webhook task —
     they must either hide it or upgrade to Pro.
     """
+    visible_tasks = project.tasks.filter(is_deleted=False, hidden=False)
+    if not visible_tasks.exists():
+        return False, 'no_tasks'
+
     if not project.owner.is_pro:
         has_unhidden_webhook = project.tasks.filter(
             type='WEBHOOK',
@@ -18,10 +22,17 @@ def can_activate(project) -> tuple[bool, str]:
         ).exists()
         if has_unhidden_webhook:
             return False, 'hide_or_upgrade'
+
+    from tasks.services import is_task_configuration_valid
+
+    for task in visible_tasks:
+        if not is_task_configuration_valid(task):
+            return False, 'invalid_tasks'
+
     return True, ''
 
 
-def set_project_state(project):
+def set_project_state(project, allow_activate=False):
     """
     Recomputes and applies the correct state for a project.
     Call after any task addition, task removal, or task hide/unhide.
@@ -37,23 +48,19 @@ def set_project_state(project):
 
     has_tasks = project.tasks.filter(is_deleted=False, hidden=False).exists()
 
-    if has_tasks:
-        ok, reason = can_activate(project)
-        if not ok:
-            # Activation blocked (e.g. unhidden webhook task on free account).
-            if project.state != Project.State.INACTIVE:
-                project.state            = Project.State.INACTIVE
-                project.went_inactive_at = timezone.now()
-                project.save(update_fields=['state', 'went_inactive_at'])
-            return
+    ok, _reason = can_activate(project)
 
-        if project.state != Project.State.ACTIVE:
-            project.state            = Project.State.ACTIVE
-            project.went_inactive_at = None
-            project.save(update_fields=['state', 'went_inactive_at'])
-            lock_tasks(project)
-    else:
-        if project.state != Project.State.INACTIVE:
-            project.state            = Project.State.INACTIVE
-            project.went_inactive_at = timezone.now()
-            project.save(update_fields=['state', 'went_inactive_at'])
+    should_be_active = allow_activate and has_tasks and ok
+    should_be_inactive = (not has_tasks) or (not ok)
+
+    if should_be_active and project.state != Project.State.ACTIVE:
+        project.state = Project.State.ACTIVE
+        project.went_inactive_at = None
+        project.save(update_fields=['state', 'went_inactive_at'])
+        return
+
+    if should_be_inactive and project.state != Project.State.INACTIVE:
+        project.state = Project.State.INACTIVE
+        project.went_inactive_at = timezone.now()
+        project.save(update_fields=['state', 'went_inactive_at'])
+        lock_tasks(project)

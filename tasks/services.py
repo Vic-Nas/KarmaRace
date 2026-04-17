@@ -248,26 +248,31 @@ def on_task_created(task):
     # Unarchive: new task makes the project worth revisiting for all users.
     task.project.archived_by.clear()
 
-    # Upfront validity checks (best-effort; failures are logged, not raised).
-    _run_creation_validity_check(task)
+    # Upfront validity checks: invalid tasks are auto-hidden.
+    if not is_task_configuration_valid(task):
+        task.hidden = True
+        task.save(update_fields=['hidden'])
 
     set_project_state(task.project)
 
 
-def _run_creation_validity_check(task):
+def is_task_configuration_valid(task) -> bool:
     """
-    Ping external resources at task creation time to catch obvious mistakes early.
-    Failures are logged but do not block task creation.
+    Returns True when a task appears externally valid/reachable.
+    Used to gate activation and to auto-hide invalid tasks on creation/edit.
     """
     if task.type in (Task.Type.GITHUB_STAR, Task.Type.GITHUB_FORK):
-        _check_github_repo_public(task)
+        return _check_github_repo_public(task)
     elif task.type == Task.Type.PH_COMMENT:
-        _check_ph_post_exists(task)
+        return _check_ph_post_exists(task)
     elif task.type == Task.Type.WEBHOOK:
-        _check_webhook_domain_reachable(task)
+        return _check_webhook_domain_reachable(task)
+
+    logger.warning('is_task_configuration_valid: unknown task type %s', task.type)
+    return False
 
 
-def _check_github_repo_public(task):
+def _check_github_repo_public(task) -> bool:
     try:
         response = requests.get(
             f'https://api.github.com/repos/{task.target_id}',
@@ -280,16 +285,20 @@ def _check_github_repo_public(task):
                     'on_task_created: GitHub repo %s is private (task %s)',
                     task.target_id, task.pk,
                 )
+                return False
+            return True
         else:
             logger.warning(
                 'on_task_created: GitHub repo %s not found (task %s, status %s)',
                 task.target_id, task.pk, response.status_code,
             )
+            return False
     except requests.RequestException as exc:
         logger.error('on_task_created: GitHub check failed for task %s: %s', task.pk, exc)
+        return False
 
 
-def _check_ph_post_exists(task):
+def _check_ph_post_exists(task) -> bool:
     query = 'query($id: ID!) { post(id: $id) { id } }'
     try:
         response = requests.post(
@@ -307,11 +316,14 @@ def _check_ph_post_exists(task):
                 'on_task_created: PH post %s not found (task %s)',
                 task.target_id, task.pk,
             )
+            return False
+        return True
     except requests.RequestException as exc:
         logger.error('on_task_created: PH check failed for task %s: %s', task.pk, exc)
+        return False
 
 
-def _check_webhook_domain_reachable(task):
+def _check_webhook_domain_reachable(task) -> bool:
     """HEAD (fallback GET) the root domain of the webhook endpoint."""
     from urllib.parse import urlparse
     parsed = urlparse(task.target_id)
@@ -323,6 +335,8 @@ def _check_webhook_domain_reachable(task):
                 'on_task_created: webhook domain %s returned %s (task %s)',
                 root, response.status_code, task.pk,
             )
+            return False
+        return True
     except requests.RequestException:
         try:
             response = requests.get(root, timeout=10, allow_redirects=True)
@@ -331,11 +345,14 @@ def _check_webhook_domain_reachable(task):
                     'on_task_created: webhook domain %s returned %s (task %s)',
                     root, response.status_code, task.pk,
                 )
+                return False
+            return True
         except requests.RequestException as exc:
             logger.warning(
                 'on_task_created: webhook domain %s unreachable (task %s): %s',
                 root, task.pk, exc,
             )
+            return False
 
 
 # ---------------------------------------------------------------------------
