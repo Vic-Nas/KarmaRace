@@ -34,19 +34,25 @@
 
 <div class="mb-4">
   <h2 class="h5">API Calls and Expected Return</h2>
-  <p>When a webhook task is checked, KarmaRace sends:</p>
+  <p>When a webhook task is checked (and during publish health checks), KarmaRace sends:</p>
   <pre class="bg-light border rounded p-3"><code>POST {task.target_id}
 Content-Type: application/json
 Authorization: Bearer {task.webhook_secret}  # only if secret is set
 
 {
-  "task_slug": "webhook-123-https-example-com-verify",
+  "task_slug": "webhook-vic-https-example-com-verify",
   "platform_username": "tester_username"
 }</code></pre>
 
   <p>Expected response:</p>
   <pre class="bg-light border rounded p-3"><code>{
   "verified": true
+}</code></pre>
+
+  <p>or</p>
+
+  <pre class="bg-light border rounded p-3"><code>{
+  "verified": false
 }</code></pre>
 
   <p>If verification fails, KarmaRace reports Sent/Expected/Got diagnostics to help debugging.</p>

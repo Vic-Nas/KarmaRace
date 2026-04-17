@@ -6,7 +6,7 @@ from django.views.decorators.http import require_POST
 
 from .forms import TaskForm
 from .models import Task
-from .services import on_task_created, on_task_unhidden, soft_delete_task, is_task_configuration_valid
+from .services import on_task_created, on_task_unhidden, soft_delete_task
 from .services import get_task_configuration_failure
 
 
@@ -23,6 +23,7 @@ def task_create(request):
     if request.method == 'POST' and form.is_valid():
         task = form.save(commit=False)
         task.owner = request.user
+        task.hidden = True
         if task.type != Task.Type.WEBHOOK:
             task.webhook_secret = ''
         task.save()
@@ -40,8 +41,6 @@ def task_create(request):
 @login_required
 def task_edit(request, task_pk):
     task = get_object_or_404(Task, pk=task_pk, owner=request.user, is_deleted=False)
-
-    was_hidden = task.hidden
     form = TaskForm(request.POST or None, instance=task)
 
     if request.method == 'POST' and form.is_valid():
@@ -50,15 +49,7 @@ def task_edit(request, task_pk):
             task.webhook_secret = ''
         task.save()
 
-        if is_task_configuration_valid(task):
-            if was_hidden and task.hidden:
-                task.hidden = False
-                task.save(update_fields=['hidden'])
-                on_task_unhidden(task)
-        else:
-            if not task.hidden:
-                task.hidden = True
-                task.save(update_fields=['hidden'])
+        # Save/edit should not auto-publish. Keep hidden state untouched here.
 
         return redirect('my_tasks')
 

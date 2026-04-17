@@ -305,7 +305,11 @@ def get_task_configuration_failure(task):
         pro_gate = _check_webhook_owner_plan_detailed(task)
         if pro_gate is not None:
             return pro_gate
-        return _check_webhook_domain_reachable_detailed(task)
+        detail = _check_webhook_endpoint_contract_detailed(task)
+        if detail is not None:
+            logger.warning('webhook validation failed for task %s: %s', task.pk, detail)
+            return _webhook_user_facing_reason(detail)
+        return None
 
     logger.warning('is_task_configuration_valid: unknown task type %s', task.type)
     return 'Unknown task type.'
@@ -432,8 +436,8 @@ def _matches_ph_user(edge, ph_user_id, ph_username):
     return False
 
 
-def _check_webhook_domain_reachable_detailed(task):
-    """HEAD (fallback GET) the root domain of the webhook endpoint."""
+def _check_webhook_endpoint_contract_detailed(task):
+    """POST probe payload and require JSON with boolean 'verified'."""
     from urllib.parse import urlparse
     parsed = urlparse(task.target_id)
     if not parsed.scheme or not parsed.netloc:
@@ -443,50 +447,62 @@ def _check_webhook_domain_reachable_detailed(task):
             'Expected: full http/https URL; '
             'Got: missing scheme or host.'
         )
-    root   = f'{parsed.scheme}://{parsed.netloc}/'
-
-    expected = 'host reachable (HEAD/GET to root URL) with status < 500'
+    probe_slug = _task_slug(task)
+    expected = '{"verified": true|false}'
+    payload = {
+        'task_slug': probe_slug,
+        'platform_username': 'probe-user',
+    }
+    headers = {'Content-Type': 'application/json'}
+    if task.webhook_secret:
+        headers['Authorization'] = f'Bearer {task.webhook_secret}'
 
     try:
-        response = requests.head(root, timeout=10, allow_redirects=True)
-        if response.status_code >= 500:
-            logger.warning(
-                'on_task_created: webhook domain %s returned %s (task %s)',
-                root, response.status_code, task.pk,
-            )
-            return (
-                'Webhook host validation failed. '
-                f'Sent: HEAD {root}; '
-                f'Expected: {expected}; '
-                f'Got: status {response.status_code}.'
-            )
-        return None
-    except requests.RequestException as head_exc:
+        response = requests.post(
+            task.target_id,
+            json=payload,
+            headers=headers,
+            timeout=10,
+        )
+        body = response.text
+
         try:
-            response = requests.get(root, timeout=10, allow_redirects=True)
-            if response.status_code >= 500:
-                logger.warning(
-                    'on_task_created: webhook domain %s returned %s (task %s)',
-                    root, response.status_code, task.pk,
-                )
-                return (
-                    'Webhook host validation failed. '
-                    f'Sent: GET {root} (HEAD fallback after error: {head_exc}); '
-                    f'Expected: {expected}; '
-                    f'Got: status {response.status_code}.'
-                )
-            return None
-        except requests.RequestException as exc:
-            logger.warning(
-                'on_task_created: webhook domain %s unreachable (task %s): %s',
-                root, task.pk, exc,
-            )
+            decoded = response.json()
+        except ValueError:
             return (
-                'Webhook host validation failed. '
-                f'Sent: HEAD {root}, then GET {root}; '
+                'Webhook endpoint contract check failed. '
+                f'Sent: POST {task.target_id} body={payload}; '
                 f'Expected: {expected}; '
-                f'Got: HEAD error={head_exc}; GET error={exc}.'
+                f'Got: status={response.status_code} non-JSON body={body[:300]}.'
             )
+
+        verified = decoded.get('verified', None)
+        if isinstance(verified, bool):
+            return None
+
+        return (
+            'Webhook endpoint contract check failed. '
+            f'Sent: POST {task.target_id} body={payload}; '
+            f'Expected: {expected}; '
+            f'Got: status={response.status_code} json={decoded}.'
+        )
+    except requests.RequestException as exc:
+        return (
+            'Webhook endpoint contract check failed. '
+            f'Sent: POST {task.target_id} body={payload}; '
+            f'Expected: {expected}; '
+            f'Got: request error={exc}.'
+        )
+
+
+def _webhook_user_facing_reason(detail):
+    if 'missing scheme or host' in detail:
+        return 'Webhook URL is invalid. Use a full http/https URL.'
+    if 'non-JSON body' in detail:
+        return 'Webhook endpoint must return JSON with "verified": true or false.'
+    if 'request error=' in detail:
+        return 'Webhook endpoint is unreachable from the server.'
+    return 'Webhook endpoint must return JSON with "verified": true or false.'
 
 
 def _check_webhook_owner_plan_detailed(task):
@@ -567,15 +583,7 @@ def _check_task_health(task) -> bool:
         elif task.type == Task.Type.WEBHOOK:
             if _check_webhook_owner_plan_detailed(task) is not None:
                 return False
-
-            from urllib.parse import urlparse
-            parsed = urlparse(task.target_id)
-            root   = f'{parsed.scheme}://{parsed.netloc}/'
-            try:
-                response = requests.head(root, timeout=10, allow_redirects=True)
-            except requests.RequestException:
-                response = requests.get(root, timeout=10, allow_redirects=True)
-            return response.status_code < 500
+            return _check_webhook_endpoint_contract_detailed(task) is None
 
     except requests.RequestException as exc:
         logger.error('run_health_check: request failed for task %s: %s', task.pk, exc)
@@ -661,7 +669,8 @@ def _task_slug(task):
     }
     platform = platform_map.get(task.type, 'task')
     target_component = _slug_component(task.target_id)
-    return f'{platform}-{task.pk}-{target_component}'
+    owner_component = _slug_component(getattr(task.owner, 'username', '') or 'owner')
+    return f'{platform}-{owner_component}-{target_component}'
 
 
 def _slug_component(raw):
