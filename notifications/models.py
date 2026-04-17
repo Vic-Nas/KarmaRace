@@ -10,8 +10,6 @@ class Notification(models.Model):
         KARMA_LOW          = 'KARMA_LOW'
         PROJECT_STATE      = 'PROJECT_STATE'
         APPRECIATION       = 'APPRECIATION'
-        PROMISE_ACCEPTED   = 'PROMISE_ACCEPTED'
-        PROMISE_BREACHED   = 'PROMISE_BREACHED'
         FLAG_UP_RECEIVED   = 'FLAG_UP_RECEIVED'
         FLAG_UP_SENT       = 'FLAG_UP_SENT'
 

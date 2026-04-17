@@ -27,14 +27,12 @@
   </div>
 
   <div>
-    <div class="small text-muted mb-1">Promise</div>
-    <div class="btn-group" role="group" aria-label="Promise filter">
-      <input type="radio" class="btn-check" name="promise" id="promise_with" value="with_promise" {% if promise == 'with_promise' %}checked{% endif %}>
-      <label class="btn btn-outline-dark btn-sm" for="promise_with">With Promise</label>
-
-      <input type="radio" class="btn-check" name="promise" id="promise_without" value="without_promise" {% if promise == 'without_promise' %}checked{% endif %}>
-      <label class="btn btn-outline-dark btn-sm" for="promise_without">Without Promise</label>
-    </div>
+    {% if obligation_mode %}
+      <div class="alert alert-warning py-2 mb-0">
+        You have {{ open_obligations_count }} open obligation{{ open_obligations_count|pluralize }}.
+        Feed is locked to tasks that satisfy what you owe.
+      </div>
+    {% endif %}
   </div>
 
   <div>
@@ -43,7 +41,11 @@
 </form>
 
 {% if feed_empty %}
-  <p>No more tasks to test right now.</p>
+  {% if obligation_mode %}
+    <p>No eligible tasks are currently available to clear your open obligations. Check back later.</p>
+  {% else %}
+    <p>No more tasks to test right now.</p>
+  {% endif %}
 
 {% else %}
   <h1>
@@ -63,15 +65,13 @@
       {% csrf_token %}
       <input type="hidden" name="completion" value="{{ completion }}">
       <input type="hidden" name="archive" value="{{ archive }}">
-      <input type="hidden" name="promise" value="{{ promise }}">
       <button type="submit" class="btn btn-primary">Check</button>
     </form>
     <form method="post" action="{% url 'feed_done' task.id %}">
       {% csrf_token %}
       <input type="hidden" name="completion" value="{{ completion }}">
       <input type="hidden" name="archive" value="{{ archive }}">
-      <input type="hidden" name="promise" value="{{ promise }}">
-      <button type="submit" class="btn btn-outline-secondary">Archive</button>
+      <button type="submit" class="btn btn-outline-secondary" {% if obligation_mode %}disabled{% endif %}>Archive</button>
     </form>
   </div>
 

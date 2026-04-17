@@ -19,7 +19,16 @@
     <li>Publish the task (must pass configuration and health checks).</li>
     <li>A tester opens the feed and presses Check.</li>
     <li>If verification succeeds, tester gains karma and owner pays the task reward.</li>
+    <li>Completion also settles or creates reciprocity obligations by task type.</li>
   </ol>
+</div>
+
+<div class="mb-4">
+  <h2 class="h5">Reciprocity Lock</h2>
+  <p>
+    Reciprocity is always on. If you have open obligations, your feed is automatically restricted to tasks that can satisfy them.
+    During this state, archive/skip is disabled until obligations are cleared.
+  </p>
 </div>
 
 <div class="mb-4">
@@ -72,7 +81,7 @@ Authorization: Bearer {task.webhook_secret}  # only if secret is set
     <li>Webhook tasks are Pro-only.</li>
     <li>GitHub repo is private or missing.</li>
     <li>Product Hunt slug is invalid or post not found.</li>
-    <li>Webhook host is unreachable or returns server errors.</li>
+    <li>Webhook endpoint is unreachable or does not return JSON with a boolean verified field.</li>
   </ul>
 </div>
 {% endblock %}

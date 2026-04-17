@@ -5,10 +5,10 @@ from django.urls import reverse
 from django.utils.http import urlencode
 from django.utils import timezone
 from django.views.decorators.http import require_POST
-from django.db.models import Sum, Value
+from django.db.models import Sum, Value, Q
 from django.db.models.functions import Coalesce
 
-from tasks.models import Task, TaskCompletion
+from tasks.models import Task, TaskCompletion, ReciprocityObligation
 
 
 def _expire_stale_cards_for_user(user):
@@ -32,34 +32,51 @@ def _expire_stale_cards_for_user(user):
         user.archived_tasks.add(*stale_ids)
 
 
-def _feed_queryset(user, completion='not_completed', archive='not_archived', promise='with_promise'):
+def _open_obligations(user):
+    if not user.is_authenticated:
+        return []
+    return list(
+        ReciprocityObligation.objects.filter(
+            debtor=user,
+            state=ReciprocityObligation.State.OPEN,
+        ).select_related('creditor')
+    )
+
+
+def _feed_queryset(user, completion='not_completed', archive='not_archived', obligations=None):
     """Visible tasks ranked by owner karma balance (descending)."""
     qs = Task.objects.filter(is_deleted=False, hidden=False).select_related('owner')
 
     if user.is_authenticated:
         qs = qs.exclude(owner=user)
 
-        if archive == 'not_archived':
-            qs = qs.exclude(archived_by=user)
-        elif archive == 'archived':
-            qs = qs.filter(archived_by=user)
+        if obligations:
+            allowed_pairs = Q(pk__in=[])
+            for item in obligations:
+                allowed_pairs |= Q(owner_id=item.creditor_id, type=item.task_type)
 
-        if completion == 'not_completed':
+            qs = qs.filter(allowed_pairs)
+            qs = qs.exclude(archived_by=user)
             qs = qs.exclude(
                 completions__tester=user,
                 completions__state=TaskCompletion.State.CONFIRMED,
             )
-        elif completion == 'completed':
-            qs = qs.filter(
-                completions__tester=user,
-                completions__state=TaskCompletion.State.CONFIRMED,
-            )
+        else:
+            if archive == 'not_archived':
+                qs = qs.exclude(archived_by=user)
+            elif archive == 'archived':
+                qs = qs.filter(archived_by=user)
 
-        # Promise dimension: standard verifiable tasks vs webhook tasks.
-        if promise == 'with_promise':
-            qs = qs.exclude(type=Task.Type.WEBHOOK)
-        elif promise == 'without_promise':
-            qs = qs.filter(type=Task.Type.WEBHOOK)
+            if completion == 'not_completed':
+                qs = qs.exclude(
+                    completions__tester=user,
+                    completions__state=TaskCompletion.State.CONFIRMED,
+                )
+            elif completion == 'completed':
+                qs = qs.filter(
+                    completions__tester=user,
+                    completions__state=TaskCompletion.State.CONFIRMED,
+                )
 
     qs = qs.annotate(
         owner_balance=Coalesce(Sum('owner__karma_transactions__delta'), Value(0))
@@ -68,11 +85,11 @@ def _feed_queryset(user, completion='not_completed', archive='not_archived', pro
     return qs
 
 
-def _get_feed_task(user, completion='not_completed', archive='not_archived', promise='with_promise'):
+def _get_feed_task(user, completion='not_completed', archive='not_archived', obligations=None):
     """Pick first healthy task candidate from the ranked task feed."""
     from tasks.services import run_health_check
 
-    qs = _feed_queryset(user, completion=completion, archive=archive, promise=promise)
+    qs = _feed_queryset(user, completion=completion, archive=archive, obligations=obligations)
 
     for task in qs.iterator():
         if run_health_check(task):
@@ -110,13 +127,13 @@ def feed(request):
 
     completion = request.GET.get('completion') or 'not_completed'
     archive = request.GET.get('archive') or 'not_archived'
-    promise = request.GET.get('promise') or 'with_promise'
+    obligations = _open_obligations(request.user)
 
     task = _get_feed_task(
         request.user,
         completion=completion,
         archive=archive,
-        promise=promise,
+        obligations=obligations,
     )
     completed_task_ids = set()
 
@@ -138,13 +155,14 @@ def feed(request):
         'feed_empty': task is None,
         'completion': completion,
         'archive': archive,
-        'promise': promise,
+        'obligation_mode': bool(obligations),
+        'open_obligations_count': len(obligations),
     })
 
 
 def _redirect_to_feed_with_filters(request):
     params = {}
-    for key in ('completion', 'archive', 'promise'):
+    for key in ('completion', 'archive'):
         value = (request.POST.get(key) or '').strip()
         if value:
             params[key] = value
@@ -161,6 +179,10 @@ def done(request, task_id):
     if not request.user.is_authenticated:
         return redirect('account_login')
 
+    if _open_obligations(request.user):
+        messages.error(request, 'Archive is disabled while you have open obligations.')
+        return _redirect_to_feed_with_filters(request)
+
     task = get_object_or_404(Task, pk=task_id, is_deleted=False, hidden=False)
     if task.owner_id != request.user.id:
         task.archived_by.add(request.user)
@@ -176,7 +198,7 @@ def check(request, task_id):
 
     from karma.models import KarmaTransaction
     from karma.services import credit_karma, debit_karma
-    from tasks.services import verify_task_with_details
+    from tasks.services import verify_task_with_details, settle_or_create_obligation
 
     task = get_object_or_404(Task, pk=task_id, is_deleted=False, hidden=False)
     if task.owner_id == request.user.id:
@@ -211,6 +233,13 @@ def check(request, task_id):
                     reason=KarmaTransaction.Reason.TASK_COST,
                     related_object_id=task.pk,
                 )
+
+            settle_or_create_obligation(
+                actor=request.user,
+                counterparty=task.owner,
+                task_type=task.type,
+                completed_task=task,
+            )
 
             task.succeed_count += 1
             messages.success(request, detail or 'Task check passed. Reward applied.')

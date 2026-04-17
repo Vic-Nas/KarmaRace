@@ -1,10 +1,12 @@
 # tasks/services.py
 import logging
 import requests
+from django.db import transaction
+from django.utils import timezone
 
 from django.conf import settings
 
-from tasks.models import Task, TaskCompletion
+from tasks.models import Task, TaskCompletion, ReciprocityObligation
 
 logger = logging.getLogger(__name__)
 
@@ -270,6 +272,36 @@ def soft_delete_task(task):
         task=task,
         state=TaskCompletion.State.PENDING,
     ).update(state=TaskCompletion.State.FAILED)
+
+
+@transaction.atomic
+def settle_or_create_obligation(actor, counterparty, task_type, completed_task):
+    """Settle existing debt first; otherwise create reverse obligation."""
+    if actor.pk == counterparty.pk:
+        return None
+
+    debt = ReciprocityObligation.objects.select_for_update().filter(
+        debtor=actor,
+        creditor=counterparty,
+        task_type=task_type,
+        state=ReciprocityObligation.State.OPEN,
+    ).order_by('created_at').first()
+
+    if debt:
+        debt.state = ReciprocityObligation.State.FULFILLED
+        debt.fulfilled_by_task = completed_task
+        debt.fulfilled_at = timezone.now()
+        debt.save(update_fields=['state', 'fulfilled_by_task', 'fulfilled_at'])
+        return 'settled'
+
+    ReciprocityObligation.objects.create(
+        debtor=counterparty,
+        creditor=actor,
+        task_type=task_type,
+        state=ReciprocityObligation.State.OPEN,
+        source_task=completed_task,
+    )
+    return 'created'
 
 
 # ---------------------------------------------------------------------------
