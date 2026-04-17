@@ -12,6 +12,7 @@
   <a class="navbar-brand fw-bold" href="/">KarmaRace</a>
   <div class="ms-auto d-flex align-items-center gap-2">
     {% if user.is_authenticated %}
+      <a href="{% url 'my_tasks' %}" class="btn btn-sm btn-outline-primary">My Tasks</a>
       <span class="text-muted small">{{ user.username }}</span>
       <a href="{% url 'account_logout' %}" class="btn btn-sm btn-outline-secondary">Log out</a>
     {% else %}

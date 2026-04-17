@@ -41,10 +41,25 @@
 <script>
   const typeSelect = document.getElementById('id_type');
   const secretRow = document.getElementById('webhook-secret-row');
+  const descriptionInput = document.getElementById('id_description');
+
   function toggleSecret() {
     secretRow.style.display = typeSelect.value === 'WEBHOOK' ? '' : 'none';
   }
+
+  function toggleDescription() {
+    const isWebhook = typeSelect.value === 'WEBHOOK';
+    descriptionInput.disabled = !isWebhook;
+    if (!isWebhook) {
+      descriptionInput.classList.add('bg-light');
+    } else {
+      descriptionInput.classList.remove('bg-light');
+    }
+  }
+
   typeSelect.addEventListener('change', toggleSecret);
+  typeSelect.addEventListener('change', toggleDescription);
   toggleSecret();
+  toggleDescription();
 </script>
 {% endblock %}
