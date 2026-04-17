@@ -2,7 +2,6 @@
 import logging
 import requests
 from django.db import transaction
-from django.utils import timezone
 
 from django.conf import settings
 
@@ -288,10 +287,7 @@ def settle_or_create_obligation(actor, counterparty, task_type, completed_task):
     ).order_by('created_at').first()
 
     if debt:
-        debt.state = ReciprocityObligation.State.FULFILLED
-        debt.fulfilled_by_task = completed_task
-        debt.fulfilled_at = timezone.now()
-        debt.save(update_fields=['state', 'fulfilled_by_task', 'fulfilled_at'])
+        debt.delete()
         return 'settled'
 
     ReciprocityObligation.objects.create(

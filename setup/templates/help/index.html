@@ -19,15 +19,16 @@
     <li>Publish the task (must pass configuration and health checks).</li>
     <li>A tester opens the feed and presses Check.</li>
     <li>If verification succeeds, tester gains karma and owner pays the task reward.</li>
-    <li>Completion also settles or creates reciprocity obligations by task type.</li>
+    <li>Completion also settles or creates reciprocity obligations by task type (settled obligations are removed).</li>
   </ol>
 </div>
 
 <div class="mb-4">
   <h2 class="h5">Reciprocity Lock</h2>
   <p>
-    Reciprocity is always on. If you have open obligations, your feed is automatically restricted to tasks that can satisfy them.
-    During this state, archive/skip is disabled until obligations are cleared.
+    Reciprocity is always on. If you have open obligations and matching cards are currently available,
+    your feed is restricted to tasks that can satisfy those obligations, and archive/skip is disabled.
+    If no matching obligation card is available, feed falls back to normal cards.
   </p>
 </div>
 

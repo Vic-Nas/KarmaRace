@@ -43,6 +43,20 @@ def _open_obligations(user):
     )
 
 
+def _active_lock_obligations(user, obligations):
+    """Enforce lock only when at least one actionable obligation card exists."""
+    if not obligations:
+        return []
+
+    candidate = _get_feed_task(
+        user,
+        completion='not_completed',
+        archive='not_archived',
+        obligations=obligations,
+    )
+    return obligations if candidate else []
+
+
 def _feed_queryset(user, completion='not_completed', archive='not_archived', obligations=None):
     """Visible tasks ranked by owner karma balance (descending)."""
     qs = Task.objects.filter(is_deleted=False, hidden=False).select_related('owner')
@@ -127,7 +141,7 @@ def feed(request):
 
     completion = request.GET.get('completion') or 'not_completed'
     archive = request.GET.get('archive') or 'not_archived'
-    obligations = _open_obligations(request.user)
+    obligations = _active_lock_obligations(request.user, _open_obligations(request.user))
 
     task = _get_feed_task(
         request.user,
@@ -179,7 +193,8 @@ def done(request, task_id):
     if not request.user.is_authenticated:
         return redirect('account_login')
 
-    if _open_obligations(request.user):
+    obligations = _active_lock_obligations(request.user, _open_obligations(request.user))
+    if obligations:
         messages.error(request, 'Archive is disabled while you have open obligations.')
         return _redirect_to_feed_with_filters(request)
 
