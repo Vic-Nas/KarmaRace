@@ -12,4 +12,5 @@ urlpatterns = [
     path('', include('feed.urls')),
     path('', include('accounts.urls')),
     path('projects/', include('projects.urls')),
+    path('tasks/', include('tasks.urls')),
 ]

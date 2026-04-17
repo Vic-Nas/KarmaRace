@@ -1,45 +1,92 @@
-{# projects/templates/projects/detail.html #}
+{# setup/templates/projects/detail.html #}
 {% extends "base.html" %}
-
 {% block content %}
-<h1>{{ project.name }}</h1>
-<p><a href="{{ project.url }}" target="_blank" rel="noopener">{{ project.url }}</a></p>
-<p>{{ project.description }}</p>
-<p>Status: <strong>{{ project.state }}</strong></p>
 
-<p>
-  <a href="{% url 'project_edit' project.pk %}">Edit project</a>
-</p>
+<div class="d-flex justify-content-between align-items-start mb-2">
+  <h1 class="mb-0">{{ project.name }}</h1>
+  <span class="badge {% if project.state == 'ACTIVE' %}bg-success{% else %}bg-secondary{% endif %} ms-3 mt-1">
+    {{ project.state }}
+  </span>
+</div>
 
-<h2>Tasks</h2>
+{% if project.url %}
+  <p><a href="{{ project.url }}" target="_blank" rel="noopener">{{ project.url }}</a></p>
+{% else %}
+  <p class="text-muted fst-italic">No URL yet — <a href="{% url 'project_edit' project.pk %}">add one</a></p>
+{% endif %}
+
+{% if project.description %}
+  <p>{{ project.description }}</p>
+{% endif %}
+
+<a href="{% url 'project_edit' project.pk %}" class="btn btn-sm btn-outline-secondary mb-4">Edit project details</a>
+
+<hr>
+
+<h2 class="h5 mb-3">Tasks</h2>
 
 {% if tasks %}
-  <ul>
+  <ul class="list-group mb-4">
     {% for task in tasks %}
-      <li>
-        <strong>{{ task.get_type_display }}</strong>
-        {% if task.hidden %}
-          — <span class="badge badge--hidden">Hidden</span>
-          {% comment %}
-            hidden=True can mean either owner-hidden or system-hidden after a
-            health check failure. The owner can un-hide manually from their
-            dashboard (re-check endpoint). We surface the flag here without
-            distinguishing the cause; a later iteration can add a
-            `health_failed` boolean to the Task model if needed.
-          {% endcomment %}
-        {% endif %}
-        {% if task.is_deleted %}
-          — <span class="badge badge--deleted">Deleted</span>
-        {% endif %}
-        <br>
-        <small>{{ task.description }}</small>
+      <li class="list-group-item d-flex justify-content-between align-items-start">
+        <div>
+          <strong>{{ task.get_type_display }}</strong>
+          <span class="text-muted small ms-2">{{ task.target_id }}</span><br>
+          <small class="text-muted">{{ task.description }}</small>
+        </div>
+        <div class="d-flex gap-1 flex-shrink-0 ms-2">
+          {% if task.hidden %}<span class="badge bg-warning text-dark">Hidden</span>{% endif %}
+          {% if task.is_deleted %}<span class="badge bg-danger">Deleted</span>{% endif %}
+        </div>
       </li>
     {% endfor %}
   </ul>
 {% else %}
-  <p>No tasks yet. Add tasks so your project can go Active.</p>
+  <p class="text-muted">No tasks yet. Add one below — your project will go Active once it has a visible task.</p>
 {% endif %}
 
-{# Task creation form will be added in the tasks app iteration. #}
+<h3 class="h6 mb-3">Add a task</h3>
+<form method="post" action="{% url 'task_create' project.pk %}">
+  {% csrf_token %}
+
+  <div class="mb-3">
+    <label for="id_type" class="form-label">Type</label>
+    {{ task_form.type }}
+  </div>
+
+  <div class="mb-3">
+    <label for="id_target_id" class="form-label">Target</label>
+    {{ task_form.target_id }}
+    <div class="form-text">GitHub: <code>owner/repo</code> &nbsp;·&nbsp; Product Hunt: post ID &nbsp;·&nbsp; Webhook: full URL</div>
+  </div>
+
+  <div class="mb-3" id="webhook-secret-row" style="display:none">
+    <label for="id_webhook_secret" class="form-label">Webhook secret <span class="text-muted">(optional)</span></label>
+    {{ task_form.webhook_secret }}
+  </div>
+
+  <div class="mb-3">
+    <label for="id_description" class="form-label">Instructions for testers</label>
+    {{ task_form.description }}
+  </div>
+
+  {% if task_form.errors %}
+    <div class="alert alert-danger">
+      {% for field in task_form %}{% for e in field.errors %}<div>{{ field.label }}: {{ e }}</div>{% endfor %}{% endfor %}
+    </div>
+  {% endif %}
+
+  <button type="submit" class="btn btn-primary">Add Task</button>
+</form>
+
+<script>
+  const typeSelect = document.getElementById('id_type');
+  const secretRow = document.getElementById('webhook-secret-row');
+  function toggleSecret() {
+    secretRow.style.display = typeSelect.value === 'WEBHOOK' ? '' : 'none';
+  }
+  typeSelect.addEventListener('change', toggleSecret);
+  toggleSecret();
+</script>
 
 {% endblock %}
