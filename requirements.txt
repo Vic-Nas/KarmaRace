@@ -4,3 +4,4 @@ django
 django-environ
 environ
 whitenoise
+stripe

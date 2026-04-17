@@ -6,6 +6,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('accounts/', include('allauth.urls')),
     path('app/accounts/', include('accounts.urls')),
+    path('billing/', include('billing.urls')),
     path('help/', views.help_index, name='help_index'),
     path('legal/privacy/', views.legal_privacy, name='legal_privacy'),
     path('legal/terms/', views.legal_terms, name='legal_terms'),

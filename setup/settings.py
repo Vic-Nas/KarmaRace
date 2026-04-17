@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'django.contrib.sites',
 
     'accounts',
+    'billing',
 
     'allauth',
     'allauth.account',
