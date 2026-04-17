@@ -59,10 +59,10 @@ def debit_karma(user, delta: int, reason: str, related_object_id: int = None):
         return  # PlatformConfig missing — skip notification rather than crash
 
     if new_balance < threshold:
-        from notifications.services import fire_notification
+        from notifications.services import notify
         from notifications.models import Notification
 
-        fire_notification(
+        notify(
             user=user,
             event=Notification.Event.KARMA_LOW,
             payload={'balance': new_balance, 'threshold': threshold},

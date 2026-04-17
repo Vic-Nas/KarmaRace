@@ -50,7 +50,6 @@ INSTALLED_APPS = [
     'feed',
     'karma',
     'notifications',
-    'projects',
     'tasks',
 
     'procrastinate.contrib.django',

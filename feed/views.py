@@ -67,7 +67,6 @@ def feed(request):
     project = _get_feed_project(request.user)
 
     completed_task_ids = set()
-    has_completion = False
 
     if project and request.user.is_authenticated:
         completed_task_ids = set(
@@ -77,7 +76,6 @@ def feed(request):
                 state=TaskCompletion.State.CONFIRMED,
             ).values_list('task_id', flat=True)
         )
-        has_completion = bool(completed_task_ids)
 
     # Show only live tasks to the tester.
     tasks = (
@@ -106,7 +104,6 @@ def feed(request):
         'project':           project,
         'tasks_with_rewards': tasks_with_rewards,
         'completed_task_ids': completed_task_ids,
-        'has_completion':    has_completion,
         'feed_empty':        project is None,
     })
 

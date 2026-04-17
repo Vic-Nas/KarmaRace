@@ -8,8 +8,7 @@
 {% endif %}
 
 {% if feed_empty %}
-  <p>No more projects to test right now.</p>
-  {% comment %} <a href="{% url 'archive' %}">View your archive</a> — some projects may have tasks you haven't completed yet. {% endcomment %}
+  <p>No more tasks to test right now.</p>
 
 {% else %}
   <h1>{{ project.name }}</h1>
@@ -29,25 +28,6 @@
       <li>No tasks yet.</li>
     {% endfor %}
   </ul>
-
-  {% if has_completion %}
-    <h2>Leave an appreciation</h2>
-    <form method="post" action="{% url 'appreciation_create' project.id %}">
-      {% csrf_token %}
-      <textarea name="text" rows="3" placeholder="Your feedback..."></textarea>
-      <br>
-      <label>
-        Rating:
-        <select name="rating">
-          {% for i in "12345" %}<option value="{{ i }}">{{ i }}★</option>{% endfor %}
-        </select>
-      </label>
-      <br>
-      <label><input type="checkbox" name="anonymous"> Post anonymously</label>
-      <br>
-      <button type="submit">Submit</button>
-    </form>
-  {% endif %}
 
   <form method="post" action="{% url 'feed_done' project.id %}">
     {% csrf_token %}
