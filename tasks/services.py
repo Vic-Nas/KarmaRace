@@ -427,17 +427,21 @@ def _matches_ph_user(edge, ph_user_id, ph_username):
     return False
 
 
-def _check_webhook_domain_reachable(task) -> bool:
-    return _check_webhook_domain_reachable_detailed(task) is None
-
-
 def _check_webhook_domain_reachable_detailed(task):
     """HEAD (fallback GET) the root domain of the webhook endpoint."""
     from urllib.parse import urlparse
     parsed = urlparse(task.target_id)
     if not parsed.scheme or not parsed.netloc:
-        return 'Webhook target must be a valid URL (including http/https).'
+        return (
+            'Webhook target is invalid. '
+            f'Sent: {task.target_id}; '
+            'Expected: full http/https URL; '
+            'Got: missing scheme or host.'
+        )
     root   = f'{parsed.scheme}://{parsed.netloc}/'
+
+    expected = 'host reachable (HEAD/GET to root URL) with status < 500'
+
     try:
         response = requests.head(root, timeout=10, allow_redirects=True)
         if response.status_code >= 500:
@@ -445,9 +449,14 @@ def _check_webhook_domain_reachable_detailed(task):
                 'on_task_created: webhook domain %s returned %s (task %s)',
                 root, response.status_code, task.pk,
             )
-            return f'Webhook host is reachable but returned status {response.status_code}.'
+            return (
+                'Webhook host validation failed. '
+                f'Sent: HEAD {root}; '
+                f'Expected: {expected}; '
+                f'Got: status {response.status_code}.'
+            )
         return None
-    except requests.RequestException:
+    except requests.RequestException as head_exc:
         try:
             response = requests.get(root, timeout=10, allow_redirects=True)
             if response.status_code >= 500:
@@ -455,14 +464,24 @@ def _check_webhook_domain_reachable_detailed(task):
                     'on_task_created: webhook domain %s returned %s (task %s)',
                     root, response.status_code, task.pk,
                 )
-                return f'Webhook host is reachable but returned status {response.status_code}.'
+                return (
+                    'Webhook host validation failed. '
+                    f'Sent: GET {root} (HEAD fallback after error: {head_exc}); '
+                    f'Expected: {expected}; '
+                    f'Got: status {response.status_code}.'
+                )
             return None
         except requests.RequestException as exc:
             logger.warning(
                 'on_task_created: webhook domain %s unreachable (task %s): %s',
                 root, task.pk, exc,
             )
-            return f'Webhook host is unreachable: {exc}'
+            return (
+                'Webhook host validation failed. '
+                f'Sent: HEAD {root}, then GET {root}; '
+                f'Expected: {expected}; '
+                f'Got: HEAD error={head_exc}; GET error={exc}.'
+            )
 
 
 # ---------------------------------------------------------------------------
