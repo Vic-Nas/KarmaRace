@@ -1,11 +1,13 @@
 # tasks/views.py
 from django.contrib.auth.decorators import login_required
+from django.contrib import messages
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
 from .forms import TaskForm
 from .models import Task
 from .services import on_task_created, on_task_unhidden, soft_delete_task, is_task_configuration_valid
+from .services import get_task_configuration_failure
 
 
 @login_required
@@ -25,7 +27,7 @@ def task_create(request):
             task.webhook_secret = ''
         task.save()
         on_task_created(task)
-        return redirect('feed')
+        return redirect('my_tasks')
 
     return render(request, 'tasks/edit.html', {
         'task': None,
@@ -57,7 +59,7 @@ def task_edit(request, task_pk):
                 task.hidden = True
                 task.save(update_fields=['hidden'])
 
-        return redirect('feed')
+        return redirect('my_tasks')
 
     return render(request, 'tasks/edit.html', {
         'task': task,
@@ -90,7 +92,12 @@ def task_unpublish(request, task_pk):
 def task_publish(request, task_pk):
     task = get_object_or_404(Task, pk=task_pk, owner=request.user, is_deleted=False)
     if task.hidden:
-        task.hidden = False
-        task.save(update_fields=['hidden'])
-        on_task_unhidden(task)
+        reason = get_task_configuration_failure(task)
+        if reason is None:
+            task.hidden = False
+            task.save(update_fields=['hidden'])
+            on_task_unhidden(task)
+            messages.success(request, 'Task published.')
+        else:
+            messages.error(request, f'Cannot publish task: {reason}')
     return redirect('my_tasks')

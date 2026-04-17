@@ -3,6 +3,18 @@
 
 {% block content %}
 
+<form method="get" class="mb-3 d-flex gap-3 align-items-center">
+  <label class="form-check-label">
+    <input class="form-check-input me-1" type="checkbox" name="include_completed" value="1" {% if include_completed %}checked{% endif %}>
+    Include completed
+  </label>
+  <label class="form-check-label">
+    <input class="form-check-input me-1" type="checkbox" name="include_archived" value="1" {% if include_archived %}checked{% endif %}>
+    Include archived
+  </label>
+  <button type="submit" class="btn btn-sm btn-outline-secondary">Apply Filters</button>
+</form>
+
 {% if feed_empty %}
   <p>No more tasks to test right now.</p>
 
@@ -13,10 +25,16 @@
   <p><strong>Reward:</strong> {{ task_reward }} karma {% if task.id in completed_task_ids %}✓{% endif %}</p>
   <p class="text-muted">by {{ task.owner.username }}</p>
 
-  <form method="post" action="{% url 'feed_done' task.id %}">
-    {% csrf_token %}
-    <button type="submit">Done</button>
-  </form>
+  <div class="d-flex gap-2">
+    <form method="post" action="{% url 'feed_check' task.id %}">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-primary">Check</button>
+    </form>
+    <form method="post" action="{% url 'feed_done' task.id %}">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-outline-secondary">Archive</button>
+    </form>
+  </div>
 
   {% if request.user.is_authenticated and request.user.id == task.owner_id %}
     <div class="mt-3 d-flex gap-2">
