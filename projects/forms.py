@@ -1,7 +1,7 @@
-
 # projects/forms.py
 from django import forms
 from .models import Project
+
 
 class ProjectCreateForm(forms.ModelForm):
     class Meta:
@@ -10,6 +10,7 @@ class ProjectCreateForm(forms.ModelForm):
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'My Awesome App'}),
         }
+
 
 class ProjectEditForm(forms.ModelForm):
     activate = forms.BooleanField(
