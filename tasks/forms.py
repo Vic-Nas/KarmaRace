@@ -15,7 +15,7 @@ class TaskForm(forms.ModelForm):
             }),
             'target_id': forms.TextInput(attrs={
                 'class': 'form-control',
-                'placeholder': 'owner/repo  — or PH post ID  — or https://your-webhook.com/verify',
+                'placeholder': 'owner/repo  — or PH ID/slug/URL  — or https://your-webhook.com/verify',
             }),
             'webhook_secret': forms.TextInput(attrs={
                 'class': 'form-control',
@@ -27,7 +27,7 @@ class TaskForm(forms.ModelForm):
             'webhook_secret': 'Webhook secret (optional)',
         }
         help_texts = {
-            'target_id': 'GitHub: <code>owner/repo</code> &nbsp;·&nbsp; Product Hunt: post ID &nbsp;·&nbsp; Webhook: full URL',
+            'target_id': 'GitHub: <code>owner/repo</code> &nbsp;·&nbsp; Product Hunt: post ID, slug, or URL &nbsp;·&nbsp; Webhook: full URL',
             'type': '',
         }
 

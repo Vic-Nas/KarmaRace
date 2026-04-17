@@ -101,7 +101,7 @@ def verify_ph_with_details(task, tester):
     """
     Check Product Hunt upvote or comment presence via PH GraphQL API.
     Uses tester's stored access_token for user-scoped queries.
-    task.target_id must be the PH post numeric ID.
+    task.target_id may be a PH post numeric ID, slug, or producthunt.com URL.
 
     Either an upvote (isVoted) or a comment by the tester passes.
     Paginates through all comments using GraphQL cursor-based pagination.
@@ -113,8 +113,12 @@ def verify_ph_with_details(task, tester):
         return False, 'Your Product Hunt account is not linked.'
 
     access_token = linked.access_token
-    ph_user_id   = linked.platform_id
-    post_id      = task.target_id
+    ph_user_id = (linked.platform_id or '').strip()
+    ph_username = (linked.platform_username or '').strip().lower()
+
+    ok, post_vars, id_mode_reason = _resolve_ph_post_query_vars(task.target_id)
+    if not ok:
+        return False, id_mode_reason
 
     headers = {
         'Authorization': f'Bearer {access_token}',
@@ -122,17 +126,14 @@ def verify_ph_with_details(task, tester):
     }
 
     # First check isVoted — single cheap query, no pagination needed.
-    voted_query = """
-    query($postId: ID!) {
-      post(id: $postId) {
-        isVoted
-      }
-    }
-    """
+    voted_query = (
+        'query(' + _ph_query_signature(post_vars) + ') '
+        '{ post(' + _ph_query_arg(post_vars) + ') { isVoted } }'
+    )
     try:
         response = requests.post(
             'https://api.producthunt.com/v2/api/graphql',
-            json={'query': voted_query, 'variables': {'postId': post_id}},
+            json={'query': voted_query, 'variables': post_vars},
             headers=headers,
             timeout=10,
         )
@@ -140,8 +141,8 @@ def verify_ph_with_details(task, tester):
         data = response.json()
         post = data.get('data', {}).get('post')
         if not post:
-            logger.warning('verify_ph: post %s not found', post_id)
-            return False, 'Product Hunt post not found. Check post ID.'
+            logger.warning('verify_ph: post target %s not found', task.target_id)
+            return False, 'Product Hunt post not found. Use post ID, post slug, or a valid producthunt.com URL.'
         if post.get('isVoted'):
             return True, 'Verified Product Hunt upvote.'
     except requests.RequestException as exc:
@@ -149,23 +150,12 @@ def verify_ph_with_details(task, tester):
         return False, f'Product Hunt vote check failed: {exc}'
 
     # isVoted is False — check comments with cursor-based pagination.
-    comments_query = """
-    query($postId: ID!, $cursor: String) {
-      post(id: $postId) {
-        comments(first: 100, after: $cursor) {
-          edges {
-            node {
-              user { id }
-            }
-          }
-          pageInfo {
-            hasNextPage
-            endCursor
-          }
-        }
-      }
-    }
-    """
+    comments_query = (
+        'query(' + _ph_query_signature(post_vars, include_cursor=True) + ') '
+        '{ post(' + _ph_query_arg(post_vars) + ') '
+        '{ comments(first: 100, after: $cursor) '
+        '{ edges { node { user { id username } } } pageInfo { hasNextPage endCursor } } } }'
+    )
     cursor = None
     try:
         while True:
@@ -173,7 +163,7 @@ def verify_ph_with_details(task, tester):
                 'https://api.producthunt.com/v2/api/graphql',
                 json={
                     'query': comments_query,
-                    'variables': {'postId': post_id, 'cursor': cursor},
+                    'variables': {**post_vars, 'cursor': cursor},
                 },
                 headers=headers,
                 timeout=10,
@@ -183,10 +173,7 @@ def verify_ph_with_details(task, tester):
             comments = data.get('data', {}).get('post', {}).get('comments', {})
             edges    = comments.get('edges', [])
 
-            if any(
-                edge.get('node', {}).get('user', {}).get('id') == ph_user_id
-                for edge in edges
-            ):
+            if any(_matches_ph_user(edge, ph_user_id, ph_username) for edge in edges):
                 return True, 'Verified Product Hunt comment.'
 
             page_info = comments.get('pageInfo', {})
@@ -352,11 +339,15 @@ def _check_ph_post_exists(task) -> bool:
 
 
 def _check_ph_post_exists_detailed(task):
-    query = 'query($id: ID!) { post(id: $id) { id } }'
+    ok, post_vars, reason = _resolve_ph_post_query_vars(task.target_id)
+    if not ok:
+        return reason
+
+    query = f'query({ _ph_query_signature(post_vars) }) {{ post({ _ph_query_arg(post_vars) }) {{ id }} }}'
     try:
         response = requests.post(
             'https://api.producthunt.com/v2/api/graphql',
-            json={'query': query, 'variables': {'id': task.target_id}},
+            json={'query': query, 'variables': post_vars},
             headers={
                 'Authorization': f'Bearer {settings.PH_DEV_TOKEN}',
                 'Content-Type':  'application/json',
@@ -369,11 +360,59 @@ def _check_ph_post_exists_detailed(task):
                 'on_task_created: PH post %s not found (task %s)',
                 task.target_id, task.pk,
             )
-            return 'Product Hunt post not found. Check post ID.'
+            return 'Product Hunt post not found. Use post ID, post slug, or a valid producthunt.com URL.'
         return None
     except requests.RequestException as exc:
         logger.error('on_task_created: PH check failed for task %s: %s', task.pk, exc)
         return f'Product Hunt post check failed: {exc}'
+
+
+def _resolve_ph_post_query_vars(target):
+    """Return (ok, vars, reason). vars is {'postId': ...} or {'postSlug': ...}."""
+    raw = (target or '').strip()
+    if not raw:
+        return False, None, 'Product Hunt target is required.'
+
+    if raw.isdigit():
+        return True, {'postId': raw}, None
+
+    from urllib.parse import urlparse
+
+    candidate = raw
+    if raw.startswith('http://') or raw.startswith('https://'):
+        parsed = urlparse(raw)
+        if 'producthunt.com' not in parsed.netloc:
+            return False, None, 'Product Hunt URL must be from producthunt.com.'
+        segments = [seg for seg in parsed.path.split('/') if seg]
+        if not segments:
+            return False, None, 'Product Hunt URL is missing a slug.'
+        candidate = segments[-1]
+
+    # Accept slug-like identifiers from URL or direct input.
+    return True, {'postSlug': candidate}, None
+
+
+def _ph_query_signature(post_vars, include_cursor=False):
+    base = '$postId: ID!' if 'postId' in post_vars else '$postSlug: String!'
+    if include_cursor:
+        return f'{base}, $cursor: String'
+    return base
+
+
+def _ph_query_arg(post_vars):
+    return 'id: $postId' if 'postId' in post_vars else 'slug: $postSlug'
+
+
+def _matches_ph_user(edge, ph_user_id, ph_username):
+    user = edge.get('node', {}).get('user', {})
+    edge_id = (user.get('id') or '').strip()
+    edge_username = (user.get('username') or '').strip().lower()
+
+    if ph_user_id and edge_id and edge_id == ph_user_id:
+        return True
+    if ph_username and edge_username and edge_username == ph_username:
+        return True
+    return False
 
 
 def _check_webhook_domain_reachable(task) -> bool:
