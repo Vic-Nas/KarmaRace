@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'allauth.account',
     'allauth.socialaccount',
     'allauth.socialaccount.providers.google',
+    'allauth.socialaccount.providers.github',
 
     'feed',
     'karma',
@@ -147,6 +148,11 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 # Google
 GOOGLE_CLIENT_ID = env('GOOGLE_CLIENT_ID')
 GOOGLE_CLIENT_SECRET = env('GOOGLE_CLIENT_SECRET')
+
+# GitHub OAuth
+GITHUB_CLIENT_ID = env('GITHUB_CLIENT_ID', default='')
+GITHUB_CLIENT_SECRET = env('GITHUB_CLIENT_SECRET', default='')
+
 SOCIALACCOUNT_PROVIDERS = {
     'google': {
         'APP': {
@@ -154,7 +160,14 @@ SOCIALACCOUNT_PROVIDERS = {
             'secret': GOOGLE_CLIENT_SECRET,
         },
         'SCOPE': ['profile', 'email'],
-    }
+    },
+    'github': {
+        'APP': {
+            'client_id': GITHUB_CLIENT_ID,
+            'secret': GITHUB_CLIENT_SECRET,
+        },
+        'SCOPE': ['read:user'],
+    },
 }
 
 # Ads
@@ -173,6 +186,8 @@ RESEND_WEBHOOK_SECRET = os.environ.get('RESEND_WEBHOOK_SECRET', '')
 
 # PH
 PH_DEV_TOKEN = env('PH_DEV_TOKEN')
+PH_CLIENT_ID = env('PH_CLIENT_ID', default='')
+PH_CLIENT_SECRET = env('PH_CLIENT_SECRET', default='')
 
 # GitHub (server credential for GitHub API calls)
 GITHUB_TOKEN = os.environ.get('GITHUB_TOKEN', '')

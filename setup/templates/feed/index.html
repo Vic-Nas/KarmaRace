@@ -3,16 +3,43 @@
 
 {% block content %}
 
-<form method="get" class="mb-3 d-flex gap-3 align-items-center">
-  <label class="form-check-label">
-    <input class="form-check-input me-1" type="checkbox" name="include_completed" value="1" {% if include_completed %}checked{% endif %}>
-    Include completed
-  </label>
-  <label class="form-check-label">
-    <input class="form-check-input me-1" type="checkbox" name="include_archived" value="1" {% if include_archived %}checked{% endif %}>
-    Include archived
-  </label>
-  <button type="submit" class="btn btn-sm btn-outline-secondary">Apply Filters</button>
+<form method="get" class="mb-3 d-grid gap-3">
+  <div>
+    <div class="small text-muted mb-1">Completion</div>
+    <div class="btn-group" role="group" aria-label="Completion filter">
+      <input type="radio" class="btn-check" name="completion" id="completion_not_completed" value="not_completed" {% if completion == 'not_completed' %}checked{% endif %}>
+      <label class="btn btn-outline-primary btn-sm" for="completion_not_completed">Not Completed</label>
+
+      <input type="radio" class="btn-check" name="completion" id="completion_completed" value="completed" {% if completion == 'completed' %}checked{% endif %}>
+      <label class="btn btn-outline-primary btn-sm" for="completion_completed">Completed</label>
+    </div>
+  </div>
+
+  <div>
+    <div class="small text-muted mb-1">Archive</div>
+    <div class="btn-group" role="group" aria-label="Archive filter">
+      <input type="radio" class="btn-check" name="archive" id="archive_not_archived" value="not_archived" {% if archive == 'not_archived' %}checked{% endif %}>
+      <label class="btn btn-outline-secondary btn-sm" for="archive_not_archived">Not Archived</label>
+
+      <input type="radio" class="btn-check" name="archive" id="archive_archived" value="archived" {% if archive == 'archived' %}checked{% endif %}>
+      <label class="btn btn-outline-secondary btn-sm" for="archive_archived">Archived</label>
+    </div>
+  </div>
+
+  <div>
+    <div class="small text-muted mb-1">Promise</div>
+    <div class="btn-group" role="group" aria-label="Promise filter">
+      <input type="radio" class="btn-check" name="promise" id="promise_with" value="with_promise" {% if promise == 'with_promise' %}checked{% endif %}>
+      <label class="btn btn-outline-dark btn-sm" for="promise_with">With Promise</label>
+
+      <input type="radio" class="btn-check" name="promise" id="promise_without" value="without_promise" {% if promise == 'without_promise' %}checked{% endif %}>
+      <label class="btn btn-outline-dark btn-sm" for="promise_without">Without Promise</label>
+    </div>
+  </div>
+
+  <div>
+    <button type="submit" class="btn btn-sm btn-primary">Apply Filters</button>
+  </div>
 </form>
 
 {% if feed_empty %}
@@ -28,10 +55,16 @@
   <div class="d-flex gap-2">
     <form method="post" action="{% url 'feed_check' task.id %}">
       {% csrf_token %}
+      <input type="hidden" name="completion" value="{{ completion }}">
+      <input type="hidden" name="archive" value="{{ archive }}">
+      <input type="hidden" name="promise" value="{{ promise }}">
       <button type="submit" class="btn btn-primary">Check</button>
     </form>
     <form method="post" action="{% url 'feed_done' task.id %}">
       {% csrf_token %}
+      <input type="hidden" name="completion" value="{{ completion }}">
+      <input type="hidden" name="archive" value="{{ archive }}">
+      <input type="hidden" name="promise" value="{{ promise }}">
       <button type="submit" class="btn btn-outline-secondary">Archive</button>
     </form>
   </div>

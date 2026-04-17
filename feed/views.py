@@ -1,6 +1,9 @@
 # feed/views.py
 from django.contrib import messages
 from django.shortcuts import render, redirect, get_object_or_404
+from django.urls import reverse
+from django.utils.http import urlencode
+from django.utils import timezone
 from django.views.decorators.http import require_POST
 from django.db.models import Sum, Value
 from django.db.models.functions import Coalesce
@@ -8,19 +11,55 @@ from django.db.models.functions import Coalesce
 from tasks.models import Task, TaskCompletion
 
 
-def _feed_queryset(user, include_archived=False, include_completed=False):
+def _expire_stale_cards_for_user(user):
+    """Auto-archive cards older than 1 day when tester made no decision."""
+    if not user.is_authenticated:
+        return
+
+    cutoff = timezone.now() - timezone.timedelta(days=1)
+
+    stale_qs = (
+        Task.objects
+        .filter(is_deleted=False, hidden=False, created_at__lt=cutoff)
+        .exclude(owner=user)
+        .exclude(archived_by=user)
+        .exclude(completions__tester=user)
+        .distinct()
+    )
+
+    stale_ids = list(stale_qs.values_list('id', flat=True))
+    if stale_ids:
+        user.archived_tasks.add(*stale_ids)
+
+
+def _feed_queryset(user, completion='not_completed', archive='not_archived', promise='with_promise'):
     """Visible tasks ranked by owner karma balance (descending)."""
     qs = Task.objects.filter(is_deleted=False, hidden=False).select_related('owner')
 
     if user.is_authenticated:
         qs = qs.exclude(owner=user)
-        if not include_archived:
+
+        if archive == 'not_archived':
             qs = qs.exclude(archived_by=user)
-        if not include_completed:
+        elif archive == 'archived':
+            qs = qs.filter(archived_by=user)
+
+        if completion == 'not_completed':
             qs = qs.exclude(
                 completions__tester=user,
                 completions__state=TaskCompletion.State.CONFIRMED,
             )
+        elif completion == 'completed':
+            qs = qs.filter(
+                completions__tester=user,
+                completions__state=TaskCompletion.State.CONFIRMED,
+            )
+
+        # Promise dimension: standard verifiable tasks vs webhook tasks.
+        if promise == 'with_promise':
+            qs = qs.exclude(type=Task.Type.WEBHOOK)
+        elif promise == 'without_promise':
+            qs = qs.filter(type=Task.Type.WEBHOOK)
 
     qs = qs.annotate(
         owner_balance=Coalesce(Sum('owner__karma_transactions__delta'), Value(0))
@@ -29,11 +68,11 @@ def _feed_queryset(user, include_archived=False, include_completed=False):
     return qs
 
 
-def _get_feed_task(user, include_archived=False, include_completed=False):
+def _get_feed_task(user, completion='not_completed', archive='not_archived', promise='with_promise'):
     """Pick first healthy task candidate from the ranked task feed."""
     from tasks.services import run_health_check
 
-    qs = _feed_queryset(user, include_archived=include_archived, include_completed=include_completed)
+    qs = _feed_queryset(user, completion=completion, archive=archive, promise=promise)
 
     for task in qs.iterator():
         if run_health_check(task):
@@ -67,13 +106,17 @@ def _reward_for_task(task):
 
 
 def feed(request):
-    include_archived = request.GET.get('include_archived') == '1'
-    include_completed = request.GET.get('include_completed') == '1'
+    _expire_stale_cards_for_user(request.user)
+
+    completion = request.GET.get('completion') or 'not_completed'
+    archive = request.GET.get('archive') or 'not_archived'
+    promise = request.GET.get('promise') or 'with_promise'
 
     task = _get_feed_task(
         request.user,
-        include_archived=include_archived,
-        include_completed=include_completed,
+        completion=completion,
+        archive=archive,
+        promise=promise,
     )
     completed_task_ids = set()
 
@@ -93,9 +136,23 @@ def feed(request):
         'task_reward': karma_rewards.get(task.type, '?') if task else '?',
         'completed_task_ids': completed_task_ids,
         'feed_empty': task is None,
-        'include_archived': include_archived,
-        'include_completed': include_completed,
+        'completion': completion,
+        'archive': archive,
+        'promise': promise,
     })
+
+
+def _redirect_to_feed_with_filters(request):
+    params = {}
+    for key in ('completion', 'archive', 'promise'):
+        value = (request.POST.get(key) or '').strip()
+        if value:
+            params[key] = value
+
+    url = reverse('feed')
+    if params:
+        return redirect(f'{url}?{urlencode(params)}')
+    return redirect(url)
 
 
 @require_POST
@@ -108,7 +165,7 @@ def done(request, task_id):
     if task.owner_id != request.user.id:
         task.archived_by.add(request.user)
 
-    return redirect('feed')
+    return _redirect_to_feed_with_filters(request)
 
 
 @require_POST
@@ -165,4 +222,4 @@ def check(request, task_id):
         messages.error(request, detail or 'Task check failed. Please verify target/action and try again.')
 
     task.save(update_fields=['tried_count', 'succeed_count'])
-    return redirect('feed')
+    return _redirect_to_feed_with_filters(request)

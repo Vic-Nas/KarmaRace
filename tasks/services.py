@@ -101,7 +101,7 @@ def verify_ph_with_details(task, tester):
     """
     Check Product Hunt upvote or comment presence via PH GraphQL API.
     Uses tester's stored access_token for user-scoped queries.
-    task.target_id may be a PH post numeric ID, slug, or producthunt.com URL.
+    task.target_id must be a PH post slug.
 
     Either an upvote (isVoted) or a comment by the tester passes.
     Paginates through all comments using GraphQL cursor-based pagination.
@@ -142,7 +142,7 @@ def verify_ph_with_details(task, tester):
         post = data.get('data', {}).get('post')
         if not post:
             logger.warning('verify_ph: post target %s not found', task.target_id)
-            return False, 'Product Hunt post not found. Use post ID, post slug, or a valid producthunt.com URL.'
+            return False, 'Product Hunt post not found. Use post slug.'
         if post.get('isVoted'):
             return True, 'Verified Product Hunt upvote.'
     except requests.RequestException as exc:
@@ -360,7 +360,7 @@ def _check_ph_post_exists_detailed(task):
                 'on_task_created: PH post %s not found (task %s)',
                 task.target_id, task.pk,
             )
-            return 'Product Hunt post not found. Use post ID, post slug, or a valid producthunt.com URL.'
+            return 'Product Hunt post not found. Use post slug.'
         return None
     except requests.RequestException as exc:
         logger.error('on_task_created: PH check failed for task %s: %s', task.pk, exc)
@@ -368,39 +368,37 @@ def _check_ph_post_exists_detailed(task):
 
 
 def _resolve_ph_post_query_vars(target):
-    """Return (ok, vars, reason). vars is {'postId': ...} or {'postSlug': ...}."""
+    """Return (ok, vars, reason). vars is {'postSlug': ...}."""
     raw = (target or '').strip()
     if not raw:
         return False, None, 'Product Hunt target is required.'
 
-    if raw.isdigit():
-        return True, {'postId': raw}, None
-
-    from urllib.parse import urlparse
-
-    candidate = raw
     if raw.startswith('http://') or raw.startswith('https://'):
-        parsed = urlparse(raw)
-        if 'producthunt.com' not in parsed.netloc:
-            return False, None, 'Product Hunt URL must be from producthunt.com.'
-        segments = [seg for seg in parsed.path.split('/') if seg]
-        if not segments:
-            return False, None, 'Product Hunt URL is missing a slug.'
-        candidate = segments[-1]
+        return False, None, 'Use Product Hunt post slug only (no URL).'
 
-    # Accept slug-like identifiers from URL or direct input.
+    if raw.isdigit():
+        return False, None, 'Use Product Hunt post slug only (no numeric ID).'
+
+    candidate = raw.strip().lower()
+    if not candidate:
+        return False, None, 'Product Hunt slug is required.'
+
+    # Keep slug validation intentionally simple for now.
+    if any(ch.isspace() for ch in candidate):
+        return False, None, 'Product Hunt slug must not contain spaces.'
+
     return True, {'postSlug': candidate}, None
 
 
 def _ph_query_signature(post_vars, include_cursor=False):
-    base = '$postId: ID!' if 'postId' in post_vars else '$postSlug: String!'
+    base = '$postSlug: String!'
     if include_cursor:
         return f'{base}, $cursor: String'
     return base
 
 
 def _ph_query_arg(post_vars):
-    return 'id: $postId' if 'postId' in post_vars else 'slug: $postSlug'
+    return 'slug: $postSlug'
 
 
 def _matches_ph_user(edge, ph_user_id, ph_username):
@@ -506,10 +504,13 @@ def _check_task_health(task) -> bool:
             return not response.json().get('private', True)
 
         elif task.type == Task.Type.PH_COMMENT:
-            query = 'query($id: ID!) { post(id: $id) { id } }'
+            ok, post_vars, _ = _resolve_ph_post_query_vars(task.target_id)
+            if not ok:
+                return False
+            query = 'query($postSlug: String!) { post(slug: $postSlug) { id } }'
             response = requests.post(
                 'https://api.producthunt.com/v2/api/graphql',
-                json={'query': query, 'variables': {'id': task.target_id}},
+                json={'query': query, 'variables': post_vars},
                 headers={
                     'Authorization': f'Bearer {settings.PH_DEV_TOKEN}',
                     'Content-Type':  'application/json',
