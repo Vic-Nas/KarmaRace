@@ -1,0 +1,55 @@
+{# /setup/templates/feed/index.html #}
+{% extends "base.html" %}
+
+{% block content %}
+
+{% if feed_empty %}
+  <p>No more projects to test right now.</p>
+  <a href="{% url 'archive' %}">View your archive</a> — some projects may have tasks you haven't completed yet.
+
+{% else %}
+  <h1>{{ project.name }}</h1>
+  <p><a href="{{ project.url }}" target="_blank" rel="noopener">{{ project.url }}</a></p>
+  <p>{{ project.description }}</p>
+  <p>by {{ project.owner.get_full_name|default:project.owner.username }}</p>
+
+  <h2>Tasks</h2>
+  <ul>
+    {% for task in tasks %}
+      <li>
+        {{ task.get_type_display }}
+        — {{ task.karma_reward }} karma
+        {% if task.id in completed_task_ids %}✓{% endif %}
+      </li>
+    {% empty %}
+      <li>No tasks yet.</li>
+    {% endfor %}
+  </ul>
+
+  {% if has_completion %}
+    <h2>Leave an appreciation</h2>
+    <form method="post" action="{% url 'appreciation_create' project.id %}">
+      {% csrf_token %}
+      <textarea name="text" rows="3" placeholder="Your feedback..."></textarea>
+      <br>
+      <label>
+        Rating:
+        <select name="rating">
+          {% for i in "12345" %}<option value="{{ i }}">{{ i }}★</option>{% endfor %}
+        </select>
+      </label>
+      <br>
+      <label><input type="checkbox" name="anonymous"> Post anonymously</label>
+      <br>
+      <button type="submit">Submit</button>
+    </form>
+  {% endif %}
+
+  <form method="post" action="{% url 'feed_done' project.id %}">
+    {% csrf_token %}
+    <button type="submit">Done</button>
+  </form>
+
+{% endif %}
+
+{% endblock %}

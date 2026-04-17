@@ -39,18 +39,21 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django.contrib.sites',
-    
+
     'accounts',
-    
+
     'allauth',
     'allauth.account',
     'allauth.socialaccount',
     'allauth.socialaccount.providers.google',
-    
+
     'feed',
     'karma',
+    'notifications',
     'projects',
     'tasks',
+
+    'procrastinate.contrib.django',
 ]
 
 SITE_ID = 1
@@ -73,8 +76,6 @@ MIDDLEWARE = [
     'allauth.account.middleware.AccountMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    
-    'allauth.account.middleware.AccountMiddleware',
 ]
 
 ROOT_URLCONF = 'setup.urls'
@@ -106,7 +107,6 @@ DATABASES = {
         default=os.environ.get('DATABASE_URL', f'sqlite:///{BASE_DIR / "db.sqlite3"}')
     )
 }
-
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -171,3 +171,16 @@ STRIPE_WEBHOOK_SECRET = env('STRIPE_WEBHOOK_SECRET')
 RESEND_API_KEY        = os.environ.get('RESEND_API_KEY')
 RESEND_FROM_EMAIL     = os.environ.get('RESEND_FROM_EMAIL', f'noreply@{DOMAIN}')
 RESEND_WEBHOOK_SECRET = os.environ.get('RESEND_WEBHOOK_SECRET', '')
+
+# PH
+PH_DEV_TOKEN = env('PH_DEV_TOKEN')
+
+# GitHub (server credential for GitHub API calls)
+GITHUB_TOKEN = os.environ.get('GITHUB_TOKEN', '')
+
+# Procrastinate (background jobs — uses the same Postgres DATABASE_URL)
+PROCRASTINATE_CONNECTORS = {
+    'default': {
+        'CONNECTOR': 'procrastinate.contrib.django.DjangoSyncConnector',
+    }
+}
