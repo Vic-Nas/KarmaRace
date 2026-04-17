@@ -1,10 +1,10 @@
 <div align="center">
-  <img src="setup/static/manual/assets/favicon.png" width="52" height="52" /><br/><br/>
-  <h2>KarmaRace</h2>
+  <a href="https://karmarace.com">
+    <img src="setup/static/manual/assets/favicon.png" width="52" height="52" />
+  </a>
+  <h2><a href="https://karmarace.com">KarmaRace</a></h2>
   <p>A reciprocity-based testing network for indie founders and startup builders.</p>
 </div>
-
-<br/>
 
 ---
 
@@ -21,7 +21,28 @@
 ## Task types
 
 <div align="center">
-  <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQwIiBoZWlnaHQ9IjkwIiB2aWV3Qm94PSIwIDAgNjQwIDkwIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgogIDxzdHlsZT4KICAgIC5jYXJkIHsgZmlsbDogIzE2MWIyMjsgc3Ryb2tlOiAjMzAzNjNkOyBzdHJva2Utd2lkdGg6IDE7IH0KICAgIC5wcm8tY2FyZCB7IGZpbGw6ICMwZDFmMTc7IHN0cm9rZTogIzFEOUU3NTsgc3Ryb2tlLXdpZHRoOiAxLjU7IH0KICAgIC5sYWJlbCB7IGZvbnQ6IDYwMCAxM3B4IHVpLXNhbnMtc2VyaWYsc3lzdGVtLXVpLHNhbnMtc2VyaWY7IGZpbGw6ICNlNmVkZjM7IH0KICAgIC5zdWIgeyBmb250OiA0MDAgMTJweCB1aS1zYW5zLXNlcmlmLHN5c3RlbS11aSxzYW5zLXNlcmlmOyBmaWxsOiAjOGI5NDllOyB9CiAgICAucHJvLXN1YiB7IGZvbnQ6IDUwMCAxMnB4IHVpLXNhbnMtc2VyaWYsc3lzdGVtLXVpLHNhbnMtc2VyaWY7IGZpbGw6ICMxRDlFNzU7IH0KICAgIC5iYWRnZSB7IGZpbGw6ICMwZjJkMWU7IH0KICAgIC5iYWRnZS10ZXh0IHsgZm9udDogNjAwIDEwcHggdWktc2Fucy1zZXJpZixzeXN0ZW0tdWksc2Fucy1zZXJpZjsgZmlsbDogIzFEOUU3NTsgfQogIDwvc3R5bGU+CiAgPHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjE5NiIgaGVpZ2h0PSI4MiIgcng9IjgiIGNsYXNzPSJjYXJkIi8+CiAgPHRleHQgeD0iMTYiIHk9IjI4IiBjbGFzcz0ibGFiZWwiPkdpdEh1YiBzdGFyIC8gZm9yazwvdGV4dD4KICA8dGV4dCB4PSIxNiIgeT0iNTAiIGNsYXNzPSJzdWIiPkZyZWUgdGllcjwvdGV4dD4KICA8cmVjdCB4PSIyMTYiIHk9IjAiIHdpZHRoPSIxOTYiIGhlaWdodD0iODIiIHJ4PSI4IiBjbGFzcz0iY2FyZCIvPgogIDx0ZXh0IHg9IjIzMiIgeT0iMjgiIGNsYXNzPSJsYWJlbCI+UHJvZHVjdCBIdW50PC90ZXh0PgogIDx0ZXh0IHg9IjIzMiIgeT0iNDYiIGNsYXNzPSJsYWJlbCI+Y29tbWVudCAmYW1wOyB1cHZvdGU8L3RleHQ+CiAgPHRleHQgeD0iMjMyIiB5PSI2NiIgY2xhc3M9InN1YiI+RnJlZSB0aWVyPC90ZXh0PgogIDxyZWN0IHg9IjQzMiIgeT0iMCIgd2lkdGg9IjE5NiIgaGVpZ2h0PSI4MiIgcng9IjgiIGNsYXNzPSJwcm8tY2FyZCIvPgogIDxyZWN0IHg9IjQ0OCIgeT0iMTIiIHdpZHRoPSIyOCIgaGVpZ2h0PSIxNyIgcng9IjQiIGNsYXNzPSJiYWRnZSIvPgogIDx0ZXh0IHg9IjQ1MiIgeT0iMjQuNSIgY2xhc3M9ImJhZGdlLXRleHQiPlBybzwvdGV4dD4KICA8dGV4dCB4PSI0NDgiIHk9IjUwIiBjbGFzcz0ibGFiZWwiPldlYmhvb2s8L3RleHQ+CiAgPHRleHQgeD0iNDQ4IiB5PSI2OCIgY2xhc3M9ImxhYmVsIj52ZXJpZmljYXRpb248L3RleHQ+Cjwvc3ZnPg==" alt="Task types" />
+<svg width="640" height="90" viewBox="0 0 640 90" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    .card { fill: #161b22; stroke: #30363d; stroke-width: 1; }
+    .pro-card { fill: #0d1f17; stroke: #1D9E75; stroke-width: 1.5; }
+    .label { font: 600 13px ui-sans-serif,system-ui,sans-serif; fill: #e6edf3; }
+    .sub { font: 400 12px ui-sans-serif,system-ui,sans-serif; fill: #8b949e; }
+    .badge { fill: #0f2d1e; }
+    .badge-text { font: 600 10px ui-sans-serif,system-ui,sans-serif; fill: #1D9E75; }
+  </style>
+  <rect x="0" y="0" width="196" height="82" rx="8" class="card"/>
+  <text x="16" y="28" class="label">GitHub star / fork</text>
+  <text x="16" y="50" class="sub">Free tier</text>
+  <rect x="222" y="0" width="196" height="82" rx="8" class="card"/>
+  <text x="238" y="28" class="label">Product Hunt</text>
+  <text x="238" y="46" class="label">comment &amp; upvote</text>
+  <text x="238" y="66" class="sub">Free tier</text>
+  <rect x="444" y="0" width="196" height="82" rx="8" class="pro-card"/>
+  <rect x="460" y="12" width="28" height="17" rx="4" class="badge"/>
+  <text x="464" y="24.5" class="badge-text">Pro</text>
+  <text x="460" y="50" class="label">Webhook</text>
+  <text x="460" y="68" class="label">verification</text>
+</svg>
 </div>
 
 <br/>
@@ -39,5 +60,31 @@
 ## Pricing
 
 <div align="center">
-  <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTAwIiBoZWlnaHQ9IjIyMCIgdmlld0JveD0iMCAwIDUwMCAyMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CiAgPHN0eWxlPgogICAgLmNhcmQgeyBmaWxsOiAjMTYxYjIyOyBzdHJva2U6ICMzMDM2M2Q7IHN0cm9rZS13aWR0aDogMTsgfQogICAgLnByby1jYXJkIHsgZmlsbDogIzBkMWYxNzsgc3Ryb2tlOiAjMUQ5RTc1OyBzdHJva2Utd2lkdGg6IDEuNTsgfQogICAgLnRpdGxlIHsgZm9udDogNjAwIDE1cHggdWktc2Fucy1zZXJpZixzeXN0ZW0tdWksc2Fucy1zZXJpZjsgZmlsbDogI2U2ZWRmMzsgfQogICAgLnByaWNlIHsgZm9udDogNDAwIDEycHggdWktc2Fucy1zZXJpZixzeXN0ZW0tdWksc2Fucy1zZXJpZjsgZmlsbDogIzhiOTQ5ZTsgfQogICAgLmZlYXQgeyBmb250OiA0MDAgMTNweCB1aS1zYW5zLXNlcmlmLHN5c3RlbS11aSxzYW5zLXNlcmlmOyBmaWxsOiAjYzlkMWQ5OyB9CiAgICAuY2hlY2sgeyBmb250OiA1MDAgMTNweCB1aS1zYW5zLXNlcmlmLHN5c3RlbS11aSxzYW5zLXNlcmlmOyBmaWxsOiAjMUQ5RTc1OyB9CiAgICAuYmFkZ2UgeyBmaWxsOiAjMGYyZDFlOyB9CiAgICAuYmFkZ2UtdGV4dCB7IGZvbnQ6IDYwMCAxMHB4IHVpLXNhbnMtc2VyaWYsc3lzdGVtLXVpLHNhbnMtc2VyaWY7IGZpbGw6ICMxRDlFNzU7IH0KICA8L3N0eWxlPgogIDxyZWN0IHg9IjAiIHk9IjAiIHdpZHRoPSIyMjgiIGhlaWdodD0iMjEyIiByeD0iMTAiIGNsYXNzPSJjYXJkIi8+CiAgPHRleHQgeD0iMjAiIHk9IjM0IiBjbGFzcz0idGl0bGUiPkZyZWU8L3RleHQ+CiAgPHRleHQgeD0iMjAiIHk9IjU0IiBjbGFzcz0icHJpY2UiPkFsd2F5cyBmcmVlPC90ZXh0PgogIDx0ZXh0IHg9IjIwIiB5PSI4NiIgIGNsYXNzPSJjaGVjayI+4pyTPC90ZXh0Pjx0ZXh0IHg9IjM2IiB5PSI4NiIgIGNsYXNzPSJmZWF0Ij5HaXRIdWIgc3RhciAmYW1wOyBmb3JrIHRhc2tzPC90ZXh0PgogIDx0ZXh0IHg9IjIwIiB5PSIxMTIiIGNsYXNzPSJjaGVjayI+4pyTPC90ZXh0Pjx0ZXh0IHg9IjM2IiB5PSIxMTIiIGNsYXNzPSJmZWF0Ij5Qcm9kdWN0IEh1bnQgdGFza3M8L3RleHQ+CiAgPHRleHQgeD0iMjAiIHk9IjEzOCIgY2xhc3M9ImNoZWNrIj7inJM8L3RleHQ+PHRleHQgeD0iMzYiIHk9IjEzOCIgY2xhc3M9ImZlYXQiPkthcm1hIGZlZWQgdmlzaWJpbGl0eTwvdGV4dD4KICA8cmVjdCB4PSIyNTIiIHk9IjAiIHdpZHRoPSIyNDgiIGhlaWdodD0iMjEyIiByeD0iMTAiIGNsYXNzPSJwcm8tY2FyZCIvPgogIDxyZWN0IHg9IjI3MiIgeT0iMTQiIHdpZHRoPSIyOCIgaGVpZ2h0PSIxNyIgcng9IjQiIGNsYXNzPSJiYWRnZSIvPgogIDx0ZXh0IHg9IjI3NiIgeT0iMjYuNSIgY2xhc3M9ImJhZGdlLXRleHQiPlBybzwvdGV4dD4KICA8dGV4dCB4PSIyNzIiIHk9IjU2IiBjbGFzcz0idGl0bGUiPlBybzwvdGV4dD4KICA8dGV4dCB4PSIyNzIiIHk9Ijc2IiBjbGFzcz0icHJpY2UiPlBhaWQgcGxhbjwvdGV4dD4KICA8dGV4dCB4PSIyNzIiIHk9IjEwOCIgY2xhc3M9ImNoZWNrIj7inJM8L3RleHQ+PHRleHQgeD0iMjg4IiB5PSIxMDgiIGNsYXNzPSJmZWF0Ij5FdmVyeXRoaW5nIGluIEZyZWU8L3RleHQ+CiAgPHRleHQgeD0iMjcyIiB5PSIxMzQiIGNsYXNzPSJjaGVjayI+4pyTPC90ZXh0Pjx0ZXh0IHg9IjI4OCIgeT0iMTM0IiBjbGFzcz0iZmVhdCI+V2ViaG9vayB0YXNrIHB1Ymxpc2hpbmc8L3RleHQ+CiAgPHRleHQgeD0iMjcyIiB5PSIxNjAiIGNsYXNzPSJjaGVjayI+4pyTPC90ZXh0Pjx0ZXh0IHg9IjI4OCIgeT0iMTYwIiBjbGFzcz0iZmVhdCI+QWR2YW5jZWQgbm90aWZpY2F0aW9uczwvdGV4dD4KICA8dGV4dCB4PSIyNzIiIHk9IjE4NiIgY2xhc3M9ImNoZWNrIj7inJM8L3RleHQ+PHRleHQgeD0iMjg4IiB5PSIxODYiIGNsYXNzPSJmZWF0Ij5Qcmlvcml0eSBmZWVkIHBsYWNlbWVudDwvdGV4dD4KPC9zdmc+" alt="Pricing" />
+<svg width="500" height="220" viewBox="0 0 500 220" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    .card { fill: #161b22; stroke: #30363d; stroke-width: 1; }
+    .pro-card { fill: #0d1f17; stroke: #1D9E75; stroke-width: 1.5; }
+    .title { font: 600 15px ui-sans-serif,system-ui,sans-serif; fill: #e6edf3; }
+    .price { font: 400 12px ui-sans-serif,system-ui,sans-serif; fill: #8b949e; }
+    .feat { font: 400 13px ui-sans-serif,system-ui,sans-serif; fill: #c9d1d9; }
+    .check { font: 500 13px ui-sans-serif,system-ui,sans-serif; fill: #1D9E75; }
+    .badge { fill: #0f2d1e; }
+    .badge-text { font: 600 10px ui-sans-serif,system-ui,sans-serif; fill: #1D9E75; }
+  </style>
+  <rect x="0" y="0" width="228" height="212" rx="10" class="card"/>
+  <text x="20" y="34" class="title">Free</text>
+  <text x="20" y="54" class="price">Always free</text>
+  <text x="20" y="86"  class="check">✓</text><text x="36" y="86"  class="feat">GitHub star &amp; fork tasks</text>
+  <text x="20" y="112" class="check">✓</text><text x="36" y="112" class="feat">Product Hunt tasks</text>
+  <text x="20" y="138" class="check">✓</text><text x="36" y="138" class="feat">Karma feed visibility</text>
+  <rect x="252" y="0" width="248" height="212" rx="10" class="pro-card"/>
+  <rect x="272" y="14" width="28" height="17" rx="4" class="badge"/>
+  <text x="276" y="26.5" class="badge-text">Pro</text>
+  <text x="272" y="56" class="title">Pro</text>
+  <text x="272" y="76" class="price">Paid plan</text>
+  <text x="272" y="108" class="check">✓</text><text x="288" y="108" class="feat">Everything in Free</text>
+  <text x="272" y="134" class="check">✓</text><text x="288" y="134" class="feat">Webhook task publishing</text>
+  <text x="272" y="160" class="check">✓</text><text x="288" y="160" class="feat">Advanced notifications</text>
+  <text x="272" y="186" class="check">✓</text><text x="288" y="186" class="feat">Priority feed placement</text>
+</svg>
 </div>
