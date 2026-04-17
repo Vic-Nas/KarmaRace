@@ -300,6 +300,9 @@ def get_task_configuration_failure(task):
     elif task.type == Task.Type.PH_COMMENT:
         return _check_ph_post_exists_detailed(task)
     elif task.type == Task.Type.WEBHOOK:
+        pro_gate = _check_webhook_owner_plan_detailed(task)
+        if pro_gate is not None:
+            return pro_gate
         return _check_webhook_domain_reachable_detailed(task)
 
     logger.warning('is_task_configuration_valid: unknown task type %s', task.type)
@@ -484,6 +487,12 @@ def _check_webhook_domain_reachable_detailed(task):
             )
 
 
+def _check_webhook_owner_plan_detailed(task):
+    if not getattr(task.owner, 'is_pro', False):
+        return 'Webhook tasks are Pro-only.'
+    return None
+
+
 # ---------------------------------------------------------------------------
 # Unhide hook
 # ---------------------------------------------------------------------------
@@ -554,6 +563,9 @@ def _check_task_health(task) -> bool:
             return bool(response.json().get('data', {}).get('post'))
 
         elif task.type == Task.Type.WEBHOOK:
+            if _check_webhook_owner_plan_detailed(task) is not None:
+                return False
+
             from urllib.parse import urlparse
             parsed = urlparse(task.target_id)
             root   = f'{parsed.scheme}://{parsed.netloc}/'

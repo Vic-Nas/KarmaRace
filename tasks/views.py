@@ -27,11 +27,6 @@ def task_create(request):
             task.webhook_secret = ''
         task.save()
 
-        if task.type == Task.Type.WEBHOOK and not request.user.is_pro:
-            task.hidden = True
-            task.save(update_fields=['hidden'])
-            messages.error(request, 'Webhook tasks are Pro-only and cannot be published on your current plan.')
-
         on_task_created(task)
         return redirect('my_tasks')
 
@@ -57,12 +52,9 @@ def task_edit(request, task_pk):
 
         if is_task_configuration_valid(task):
             if was_hidden and task.hidden:
-                if task.type == Task.Type.WEBHOOK and not request.user.is_pro:
-                    messages.error(request, 'Webhook tasks are Pro-only and cannot be published on your current plan.')
-                else:
-                    task.hidden = False
-                    task.save(update_fields=['hidden'])
-                    on_task_unhidden(task)
+                task.hidden = False
+                task.save(update_fields=['hidden'])
+                on_task_unhidden(task)
         else:
             if not task.hidden:
                 task.hidden = True
@@ -101,10 +93,6 @@ def task_unpublish(request, task_pk):
 def task_publish(request, task_pk):
     task = get_object_or_404(Task, pk=task_pk, owner=request.user, is_deleted=False)
     if task.hidden:
-        if task.type == Task.Type.WEBHOOK and not request.user.is_pro:
-            messages.error(request, 'Cannot publish task: Webhook tasks are Pro-only.')
-            return redirect('my_tasks')
-
         reason = get_task_configuration_failure(task)
         if reason is None:
             task.hidden = False
