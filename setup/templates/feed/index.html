@@ -1,7 +1,10 @@
 {# /setup/templates/feed/index.html #}
-{% extends "base.html" %}
 
 {% block content %}
+
+{% if request.user.is_authenticated %}
+  <a href="{% url 'project_create' %}">+ New Project</a>
+{% endif %}
 
 {% if feed_empty %}
   <p>No more projects to test right now.</p>
