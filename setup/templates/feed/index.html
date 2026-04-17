@@ -5,7 +5,7 @@
 
 {% if feed_empty %}
   <p>No more projects to test right now.</p>
-  <a href="{% url 'archive' %}">View your archive</a> — some projects may have tasks you haven't completed yet.
+  {% comment %} <a href="{% url 'archive' %}">View your archive</a> — some projects may have tasks you haven't completed yet. {% endcomment %}
 
 {% else %}
   <h1>{{ project.name }}</h1>
