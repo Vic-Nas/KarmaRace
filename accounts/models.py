@@ -29,3 +29,32 @@ class LinkedAccount(models.Model):
     # notifications app as NotificationPreference and NotificationDelivery.
     # Remove the migration for those models from accounts once the notifications
     # app migration is confirmed live.
+
+
+class UserPreference(models.Model):
+    """
+    Per-user overrides for PlatformConfig defaults.
+    Lookup pattern: check here first, fall back to PlatformConfig if absent.
+    Key must match a key in PlatformConfig.
+    """
+    user  = models.ForeignKey(User, on_delete=models.CASCADE, related_name='preferences')
+    key   = models.CharField(max_length=100)
+    value = models.CharField(max_length=500)
+
+    class Meta:
+        unique_together = [('user', 'key')]
+
+    def __str__(self):
+        return f'{self.user_id} / {self.key} = {self.value}'
+
+
+class PlatformConfig(models.Model):
+    """
+    Global key-value configuration editable via Django admin without a deploy.
+    Any key can be overridden per-user via UserPreference.
+    """
+    key   = models.CharField(max_length=100, unique=True)
+    value = models.CharField(max_length=500)
+
+    def __str__(self):
+        return f'{self.key} = {self.value}'

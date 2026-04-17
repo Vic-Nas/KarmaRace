@@ -50,16 +50,24 @@ def verify_github(task, tester) -> bool:
     try:
         if task.type == Task.Type.GITHUB_STAR:
             url      = f'https://api.github.com/repos/{repo}/stargazers/{username}'
-            headers  = _github_headers()
-            response = requests.get(url, headers=headers, timeout=10)
+            response = requests.get(url, headers=_github_headers(), timeout=10)
             return response.status_code == 204  # GitHub returns 204 when the relationship exists
+
         else:
-            url      = f'https://api.github.com/repos/{repo}/forks'
-            headers  = _github_headers()
-            response = requests.get(url, headers=headers, params={'per_page': 100}, timeout=10)
-            response.raise_for_status()
-            forks = response.json()
-            return any(f.get('owner', {}).get('login', '').lower() == username.lower() for f in forks)
+            # Paginate through all forks until we find the tester's or exhaust pages.
+            url = f'https://api.github.com/repos/{repo}/forks'
+            params = {'per_page': 100, 'page': 1}
+            while True:
+                response = requests.get(url, headers=_github_headers(), params=params, timeout=10)
+                response.raise_for_status()
+                forks = response.json()
+                if not forks:
+                    return False
+                if any(f.get('owner', {}).get('login', '').lower() == username.lower() for f in forks):
+                    return True
+                if len(forks) < 100:
+                    return False
+                params['page'] += 1
 
     except requests.RequestException as exc:
         logger.error('verify_github: request failed for task %s: %s', task.pk, exc)
@@ -71,6 +79,9 @@ def verify_ph(task, tester) -> bool:
     Check Product Hunt upvote or comment presence via PH GraphQL API.
     Uses tester's stored access_token for user-scoped queries.
     task.target_id must be the PH post numeric ID.
+
+    Either an upvote (isVoted) or a comment by the tester passes.
+    Paginates through all comments using GraphQL cursor-based pagination.
     """
     try:
         linked = tester.linked_accounts.get(platform='producthunt')
@@ -79,31 +90,27 @@ def verify_ph(task, tester) -> bool:
         return False
 
     access_token = linked.access_token
+    ph_user_id   = linked.platform_id
     post_id      = task.target_id
 
-    query = """
+    headers = {
+        'Authorization': f'Bearer {access_token}',
+        'Content-Type':  'application/json',
+    }
+
+    # First check isVoted — single cheap query, no pagination needed.
+    voted_query = """
     query($postId: ID!) {
       post(id: $postId) {
         isVoted
-        comments(first: 100) {
-          edges {
-            node {
-              user { id }
-            }
-          }
-        }
       }
     }
     """
-
     try:
         response = requests.post(
             'https://api.producthunt.com/v2/api/graphql',
-            json={'query': query, 'variables': {'postId': post_id}},
-            headers={
-                'Authorization': f'Bearer {access_token}',
-                'Content-Type':  'application/json',
-            },
+            json={'query': voted_query, 'variables': {'postId': post_id}},
+            headers=headers,
             timeout=10,
         )
         response.raise_for_status()
@@ -112,19 +119,60 @@ def verify_ph(task, tester) -> bool:
         if not post:
             logger.warning('verify_ph: post %s not found', post_id)
             return False
+        if post.get('isVoted'):
+            return True
+    except requests.RequestException as exc:
+        logger.error('verify_ph: vote check failed for task %s: %s', task.pk, exc)
+        return False
 
-        if task.type == Task.Type.PH_COMMENT:
-            ph_user_id = linked.platform_id
-            comments   = post.get('comments', {}).get('edges', [])
-            return any(
-                edge.get('node', {}).get('user', {}).get('id') == ph_user_id
-                for edge in comments
+    # isVoted is False — check comments with cursor-based pagination.
+    comments_query = """
+    query($postId: ID!, $cursor: String) {
+      post(id: $postId) {
+        comments(first: 100, after: $cursor) {
+          edges {
+            node {
+              user { id }
+            }
+          }
+          pageInfo {
+            hasNextPage
+            endCursor
+          }
+        }
+      }
+    }
+    """
+    cursor = None
+    try:
+        while True:
+            response = requests.post(
+                'https://api.producthunt.com/v2/api/graphql',
+                json={
+                    'query': comments_query,
+                    'variables': {'postId': post_id, 'cursor': cursor},
+                },
+                headers=headers,
+                timeout=10,
             )
+            response.raise_for_status()
+            data     = response.json()
+            comments = data.get('data', {}).get('post', {}).get('comments', {})
+            edges    = comments.get('edges', [])
 
-        return bool(post.get('isVoted'))
+            if any(
+                edge.get('node', {}).get('user', {}).get('id') == ph_user_id
+                for edge in edges
+            ):
+                return True
+
+            page_info = comments.get('pageInfo', {})
+            if not page_info.get('hasNextPage'):
+                return False
+            cursor = page_info.get('endCursor')
 
     except requests.RequestException as exc:
-        logger.error('verify_ph: request failed for task %s: %s', task.pk, exc)
+        logger.error('verify_ph: comment check failed for task %s: %s', task.pk, exc)
         return False
 
 

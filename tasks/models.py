@@ -7,20 +7,21 @@ from projects.models import Project
 class Task(models.Model):
 
     class Type(models.TextChoices):
-        GITHUB_STAR    = 'GITHUB_STAR'
-        GITHUB_FORK    = 'GITHUB_FORK'
-        PH_COMMENT     = 'PH_COMMENT'
-        ACCOUNT_CREATE = 'ACCOUNT_CREATE'
-        WEBHOOK        = 'WEBHOOK'
+        GITHUB_STAR = 'GITHUB_STAR'
+        GITHUB_FORK = 'GITHUB_FORK'
+        PH_COMMENT  = 'PH_COMMENT'
+        WEBHOOK     = 'WEBHOOK'
 
-    project       = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='tasks')
-    type          = models.CharField(max_length=20, choices=Type.choices)
-    target_id     = models.CharField(max_length=500)
-    succeed_count = models.PositiveIntegerField(default=0)
-    tried_count   = models.PositiveIntegerField(default=0)
-    is_deleted    = models.BooleanField(default=False)
-    locked        = models.BooleanField(default=False)
-    created_at    = models.DateTimeField(auto_now_add=True)
+    project        = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='tasks')
+    type           = models.CharField(max_length=20, choices=Type.choices)
+    description    = models.TextField()
+    target_id      = models.CharField(max_length=500)
+    webhook_secret = models.CharField(max_length=255, blank=True, default='')
+    succeed_count  = models.PositiveIntegerField(default=0)
+    tried_count    = models.PositiveIntegerField(default=0)
+    is_deleted     = models.BooleanField(default=False)
+    hidden         = models.BooleanField(default=False)
+    created_at     = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return f'{self.project.name} — {self.type}'
