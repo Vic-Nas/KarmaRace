@@ -28,8 +28,8 @@ DOMAIN=HOSTS[0]
 AUTH_USER_MODEL = 'accounts.User'
 
 ALLOWED_HOSTS = HOSTS
-CSRF_TRUSTED_ORIGINS = [f'https://{host}' for host in HOSTS]
-
+CSRF_TRUSTED_ORIGINS = [f'https://{host}' for host in HOSTS] + \
+    [f'http://{host}' for host in HOSTS]
 
 INSTALLED_APPS = [
     'django.contrib.admin',
