@@ -49,13 +49,11 @@ def verify_github_with_details(task, tester):
     task.target_id must be the repo full name, e.g. "owner/repo".
     tester must have a linked GitHub account with platform_username set.
     """
-    try:
-        linked = tester.linked_accounts.get(platform='github')
-    except tester.linked_accounts.model.DoesNotExist:
+    username, user_token = _get_github_identity(tester)
+    if not username:
         logger.info('verify_github: tester %s has no linked GitHub account', tester.pk)
-        return False, 'Your GitHub account is not linked.'
+        return False, 'Your GitHub account is not linked. Connect GitHub in Linked Accounts and try again.'
 
-    username = linked.platform_username
     repo     = task.target_id
 
     if not _is_valid_github_repo_target(repo):
@@ -63,29 +61,45 @@ def verify_github_with_details(task, tester):
 
     try:
         if task.type == Task.Type.GITHUB_STAR:
-            url      = f'https://api.github.com/repos/{repo}/stargazers/{username}'
-            response = requests.get(url, headers=_github_headers(), timeout=10)
+            if not user_token:
+                return False, 'Linked GitHub token is missing. Reconnect your GitHub account and try again.'
+
+            response = requests.get(
+                f'https://api.github.com/user/starred/{repo}',
+                headers=_github_headers(token_override=user_token),
+                timeout=10,
+            )
             if response.status_code == 204:
                 return True, 'Verified GitHub star.'
             if response.status_code == 404:
-                return False, 'Star not found. Ensure your GitHub user starred this public repo.'
+                return False, (
+                    f"We couldn't verify the star for @{username} yet. "
+                    'Please star the public repo with your linked GitHub account, wait a minute, then press Check again.'
+                )
+            if response.status_code in (401, 403):
+                return False, 'GitHub token is invalid or missing scope. Reconnect your GitHub account and try again.'
             return False, f'GitHub returned status {response.status_code} while checking star.'
 
         else:
-            # Paginate through all forks until we find the tester's or exhaust pages.
-            url = f'https://api.github.com/repos/{repo}/forks'
-            params = {'per_page': 100, 'page': 1}
-            while True:
-                response = requests.get(url, headers=_github_headers(), params=params, timeout=10)
-                response.raise_for_status()
-                forks = response.json()
-                if not forks:
-                    return False, 'Fork not found. Ensure your GitHub user forked this public repo.'
-                if any(f.get('owner', {}).get('login', '').lower() == username.lower() for f in forks):
-                    return True, 'Verified GitHub fork.'
-                if len(forks) < 100:
-                    return False, 'Fork not found. Ensure your GitHub user forked this public repo.'
-                params['page'] += 1
+            if not user_token:
+                return False, 'Linked GitHub token is missing. Reconnect your GitHub account and try again.'
+
+            # One-path check: ask the authenticated linked user for the specific repo.
+            response = requests.get(
+                f'https://api.github.com/repos/{username}/{repo.split("/", 1)[1]}',
+                headers=_github_headers(token_override=user_token),
+                timeout=10,
+            )
+            if response.status_code == 200 and response.json().get('fork') is True:
+                return True, 'Verified GitHub fork.'
+            if response.status_code == 404:
+                return False, (
+                    f"We couldn't verify a fork for @{username} yet. "
+                    'Please fork the repo with your linked GitHub account, wait a minute, then press Check again.'
+                )
+            if response.status_code in (401, 403):
+                return False, 'GitHub token is invalid or missing scope. Reconnect your GitHub account and try again.'
+            return False, f'GitHub returned status {response.status_code} while checking fork.'
 
     except requests.RequestException as exc:
         logger.error('verify_github: request failed for task %s: %s', task.pk, exc)
@@ -573,8 +587,39 @@ def _schedule_health_failed_notification(task):
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _github_headers() -> dict:
-    token = getattr(settings, 'GITHUB_TOKEN', None)
+def _get_github_identity(tester):
+    """Return (username, access_token) from LinkedAccount and allauth fallback."""
+    username = ''
+    access_token = ''
+
+    linked = tester.linked_accounts.filter(platform='github').first()
+    if linked:
+        username = (linked.platform_username or '').strip()
+        access_token = (linked.access_token or '').strip()
+
+    # Fallback to allauth social identity if LinkedAccount fields are stale/missing.
+    try:
+        from allauth.socialaccount.models import SocialAccount, SocialToken
+
+        social = SocialAccount.objects.filter(user=tester, provider='github').first()
+        if social:
+            if not username:
+                username = (
+                    social.extra_data.get('login')
+                    or social.extra_data.get('username')
+                    or ''
+                ).strip()
+            if not access_token:
+                token = SocialToken.objects.filter(account=social).order_by('-pk').first()
+                access_token = (token.token if token else '') or ''
+    except Exception as exc:
+        logger.warning('verify_github: allauth fallback lookup failed for tester %s: %s', tester.pk, exc)
+
+    return username, access_token
+
+
+def _github_headers(token_override=None) -> dict:
+    token = token_override or getattr(settings, 'GITHUB_TOKEN', None)
     headers = {'Accept': 'application/vnd.github+json'}
     if token:
         headers['Authorization'] = f'Bearer {token}'
