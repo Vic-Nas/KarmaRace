@@ -40,8 +40,9 @@
 <footer class="fixed-bottom border-top bg-light py-2">
   <div class="container d-flex justify-content-center gap-3 small text-muted">
     <a href="https://github.com" target="_blank" rel="noopener noreferrer">GitHub</a>
-    <span>Privacy</span>
-    <span>Terms</span>
+    <a href="{% url 'help_index' %}">Help</a>
+    <a href="{% url 'legal_privacy' %}">Privacy</a>
+    <a href="{% url 'legal_terms' %}">Terms</a>
   </div>
 </footer>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

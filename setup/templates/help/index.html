@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Help Center</h1>
+<p class="text-muted">What KarmaRace is, how it works, and API expectations.</p>
+
+<div class="mb-4">
+  <h2 class="h5">What Is KarmaRace?</h2>
+  <p>
+    KarmaRace is a task exchange app where users publish verifiable tasks and other users complete them to earn karma.
+    Feed visibility is influenced by owner karma, while task checks determine reward transfers.
+  </p>
+</div>
+
+<div class="mb-4">
+  <h2 class="h5">How It Works</h2>
+  <ol>
+    <li>Create a task in My Tasks.</li>
+    <li>Publish the task (must pass configuration and health checks).</li>
+    <li>A tester opens the feed and presses Check.</li>
+    <li>If verification succeeds, tester gains karma and owner pays the task reward.</li>
+  </ol>
+</div>
+
+<div class="mb-4">
+  <h2 class="h5">Task Types</h2>
+  <ul>
+    <li>GitHub Star: target format owner/repo.</li>
+    <li>GitHub Fork: target format owner/repo.</li>
+    <li>Product Hunt Comment/Upvote: target format slug.</li>
+    <li>Webhook: target format full URL (Pro only).</li>
+  </ul>
+</div>
+
+<div class="mb-4">
+  <h2 class="h5">API Calls and Expected Return</h2>
+  <p>When a webhook task is checked, KarmaRace sends:</p>
+  <pre class="bg-light border rounded p-3"><code>POST {task.target_id}
+Content-Type: application/json
+Authorization: Bearer {task.webhook_secret}  # only if secret is set
+
+{
+  "task_slug": "webhook-123-https-example-com-verify",
+  "platform_username": "tester_username"
+}</code></pre>
+
+  <p>Expected response:</p>
+  <pre class="bg-light border rounded p-3"><code>{
+  "verified": true
+}</code></pre>
+
+  <p>If verification fails, KarmaRace reports Sent/Expected/Got diagnostics to help debugging.</p>
+</div>
+
+<div class="mb-4">
+  <h2 class="h5">Linked Accounts</h2>
+  <p>
+    Connect GitHub and Product Hunt from Linked Accounts. OAuth tokens are used for verification requests.
+    If checks fail due to missing token, disconnect and reconnect the provider.
+  </p>
+</div>
+
+<div class="mb-4">
+  <h2 class="h5">Common Publish Failures</h2>
+  <ul>
+    <li>Webhook tasks are Pro-only.</li>
+    <li>GitHub repo is private or missing.</li>
+    <li>Product Hunt slug is invalid or post not found.</li>
+    <li>Webhook host is unreachable or returns server errors.</li>
+  </ul>
+</div>
+{% endblock %}

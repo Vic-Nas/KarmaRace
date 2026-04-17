@@ -207,7 +207,7 @@ def verify_webhook(task, tester) -> bool:
 
 def verify_webhook_with_details(task, tester):
     """
-    POST {"task_id": ..., "platform_username": ...} to owner endpoint.
+    POST {"task_slug": ..., "platform_username": ...} to owner endpoint.
     Sends Authorization: Bearer <webhook_secret> header if set.
     Expects {"verified": true/false} in response.
     task.target_id is the webhook endpoint URL.
@@ -223,10 +223,12 @@ def verify_webhook_with_details(task, tester):
     if task.webhook_secret:
         headers['Authorization'] = f'Bearer {task.webhook_secret}'
 
+    task_slug = _task_slug(task)
+
     try:
         response = requests.post(
             task.target_id,
-            json={'task_id': task.pk, 'platform_username': platform_username},
+            json={'task_slug': task_slug, 'platform_username': platform_username},
             headers=headers,
             timeout=10,
         )
@@ -237,14 +239,14 @@ def verify_webhook_with_details(task, tester):
             return True, 'Webhook verified successfully.'
         return False, (
             'Webhook responded but did not verify. '
-            f'Sent: {{"task_id": {task.pk}, "platform_username": "{platform_username}"}}; '
+            f'Sent: {{"task_slug": "{task_slug}", "platform_username": "{platform_username}"}}; '
             f'Expected: {{"verified": true}}; Got: {body}'
         )
     except requests.RequestException as exc:
         logger.error('verify_webhook: request failed for task %s: %s', task.pk, exc)
         return False, (
             'Webhook request failed. '
-            f'Sent: {{"task_id": {task.pk}, "platform_username": "{platform_username}"}}; '
+            f'Sent: {{"task_slug": "{task_slug}", "platform_username": "{platform_username}"}}; '
             f'Expected: {{"verified": true}}; Error: {exc}'
         )
     except ValueError:
@@ -647,6 +649,30 @@ def _get_github_identity(tester):
         logger.warning('verify_github: allauth fallback lookup failed for tester %s: %s', tester.pk, exc)
 
     return username, access_token
+
+
+def _task_slug(task):
+    """Deterministic slug for webhook verification payloads."""
+    platform_map = {
+        Task.Type.GITHUB_STAR: 'github-star',
+        Task.Type.GITHUB_FORK: 'github-fork',
+        Task.Type.PH_COMMENT: 'ph',
+        Task.Type.WEBHOOK: 'webhook',
+    }
+    platform = platform_map.get(task.type, 'task')
+    target_component = _slug_component(task.target_id)
+    return f'{platform}-{task.pk}-{target_component}'
+
+
+def _slug_component(raw):
+    value = (raw or '').strip().lower()
+    if not value:
+        return 'target'
+
+    import re
+    value = re.sub(r'[^a-z0-9]+', '-', value)
+    value = value.strip('-')
+    return value or 'target'
 
 
 def _github_headers(token_override=None) -> dict:
