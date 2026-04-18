@@ -48,6 +48,14 @@ def connect_account(request, platform):
 		return redirect('/accounts/github/login/?process=connect&next=/app/accounts/linked-accounts/')
 
 	if platform == LinkedAccount.PRODUCTHUNT:
+		if not settings.PH_CLIENT_ID or not settings.PH_CLIENT_SECRET:
+			messages.error(
+				request,
+				'Product Hunt OAuth is not configured. Set PH_CLIENT_ID/PH_CLIENT_SECRET '
+				'or PH_API_KEY/PH_API_SECRET in .env.',
+			)
+			return redirect('linked_accounts')
+
 		state = secrets.token_urlsafe(24)
 		request.session['ph_oauth_state'] = state
 		redirect_uri = request.build_absolute_uri('/app/accounts/producthunt/callback/')
@@ -56,6 +64,7 @@ def connect_account(request, platform):
 			'client_id': settings.PH_CLIENT_ID,
 			'redirect_uri': redirect_uri,
 			'response_type': 'code',
+			'scope': 'public',
 			'state': state,
 		})
 		return redirect(f'https://api.producthunt.com/v2/oauth/authorize?{params}')
