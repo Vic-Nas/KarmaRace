@@ -41,6 +41,27 @@
 
 .notif-prefs { margin-top: 2rem; }
 .notif-prefs__title { font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); margin-bottom: 0.75rem; }
+.notif-prefs__toggle {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--surface);
+  color: inherit;
+  font-family: inherit;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.65rem 0.85rem;
+  cursor: pointer;
+}
+.notif-prefs__toggle:hover { background: var(--accent-light); }
+.notif-prefs__arrow { transition: transform 0.18s ease; font-size: 0.9rem; color: var(--text-muted); }
+.notif-prefs__toggle[aria-expanded="true"] .notif-prefs__arrow { transform: rotate(180deg); }
+.notif-prefs__content {
+  margin-top: 0.75rem;
+  padding-top: 0.25rem;
+}
 
 .pref-row {
   display: flex;

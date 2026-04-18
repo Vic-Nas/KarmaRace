@@ -18,37 +18,13 @@
   {% endif %}
 </div>
 
-{% if notifications %}
-<div class="notif-list">
-  {% for notif in notifications %}
-  <div class="notif-item {% if not notif.read_at %}unread{% endif %}">
-    <div class="notif-item__icon">
-      {% if notif.event == 'TASK_CONFIRMED' %}✔
-      {% elif notif.event == 'TASK_HEALTH_FAILED' %}⚠
-      {% elif notif.event == 'KARMA_LOW' %}↓
-      {% elif notif.event == 'KARMA_RESTORED' %}↑
-      {% elif notif.event == 'APPRECIATION' %}♥
-      {% else %}●{% endif %}
-    </div>
-    <div class="notif-item__body">
-      <div class="notif-item__event">{{ notif.get_event_display }}</div>
-      <div class="notif-item__msg">{{ summaries|get_item:notif.pk }}</div>
-      <div class="notif-item__time">{{ notif.created_at|timesince }} ago</div>
-    </div>
-  </div>
-  {% endfor %}
-</div>
-{% else %}
-<div class="notif-empty">
-  <div style="font-size:2rem;margin-bottom:0.5rem">🔔</div>
-  No notifications yet. Complete tasks to earn karma and receive updates.
-</div>
-{% endif %}
-
-<hr>
-
 <div class="notif-prefs">
-  <div class="notif-prefs__title">Delivery Preferences</div>
+  <button type="button" class="notif-prefs__toggle" id="prefs-toggle" aria-expanded="false" aria-controls="prefs-content">
+    <span class="notif-prefs__title" style="margin:0">Delivery Preferences</span>
+    <span class="notif-prefs__arrow" id="prefs-arrow" aria-hidden="true">&#9662;</span>
+  </button>
+
+  <div class="notif-prefs__content" id="prefs-content" hidden>
 
   {% if user.is_pro %}
   <p class="small text-muted" style="margin-bottom:1rem">
@@ -130,11 +106,54 @@
     <a href="{% url 'billing_plan' %}" class="btn btn-primary btn-sm">Upgrade to Pro</a>
   </div>
   {% endif %}
+  </div>
 </div>
+
+<hr>
+
+{% if notifications %}
+<div class="notif-list">
+  {% for notif in notifications %}
+  <div class="notif-item {% if not notif.read_at %}unread{% endif %}">
+    <div class="notif-item__icon">
+      {% if notif.event == 'TASK_CONFIRMED' %}✔
+      {% elif notif.event == 'TASK_HEALTH_FAILED' %}⚠
+      {% elif notif.event == 'KARMA_LOW' %}↓
+      {% elif notif.event == 'KARMA_RESTORED' %}↑
+      {% elif notif.event == 'APPRECIATION' %}♥
+      {% else %}●{% endif %}
+    </div>
+    <div class="notif-item__body">
+      <div class="notif-item__event">{{ notif.get_event_display }}</div>
+      <div class="notif-item__msg">{{ summaries|get_item:notif.pk }}</div>
+      <div class="notif-item__time">{{ notif.created_at|timesince }} ago</div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="notif-empty">
+  <div style="font-size:2rem;margin-bottom:0.5rem">🔔</div>
+  No notifications yet. Complete tasks to earn karma and receive updates.
+</div>
+{% endif %}
 {% endblock %}
 
 {% block extra_js %}
 {% if user.is_pro %}
 <script src="{% static 'js/notifications-prefs.js' %}"></script>
 {% endif %}
+<script>
+(function () {
+  var btn = document.getElementById('prefs-toggle');
+  var panel = document.getElementById('prefs-content');
+  if (!btn || !panel) return;
+
+  btn.addEventListener('click', function () {
+    var expanded = btn.getAttribute('aria-expanded') === 'true';
+    btn.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+    panel.hidden = expanded;
+  });
+})();
+</script>
 {% endblock %}

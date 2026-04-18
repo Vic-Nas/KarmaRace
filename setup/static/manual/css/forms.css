@@ -53,7 +53,7 @@ input[type="password"], select, textarea {
 }
 input:focus, select:focus, textarea:focus {
   border-color: var(--accent2);
-  box-shadow: 0 0 0 3px rgba(58,125,46,0.15);
+  box-shadow: 0 0 0 3px rgba(78,169,90,0.22);
 }
 textarea { resize: vertical; min-height: 80px; }
 
