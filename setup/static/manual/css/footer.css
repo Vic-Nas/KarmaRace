@@ -1,0 +1,20 @@
+.kr-foot {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  height: var(--foot-h);
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  z-index: 1000;
+  font-size: 0.78rem;
+}
+
+.kr-foot a {
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+.kr-foot a:hover { color: var(--accent); text-decoration: none; }

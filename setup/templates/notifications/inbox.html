@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% load static notif_tags %}
+
+{% block title %}Notifications — KarmaRace{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/notifications.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Notifications</h1>
+  <div style="display:flex;gap:0.5rem;align-items:center">
+    {% if notifications %}
+    <form method="post" action="{% url 'notifications_mark_all_read' %}">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-secondary btn-sm">Mark all read</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+{% if muted %}
+<div class="alert alert-warning">In-app notifications are muted. You can unmute them in preferences below.</div>
+{% endif %}
+
+{% if notifications %}
+<div class="notif-list">
+  {% for notif in notifications %}
+  <div class="notif-item {% if not notif.read_at %}unread{% endif %}">
+    <div class="notif-item__icon">
+      {% if notif.event == 'TASK_CONFIRMED' %}✔
+      {% elif notif.event == 'TASK_HEALTH_FAILED' %}⚠
+      {% elif notif.event == 'KARMA_LOW' %}↓
+      {% elif notif.event == 'KARMA_RESTORED' %}↑
+      {% elif notif.event == 'APPRECIATION' %}♥
+      {% else %}●{% endif %}
+    </div>
+    <div class="notif-item__body">
+      <div class="notif-item__event">{{ notif.get_event_display }}</div>
+      <div class="notif-item__msg">{{ summaries|get_item:notif.pk }}</div>
+      <div class="notif-item__time">{{ notif.created_at|timesince }} ago</div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="notif-empty">
+  <div style="font-size:2rem;margin-bottom:0.5rem">🔔</div>
+  No notifications yet. Complete tasks to earn karma and receive updates.
+</div>
+{% endif %}
+
+<hr>
+
+<div class="notif-prefs">
+  <div class="notif-prefs__title">Preferences</div>
+
+  <form id="prefs-form">
+    {% csrf_token %}
+    <div class="pref-row">
+      <span>Mute all in-app notifications</span>
+      <label class="toggle">
+        <input type="checkbox" name="muted" value="1" {% if muted %}checked{% endif %} id="pref-muted">
+        <span class="toggle__track"><span class="toggle__thumb"></span></span>
+      </label>
+    </div>
+
+    {% if user.is_pro %}
+    <p class="small text-muted" style="margin-top:0.75rem;margin-bottom:0.5rem">Pro: configure email delivery per event.</p>
+    {% for event_key, event_label in all_events %}
+    <div class="pref-row">
+      <span>{{ event_label }} — email</span>
+      <label class="toggle">
+        <input type="checkbox" name="email_{{ event_key }}" value="1"
+          {% if prefs|get_item:event_key and prefs|get_item:event_key.email_enabled %}checked{% endif %}>
+        <span class="toggle__track"><span class="toggle__thumb"></span></span>
+      </label>
+    </div>
+    {% endfor %}
+    {% else %}
+    <p class="small text-muted" style="margin-top:0.75rem">
+      <a href="{% url 'billing_plan' %}">Upgrade to Pro</a> to enable email and webhook delivery per event.
+    </p>
+    {% endif %}
+
+    <div style="margin-top:1rem">
+      <button type="submit" class="btn btn-primary btn-sm">Save preferences</button>
+      <span id="prefs-saved" style="display:none;font-size:0.8rem;color:var(--success);margin-left:0.5rem">&#10003; Saved</span>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/notifications-prefs.js' %}"></script>
+{% endblock %}

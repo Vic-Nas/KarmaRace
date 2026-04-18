@@ -1,42 +1,45 @@
 {% extends "base.html" %}
+{% load static %}
+
+{% block title %}Linked Accounts — KarmaRace{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/cards.css' %}">
+{% endblock %}
 
 {% block content %}
-<h1>Linked Accounts</h1>
-<p class="text-muted">Connect providers via OAuth. Credentials are fetched and stored server-side.</p>
+<div class="page-header">
+  <h1>Linked Accounts</h1>
+</div>
+<p class="text-muted">Connect providers via OAuth. Credentials are stored server-side for verification.</p>
 
-<div class="row g-4">
-  <div class="col-md-6">
-    <div class="card">
-      <div class="card-body">
-        <h5 class="card-title">GitHub</h5>
-        {% if github %}
-          <p class="mb-2"><strong>Connected as:</strong> {{ github.platform_username|default:'(unknown)' }}</p>
-          <form method="post" action="{% url 'unlink_account' 'github' %}">
-            {% csrf_token %}
-            <button type="submit" class="btn btn-outline-secondary">Disconnect GitHub</button>
-          </form>
-        {% else %}
-          <a href="{% url 'connect_account' 'github' %}" class="btn btn-primary">Link GitHub</a>
-        {% endif %}
-      </div>
-    </div>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1rem;margin-top:1rem">
+  <div class="card">
+    <h3>GitHub</h3>
+    {% if github %}
+      <p class="small text-muted" style="margin-top:0.4rem">Connected as <strong>{{ github.platform_username|default:'(unknown)' }}</strong></p>
+      <form method="post" action="{% url 'unlink_account' 'github' %}" style="margin-top:0.75rem">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-secondary btn-sm">Disconnect</button>
+      </form>
+    {% else %}
+      <p class="small text-muted" style="margin-top:0.4rem">Not connected.</p>
+      <a href="{% url 'connect_account' 'github' %}" class="btn btn-primary btn-sm" style="margin-top:0.75rem">Link GitHub</a>
+    {% endif %}
   </div>
 
-  <div class="col-md-6">
-    <div class="card">
-      <div class="card-body">
-        <h5 class="card-title">Product Hunt</h5>
-        {% if producthunt %}
-          <p class="mb-2"><strong>Connected as:</strong> {{ producthunt.platform_username|default:'(unknown)' }}</p>
-          <form method="post" action="{% url 'unlink_account' 'producthunt' %}">
-            {% csrf_token %}
-            <button type="submit" class="btn btn-outline-secondary">Disconnect Product Hunt</button>
-          </form>
-        {% else %}
-          <a href="{% url 'connect_account' 'producthunt' %}" class="btn btn-primary">Link Product Hunt</a>
-        {% endif %}
-      </div>
-    </div>
+  <div class="card">
+    <h3>Product Hunt</h3>
+    {% if producthunt %}
+      <p class="small text-muted" style="margin-top:0.4rem">Connected as <strong>{{ producthunt.platform_username|default:'(unknown)' }}</strong></p>
+      <form method="post" action="{% url 'unlink_account' 'producthunt' %}" style="margin-top:0.75rem">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-secondary btn-sm">Disconnect</button>
+      </form>
+    {% else %}
+      <p class="small text-muted" style="margin-top:0.4rem">Not connected.</p>
+      <a href="{% url 'connect_account' 'producthunt' %}" class="btn btn-primary btn-sm" style="margin-top:0.75rem">Link Product Hunt</a>
+    {% endif %}
   </div>
 </div>
 {% endblock %}

@@ -1,0 +1,87 @@
+.kr-bell {
+  position: relative;
+  cursor: pointer;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 0.2rem 0.35rem;
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+}
+.kr-bell:hover { color: var(--accent); background: var(--accent-light); }
+
+.kr-bell__dot {
+  position: absolute;
+  top: 2px; right: 2px;
+  width: 8px; height: 8px;
+  background: var(--danger);
+  border-radius: 50%;
+  border: 2px solid var(--surface);
+  display: none;
+}
+.kr-bell__dot.visible { display: block; }
+
+.kr-bell__count {
+  position: absolute;
+  top: -4px; right: -6px;
+  font-size: 0.6rem;
+  font-weight: 700;
+  background: var(--danger);
+  color: #fff;
+  border-radius: 999px;
+  padding: 0 4px;
+  min-width: 16px;
+  text-align: center;
+  display: none;
+}
+.kr-bell__count.visible { display: block; }
+
+.kr-notif-dropdown {
+  position: fixed;
+  top: var(--nav-h);
+  right: 1rem;
+  width: 320px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  z-index: 1100;
+  display: none;
+  overflow: hidden;
+}
+.kr-notif-dropdown.open { display: block; }
+
+.kr-notif-dropdown__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.6rem 0.9rem;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.kr-notif-dropdown__list { max-height: 320px; overflow-y: auto; }
+
+.kr-notif-item {
+  padding: 0.65rem 0.9rem;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.kr-notif-item:hover { background: var(--accent-light); }
+.kr-notif-item.unread { font-weight: 600; }
+.kr-notif-item__time { font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; }
+
+.kr-notif-dropdown__footer {
+  padding: 0.5rem 0.9rem;
+  text-align: center;
+  font-size: 0.8rem;
+  border-top: 1px solid var(--border);
+}

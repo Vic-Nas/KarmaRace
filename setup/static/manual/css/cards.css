@@ -1,0 +1,77 @@
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.card__title { font-size: 1rem; font-weight: 700; margin-bottom: 0.35rem; }
+.card__meta { font-size: 0.78rem; color: var(--text-muted); margin-bottom: 0.5rem; }
+.card__actions { display: flex; gap: 0.5rem; align-items: center; margin-top: 1rem; flex-wrap: wrap; }
+
+.task-card { border-left: 3px solid var(--accent); }
+.task-card__type { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--accent); margin-bottom: 0.5rem; }
+.task-card__desc { font-size: 0.95rem; line-height: 1.6; margin-bottom: 0.75rem; }
+.task-card__reward { font-size: 0.82rem; color: var(--text-muted); }
+.task-card__reward strong { color: var(--accent); font-size: 1rem; }
+
+.filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+  align-items: flex-end;
+}
+.filter-group label { font-size: 0.72rem; margin-bottom: 0.2rem; }
+
+.btn-group {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.btn-group input[type="radio"] { display: none; }
+.btn-group label {
+  padding: 0.3rem 0.7rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  border-right: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  text-transform: none;
+  letter-spacing: normal;
+  margin: 0;
+  transition: background 0.12s, color 0.12s;
+}
+.btn-group label:last-of-type { border-right: none; }
+.btn-group input[type="radio"]:checked + label {
+  background: var(--accent);
+  color: #fff;
+}
+
+.list-item {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 0.85rem 1rem;
+  margin-bottom: 0.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+.list-item__info { flex: 1; min-width: 0; }
+.list-item__title { font-weight: 700; font-size: 0.95rem; margin-bottom: 0.2rem; }
+.list-item__sub { font-size: 0.78rem; color: var(--text-muted); }
+.list-item__actions { display: flex; gap: 0.35rem; flex-shrink: 0; }
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+  gap: 1rem;
+}

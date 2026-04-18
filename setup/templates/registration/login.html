@@ -1,10 +1,8 @@
-{# /setup/templates/registration/login.html #}
 {% extends "base.html" %}
+{% block title %}Sign In — KarmaRace{% endblock %}
 {% block content %}
-<h2>Log in</h2>
-<form method="post" style="max-width: 400px">
-  {% csrf_token %}
-  {{ form.as_p }}
-  <button type="submit" class="btn btn-primary mt-2">Log in</button>
-</form>
+<div style="max-width:400px;margin:3rem auto;text-align:center">
+  <h1>Sign In</h1>
+  {% block inner %}{% endblock %}
+</div>
 {% endblock %}

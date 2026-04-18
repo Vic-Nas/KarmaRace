@@ -1,0 +1,75 @@
+:root {
+  --bg: #faf9f7;
+  --surface: #ffffff;
+  --border: #e2ddd6;
+  --text: #1a1a1a;
+  --text-muted: #6b6460;
+  --accent: #8b4513;
+  --accent-hover: #6b3410;
+  --accent-light: #f5ede6;
+  --success: #2d6a4f;
+  --warning: #b5830a;
+  --danger: #9b2226;
+  --nav-h: 56px;
+  --foot-h: 44px;
+  --ad-w: 160px;
+  --ad-gap: 12px;
+}
+
+[data-theme="dark"] {
+  --bg: #141210;
+  --surface: #1e1b18;
+  --border: #3a332c;
+  --text: #f0ece6;
+  --text-muted: #9a9088;
+  --accent: #c87941;
+  --accent-hover: #e09060;
+  --accent-light: #2a1f14;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { font-size: 16px; }
+
+body {
+  font-family: 'Times New Roman', Times, serif;
+  background: var(--bg);
+  color: var(--text);
+  padding-top: var(--nav-h);
+  padding-bottom: var(--foot-h);
+  min-height: 100vh;
+  transition: background 0.2s, color 0.2s;
+}
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { color: var(--accent-hover); text-decoration: underline; }
+
+h1, h2, h3, h4 { font-weight: 700; line-height: 1.25; }
+h1 { font-size: 1.75rem; margin-bottom: 0.75rem; }
+h2 { font-size: 1.35rem; margin-bottom: 0.5rem; }
+h3 { font-size: 1.1rem; }
+
+p { line-height: 1.65; margin-bottom: 0.75rem; }
+small, .small { font-size: 0.85rem; }
+
+.text-muted { color: var(--text-muted); }
+
+hr { border: none; border-top: 1px solid var(--border); margin: 1.25rem 0; }
+
+.alert {
+  padding: 0.65rem 1rem;
+  border-radius: 4px;
+  border-left: 3px solid var(--accent);
+  background: var(--accent-light);
+  margin-bottom: 0.75rem;
+  font-size: 0.9rem;
+}
+.alert-danger { border-color: var(--danger); background: #fdf0f0; color: var(--danger); }
+.alert-success { border-color: var(--success); background: #f0faf4; color: var(--success); }
+.alert-warning { border-color: var(--warning); background: #fdf8ec; color: var(--warning); }
+.alert-info { border-color: #1a6fa8; background: #eef6fd; color: #1a6fa8; }
+
+[data-theme="dark"] .alert-danger { background: #2a1010; }
+[data-theme="dark"] .alert-success { background: #0f2a1a; }
+[data-theme="dark"] .alert-warning { background: #2a1f05; }
+[data-theme="dark"] .alert-info { background: #0a1e2a; }

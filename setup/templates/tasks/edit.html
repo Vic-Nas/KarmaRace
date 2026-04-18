@@ -1,65 +1,54 @@
 {% extends "base.html" %}
+{% load static %}
+
+{% block title %}{% if is_create %}New Task{% else %}Edit Task{% endif %} — KarmaRace{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/cards.css' %}">
+{% endblock %}
 
 {% block content %}
-<h1>{% if is_create %}New Task{% else %}Edit Task{% endif %}</h1>
+<div class="page-header">
+  <h1>{% if is_create %}New Task{% else %}Edit Task{% endif %}</h1>
+  <a href="{% url 'my_tasks' %}" class="btn btn-secondary btn-sm">← My Tasks</a>
+</div>
 
-<form method="post">
-  {% csrf_token %}
+<div class="card" style="max-width:560px">
+  <form method="post">
+    {% csrf_token %}
+    <div class="form-group">
+      <label for="id_type">Type</label>
+      {{ form.type }}
+    </div>
+    <div class="form-group">
+      <label for="id_target_id">Target</label>
+      {{ form.target_id }}
+      <div class="form-text">GitHub: <code>owner/repo</code> &nbsp;&middot;&nbsp; Product Hunt: post slug &nbsp;&middot;&nbsp; Webhook: full URL</div>
+    </div>
+    <div class="form-group" id="webhook-secret-row" style="display:none">
+      <label for="id_webhook_secret">Webhook Secret <span class="text-muted" style="text-transform:none;font-weight:400">(optional)</span></label>
+      {{ form.webhook_secret }}
+    </div>
+    <div class="form-group">
+      <label for="id_description">Instructions for testers</label>
+      {{ form.description }}
+    </div>
 
-  <div class="mb-3">
-    <label for="id_type" class="form-label">Type</label>
-    {{ form.type }}
-  </div>
-
-  <div class="mb-3">
-    <label for="id_target_id" class="form-label">Target</label>
-    {{ form.target_id }}
-    <div class="form-text">GitHub: <code>owner/repo</code> &nbsp;·&nbsp; Product Hunt: post slug &nbsp;·&nbsp; Webhook: full URL</div>
-  </div>
-
-  <div class="mb-3" id="webhook-secret-row" style="display:none">
-    <label for="id_webhook_secret" class="form-label">Webhook secret <span class="text-muted">(optional)</span></label>
-    {{ form.webhook_secret }}
-  </div>
-
-  <div class="mb-3">
-    <label for="id_description" class="form-label">Instructions for testers</label>
-    {{ form.description }}
-  </div>
-
-  {% if form.errors %}
+    {% if form.errors %}
     <div class="alert alert-danger">
       {% for field in form %}{% for e in field.errors %}<div>{{ field.label }}: {{ e }}</div>{% endfor %}{% endfor %}
       {% for e in form.non_field_errors %}<div>{{ e }}</div>{% endfor %}
     </div>
-  {% endif %}
+    {% endif %}
 
-  <button type="submit" class="btn btn-primary">Save Task</button>
-  <a href="{% url 'feed' %}" class="btn btn-outline-secondary">Cancel</a>
-</form>
+    <div style="display:flex;gap:0.5rem;margin-top:1rem">
+      <button type="submit" class="btn btn-primary">Save Task</button>
+      <a href="{% url 'my_tasks' %}" class="btn btn-secondary">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}
 
-<script>
-  const typeSelect = document.getElementById('id_type');
-  const secretRow = document.getElementById('webhook-secret-row');
-  const descriptionInput = document.getElementById('id_description');
-
-  function toggleSecret() {
-    secretRow.style.display = typeSelect.value === 'WEBHOOK' ? '' : 'none';
-  }
-
-  function toggleDescription() {
-    const isWebhook = typeSelect.value === 'WEBHOOK';
-    descriptionInput.disabled = !isWebhook;
-    if (!isWebhook) {
-      descriptionInput.classList.add('bg-light');
-    } else {
-      descriptionInput.classList.remove('bg-light');
-    }
-  }
-
-  typeSelect.addEventListener('change', toggleSecret);
-  typeSelect.addEventListener('change', toggleDescription);
-  toggleSecret();
-  toggleDescription();
-</script>
+{% block extra_js %}
+<script src="{% static 'js/task-edit.js' %}"></script>
 {% endblock %}

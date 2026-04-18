@@ -1,34 +1,43 @@
 {% extends "base.html" %}
+{% load static %}
+
+{% block title %}Plan — KarmaRace{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/cards.css' %}">
+{% endblock %}
 
 {% block content %}
-<h1>Plans</h1>
-<p class="text-muted">Manage your KarmaRace subscription with Stripe.</p>
-
-<div class="card mb-3">
-  <div class="card-body">
-    <h2 class="h5">Pro Plan</h2>
-    <p class="mb-2">Webhook task publishing and Pro account status.</p>
-    <p class="small text-muted mb-3">Stripe price id: {{ stripe_price_id }}</p>
-
-    {% if request.user.is_pro %}
-      <span class="badge text-bg-success mb-3">Pro Active</span>
-      <form method="post" action="{% url 'billing_portal' %}">
-        {% csrf_token %}
-        <button class="btn btn-outline-primary" type="submit">Manage Subscription</button>
-      </form>
-    {% else %}
-      <span class="badge text-bg-secondary mb-3">Free Plan</span>
-      <form method="post" action="{% url 'billing_checkout' %}">
-        {% csrf_token %}
-        <button class="btn btn-primary" type="submit">Upgrade to Pro</button>
-      </form>
-    {% endif %}
-  </div>
+<div class="page-header">
+  <h1>Plans</h1>
 </div>
 
-{% if profile.subscription_status %}
-  <div class="small text-muted">
-    Stripe status: {{ profile.subscription_status }}
+<div class="card" style="max-width:440px">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem">
+    <h2 style="margin:0">Pro Plan</h2>
+    {% if request.user.is_pro %}
+      <span class="badge badge-success">Active</span>
+    {% else %}
+      <span class="badge badge-muted">Free</span>
+    {% endif %}
   </div>
-{% endif %}
+
+  <p class="text-muted">Publish webhook tasks, unlock email &amp; webhook notification delivery, and support KarmaRace.</p>
+
+  {% if request.user.is_pro %}
+    <form method="post" action="{% url 'billing_portal' %}" style="margin-top:1rem">
+      {% csrf_token %}
+      <button class="btn btn-secondary" type="submit">Manage Subscription</button>
+    </form>
+  {% else %}
+    <form method="post" action="{% url 'billing_checkout' %}" style="margin-top:1rem">
+      {% csrf_token %}
+      <button class="btn btn-primary" type="submit">Upgrade to Pro</button>
+    </form>
+  {% endif %}
+
+  {% if profile.subscription_status %}
+  <p class="small text-muted" style="margin-top:1rem">Stripe status: {{ profile.subscription_status }}</p>
+  {% endif %}
+</div>
 {% endblock %}

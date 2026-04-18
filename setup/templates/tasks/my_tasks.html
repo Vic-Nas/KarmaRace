@@ -1,53 +1,61 @@
 {% extends "base.html" %}
+{% load static %}
+
+{% block title %}My Tasks — KarmaRace{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/cards.css' %}">
+{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <h1 class="mb-0">My Tasks</h1>
+<div class="page-header">
+  <h1>My Tasks</h1>
   <a href="{% url 'task_create' %}" class="btn btn-primary">+ New Task</a>
 </div>
 
 {% if tasks %}
-  <div class="list-group">
-    {% for task in tasks %}
-      <div class="list-group-item d-flex justify-content-between align-items-start">
-        <div>
-          <div class="fw-semibold">
-            {% if task.target_url %}
-              <a href="{{ task.target_url }}" target="_blank" rel="noopener noreferrer">{{ task.get_type_display }}</a>
-            {% else %}
-              {{ task.get_type_display }}
-            {% endif %}
-          </div>
-          <div class="small text-muted">Target: {{ task.target_id }}</div>
-          <div class="small">{{ task.description }}</div>
-          <span class="badge {% if task.hidden %}bg-secondary{% else %}bg-success{% endif %} mt-2">
-            {% if task.hidden %}Unpublished{% else %}Published{% endif %}
-          </span>
-        </div>
-        <div class="d-flex gap-2">
-          <a href="{% url 'task_edit' task.pk %}" class="btn btn-sm btn-outline-secondary">Edit</a>
-
-          {% if task.hidden %}
-            <form method="post" action="{% url 'task_publish' task.pk %}">
-              {% csrf_token %}
-              <button type="submit" class="btn btn-sm btn-outline-success">Publish</button>
-            </form>
-          {% else %}
-            <form method="post" action="{% url 'task_unpublish' task.pk %}">
-              {% csrf_token %}
-              <button type="submit" class="btn btn-sm btn-outline-warning">Unpublish</button>
-            </form>
-          {% endif %}
-
-          <form method="post" action="{% url 'task_delete' task.pk %}" onsubmit="return confirm('Delete this task?')">
-            {% csrf_token %}
-            <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
-          </form>
-        </div>
+  {% for task in tasks %}
+  <div class="list-item">
+    <div class="list-item__info">
+      <div class="list-item__title">
+        {% if task.target_url %}
+          <a href="{{ task.target_url }}" target="_blank" rel="noopener noreferrer">{{ task.get_type_display }}</a>
+        {% else %}
+          {{ task.get_type_display }}
+        {% endif %}
       </div>
-    {% endfor %}
+      <div class="list-item__sub">{{ task.target_id }}</div>
+      <div class="list-item__sub" style="margin-top:0.2rem">{{ task.description }}</div>
+      <div style="margin-top:0.4rem">
+        <span class="badge {% if task.hidden %}badge-muted{% else %}badge-success{% endif %}">
+          {% if task.hidden %}Unpublished{% else %}Published{% endif %}
+        </span>
+      </div>
+    </div>
+    <div class="list-item__actions">
+      <a href="{% url 'task_edit' task.pk %}" class="btn btn-secondary btn-sm">Edit</a>
+      {% if task.hidden %}
+        <form method="post" action="{% url 'task_publish' task.pk %}">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-success btn-sm">Publish</button>
+        </form>
+      {% else %}
+        <form method="post" action="{% url 'task_unpublish' task.pk %}">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-secondary btn-sm">Unpublish</button>
+        </form>
+      {% endif %}
+      <form method="post" action="{% url 'task_delete' task.pk %}" onsubmit="return confirm('Delete this task?')">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+      </form>
+    </div>
   </div>
+  {% endfor %}
 {% else %}
-  <p class="text-muted">You do not have any tasks yet.</p>
+  <div style="padding:3rem 0;text-align:center;color:var(--text-muted)">
+    <p>No tasks yet. Create one and start earning karma from testers.</p>
+    <a href="{% url 'task_create' %}" class="btn btn-primary" style="margin-top:0.5rem">Create first task</a>
+  </div>
 {% endif %}
 {% endblock %}

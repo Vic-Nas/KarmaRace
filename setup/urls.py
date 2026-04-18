@@ -12,4 +12,5 @@ urlpatterns = [
     path('legal/terms/', views.legal_terms, name='legal_terms'),
     path('', include('feed.urls')),
     path('tasks/', include('tasks.urls')),
+    path('', include('notifications.urls')),
 ]
