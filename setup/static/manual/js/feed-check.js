@@ -13,6 +13,17 @@ var FeedCheck = (function () {
             clearInterval(timer);
             var url = new URL(window.location.href);
             url.searchParams.delete('checking_task');
+            if (data.state === 'CONFIRMED') {
+              url.searchParams.set('check_result', 'CONFIRMED');
+              url.searchParams.delete('check_detail');
+            } else if (data.state === 'FAILED') {
+              url.searchParams.set('check_result', 'FAILED');
+              if (data.detail) {
+                url.searchParams.set('check_detail', data.detail);
+              } else {
+                url.searchParams.delete('check_detail');
+              }
+            }
             window.location.href = url.toString();
           }
         })

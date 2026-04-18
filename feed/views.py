@@ -145,6 +145,14 @@ def _webhook_stats(task):
 
 
 def feed(request):
+    check_result = (request.GET.get('check_result') or '').strip().upper()
+    check_detail = (request.GET.get('check_detail') or '').strip()
+    if check_result:
+        if check_result == TaskCompletion.State.CONFIRMED:
+            messages.success(request, 'Check confirmed. Karma transferred.')
+        elif check_result == TaskCompletion.State.FAILED:
+            messages.error(request, check_detail or 'Check failed. Please verify the task requirements and try again.')
+
     completion = request.GET.get('completion') or 'not_completed'
     archive = request.GET.get('archive') or 'not_archived'
     task_family = request.GET.get('task_family') or 'not_webhook'
@@ -295,7 +303,11 @@ def check(request, task_id):
         # Fallback: process immediately so checks still work when queueing is unavailable.
         try:
             process_task_check(task_id=task.pk, tester_id=request.user.pk)
-            messages.info(request, 'Queue unavailable, processed check immediately.')
+            completion.refresh_from_db(fields=['state'])
+            if completion.state == TaskCompletion.State.CONFIRMED:
+                messages.success(request, 'Queue unavailable, but check confirmed immediately.')
+            else:
+                messages.error(request, 'Queue unavailable, and check failed.')
             return _redirect_to_feed_with_filters(request)
         except Exception:
             completion.state = TaskCompletion.State.FAILED
@@ -328,6 +340,12 @@ def check_status(request, task_id):
         return JsonResponse({
             'state': TaskCompletion.State.FAILED,
             'detail': 'Verification timed out. Please retry.',
+        })
+
+    if completion.state == TaskCompletion.State.FAILED:
+        return JsonResponse({
+            'state': completion.state,
+            'detail': 'Verification failed. Make sure you completed the required action with your linked account, then retry.',
         })
 
     return JsonResponse({'state': completion.state})
