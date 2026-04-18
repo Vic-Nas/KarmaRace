@@ -91,25 +91,8 @@ def inbox(request):
     notifications = Notification.objects.filter(user=request.user).order_by('-created_at')[:50]
     Notification.objects.filter(user=request.user, read_at__isnull=True).update(read_at=timezone.now())
 
-    prefs = {}
-    webhook_url = ''
-    webhook_secret = ''
-
-    if request.user.is_pro:
-        for pref in NotificationPreference.objects.filter(user=request.user):
-            prefs[pref.event] = pref
-            # Use first found webhook_url/secret as the shared value
-            if not webhook_url and pref.webhook_url:
-                webhook_url = pref.webhook_url
-            if not webhook_secret and getattr(pref, 'webhook_secret', ''):
-                webhook_secret = pref.webhook_secret
-
     return render(request, 'notifications/inbox.html', {
         'notifications': notifications,
-        'prefs': prefs,
-        'webhook_url': webhook_url,
-        'webhook_secret': webhook_secret,
-        'all_events': Notification.Event.choices,
         'summaries': {n.pk: _notif_summary(n) for n in notifications},
     })
 

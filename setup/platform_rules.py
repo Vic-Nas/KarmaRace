@@ -8,6 +8,7 @@ KARMA_REWARDS_BY_TASK_TYPE = {
 }
 
 KARMA_LOW_THRESHOLD = 20
+KARMA_HIGH_THRESHOLD = 100
 
 # Webhook tasks are intentionally excluded from reciprocity obligations.
 WEBHOOK_OBLIGATIONS_ENABLED = False

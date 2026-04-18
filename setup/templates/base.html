@@ -26,6 +26,10 @@
     {% if user.is_authenticated %}
       <a href="{% url 'my_tasks' %}" class="btn btn-ghost btn-sm">My Tasks</a>
       <a href="{% url 'linked_accounts' %}" class="btn btn-ghost btn-sm">Accounts</a>
+      <a href="{% url 'preferences' %}" class="btn btn-ghost btn-sm">Preferences</a>
+      {% if user.is_staff %}
+        <a href="{% url 'admin:index' %}" class="btn btn-ghost btn-sm">Admin</a>
+      {% endif %}
       {% if user.is_pro %}
         <a href="{% url 'billing_plan' %}" class="kr-nav__pro-badge">Pro</a>
       {% else %}

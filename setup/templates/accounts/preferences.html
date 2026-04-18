@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% load static notif_tags %}
+
+{% block title %}Preferences — KarmaRace{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/cards.css' %}">
+<link rel="stylesheet" href="{% static 'css/notifications.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Preferences</h1>
+</div>
+
+<div class="card" style="margin-bottom:1rem">
+  <h3 style="margin-bottom:0.8rem">Karma Thresholds</h3>
+  <p class="small text-muted" style="margin-bottom:1rem">
+    These thresholds control your personal low/high karma bands.
+  </p>
+
+  <form method="post" id="prefs-form">
+    {% csrf_token %}
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:0.75rem">
+      <div class="form-group" style="margin-bottom:0">
+        <label for="karma-low-threshold">Karma Low Threshold</label>
+        <input id="karma-low-threshold" type="number" min="0" name="karma_low_threshold" value="{{ low_threshold }}" required>
+      </div>
+      <div class="form-group" style="margin-bottom:0">
+        <label for="karma-high-threshold">Karma High Threshold</label>
+        <input id="karma-high-threshold" type="number" min="0" name="karma_high_threshold" value="{{ high_threshold }}" required>
+      </div>
+    </div>
+
+    <hr style="margin:1rem 0">
+
+    <h3 style="margin-bottom:0.75rem">Delivery Preferences</h3>
+    {% if user.is_pro %}
+    <p class="small text-muted" style="margin-bottom:1rem">
+      Configure email and webhook delivery per event type. Webhook URL and secret are shared across all events where webhook is enabled.
+    </p>
+
+    <div class="pref-webhook-global" style="margin-bottom:1rem;padding:1rem;background:var(--surface);border:1px solid var(--border);border-radius:5px">
+      <div class="form-group" style="margin-bottom:0.75rem">
+        <label for="webhook-url">Webhook URL</label>
+        <input type="url" name="webhook_url" id="webhook-url" placeholder="https://your-server.com/hook" value="{{ webhook_url }}">
+      </div>
+      <div class="form-group" style="margin-bottom:0">
+        <label for="webhook-secret">Webhook Secret <span class="text-muted" style="font-weight:400;text-transform:none;letter-spacing:0">(optional, sent as Bearer token)</span></label>
+        <input type="text" name="webhook_secret" id="webhook-secret" placeholder="your-secret" value="{{ webhook_secret }}">
+      </div>
+    </div>
+
+    <div class="pref-table" style="margin-top:0.75rem">
+      <div class="pref-table__head">
+        <span>Event</span>
+        <span>Email</span>
+        <span>Webhook</span>
+      </div>
+      {% for event_key, event_label in all_events %}
+      {% with pref=prefs|get_item:event_key %}
+      <div class="pref-table__row">
+        <span class="pref-table__label">{{ event_label }}</span>
+        <label class="toggle">
+          <input type="checkbox" name="email_{{ event_key }}" value="1" {% if pref and pref.email_enabled %}checked{% endif %}>
+          <span class="toggle__track"><span class="toggle__thumb"></span></span>
+        </label>
+        <label class="toggle">
+          <input type="checkbox" name="webhook_{{ event_key }}" value="1" {% if pref and pref.webhook_enabled %}checked{% endif %}>
+          <span class="toggle__track"><span class="toggle__thumb"></span></span>
+        </label>
+      </div>
+      {% endwith %}
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="small text-muted" style="margin-bottom:1rem">
+      <a href="{% url 'billing_plan' %}">Upgrade to Pro</a> to enable email and webhook delivery preferences.
+    </p>
+
+    <div class="pref-table" style="margin-top:0.75rem">
+      <div class="pref-table__head">
+        <span>Event</span>
+        <span>Email</span>
+        <span>Webhook</span>
+      </div>
+      {% for event_key, event_label in all_events %}
+      <div class="pref-table__row pref-table__row--locked">
+        <span class="pref-table__label">{{ event_label }}</span>
+        <label class="toggle toggle--locked" title="Pro feature">
+          <input type="checkbox" disabled>
+          <span class="toggle__track"><span class="toggle__thumb"></span></span>
+        </label>
+        <label class="toggle toggle--locked" title="Pro feature">
+          <input type="checkbox" disabled>
+          <span class="toggle__track"><span class="toggle__thumb"></span></span>
+        </label>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <div style="margin-top:1rem">
+      <button type="submit" class="btn btn-primary btn-sm">Save preferences</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

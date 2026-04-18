@@ -10,102 +10,14 @@
 {% block content %}
 <div class="page-header">
   <h1>Notifications</h1>
-  {% if notifications %}
-  <form method="post" action="{% url 'notifications_mark_all_read' %}">
-    {% csrf_token %}
-    <button type="submit" class="btn btn-secondary btn-sm">Mark all read</button>
-  </form>
-  {% endif %}
-</div>
-
-<div class="notif-prefs">
-  <button type="button" class="notif-prefs__toggle" id="prefs-toggle" aria-expanded="false" aria-controls="prefs-content">
-    <span class="notif-prefs__title" style="margin:0">Delivery Preferences</span>
-    <span class="notif-prefs__arrow" id="prefs-arrow" aria-hidden="true">&#9662;</span>
-  </button>
-
-  <div class="notif-prefs__content" id="prefs-content" hidden>
-
-  {% if user.is_pro %}
-  <p class="small text-muted" style="margin-bottom:1rem">
-    Configure email and webhook delivery per event type. Webhook URL and secret are shared across all events that have webhook enabled.
-  </p>
-
-  <form id="prefs-form">
-    {% csrf_token %}
-
-    <div class="pref-webhook-global" style="margin-bottom:1.25rem;padding:1rem;background:var(--surface);border:1px solid var(--border);border-radius:5px">
-      <div class="form-group" style="margin-bottom:0.75rem">
-        <label>Webhook URL</label>
-        <input type="url" name="webhook_url" id="webhook-url" placeholder="https://your-server.com/hook"
-          value="{{ webhook_url }}">
-      </div>
-      <div class="form-group" style="margin-bottom:0">
-        <label>Webhook Secret <span class="text-muted" style="font-weight:400;text-transform:none;letter-spacing:0">(optional — sent as Bearer token)</span></label>
-        <input type="text" name="webhook_secret" id="webhook-secret" placeholder="your-secret"
-          value="{{ webhook_secret }}">
-      </div>
-    </div>
-
-    <div class="pref-table">
-      <div class="pref-table__head">
-        <span>Event</span>
-        <span>Email</span>
-        <span>Webhook</span>
-      </div>
-      {% for event_key, event_label in all_events %}
-      {% with pref=prefs|get_item:event_key %}
-      <div class="pref-table__row">
-        <span class="pref-table__label">{{ event_label }}</span>
-        <label class="toggle">
-          <input type="checkbox" name="email_{{ event_key }}" value="1" {% if pref and pref.email_enabled %}checked{% endif %}>
-          <span class="toggle__track"><span class="toggle__thumb"></span></span>
-        </label>
-        <label class="toggle">
-          <input type="checkbox" name="webhook_{{ event_key }}" value="1" {% if pref and pref.webhook_enabled %}checked{% endif %}>
-          <span class="toggle__track"><span class="toggle__thumb"></span></span>
-        </label>
-      </div>
-      {% endwith %}
-      {% endfor %}
-    </div>
-
-    <div style="margin-top:1rem">
-      <button type="submit" class="btn btn-primary btn-sm">Save preferences</button>
-      <span id="prefs-saved" style="display:none;font-size:0.8rem;color:var(--success);margin-left:0.5rem">&#10003; Saved</span>
-    </div>
-  </form>
-
-  {% else %}
-  <p class="small text-muted" style="margin-bottom:1rem">
-    <a href="{% url 'billing_plan' %}">Upgrade to Pro</a> to enable email and webhook delivery per event.
-  </p>
-
-  <div class="pref-table">
-    <div class="pref-table__head">
-      <span>Event</span>
-      <span>Email</span>
-      <span>Webhook</span>
-    </div>
-    {% for event_key, event_label in all_events %}
-    <div class="pref-table__row pref-table__row--locked">
-      <span class="pref-table__label">{{ event_label }}</span>
-      <label class="toggle toggle--locked" title="Pro feature">
-        <input type="checkbox" disabled>
-        <span class="toggle__track"><span class="toggle__thumb"></span></span>
-      </label>
-      <label class="toggle toggle--locked" title="Pro feature">
-        <input type="checkbox" disabled>
-        <span class="toggle__track"><span class="toggle__thumb"></span></span>
-      </label>
-    </div>
-    {% endfor %}
-  </div>
-
-  <div style="margin-top:1rem">
-    <a href="{% url 'billing_plan' %}" class="btn btn-primary btn-sm">Upgrade to Pro</a>
-  </div>
-  {% endif %}
+  <div style="display:flex;gap:0.5rem;align-items:center">
+    <a href="{% url 'preferences' %}" class="btn btn-ghost btn-sm">Preferences</a>
+    {% if notifications %}
+    <form method="post" action="{% url 'notifications_mark_all_read' %}">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-secondary btn-sm">Mark all read</button>
+    </form>
+    {% endif %}
   </div>
 </div>
 
@@ -140,20 +52,4 @@
 {% endblock %}
 
 {% block extra_js %}
-{% if user.is_pro %}
-<script src="{% static 'js/notifications-prefs.js' %}"></script>
-{% endif %}
-<script>
-(function () {
-  var btn = document.getElementById('prefs-toggle');
-  var panel = document.getElementById('prefs-content');
-  if (!btn || !panel) return;
-
-  btn.addEventListener('click', function () {
-    var expanded = btn.getAttribute('aria-expanded') === 'true';
-    btn.setAttribute('aria-expanded', expanded ? 'false' : 'true');
-    panel.hidden = expanded;
-  });
-})();
-</script>
 {% endblock %}
