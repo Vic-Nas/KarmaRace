@@ -1,9 +1,9 @@
 # feed/views.py
 from django.contrib import messages
 from django.shortcuts import render, redirect, get_object_or_404
+from django.http import JsonResponse
 from django.urls import reverse
 from django.utils.http import urlencode
-from django.utils import timezone
 from django.views.decorators.http import require_POST
 from django.db.models import Sum, Value, Q
 from django.db.models.functions import Coalesce
@@ -14,27 +14,6 @@ from setup.platform_rules import (
     WEBHOOK_FAILURE_RATE_EPSILON,
     WEBHOOK_OBLIGATIONS_ENABLED,
 )
-
-
-def _expire_stale_cards_for_user(user):
-    """Auto-archive cards older than 1 day when tester made no decision."""
-    if not user.is_authenticated:
-        return
-
-    cutoff = timezone.now() - timezone.timedelta(days=1)
-
-    stale_qs = (
-        Task.objects
-        .filter(is_deleted=False, hidden=False, created_at__lt=cutoff)
-        .exclude(owner=user)
-        .exclude(archived_by=user)
-        .exclude(completions__tester=user)
-        .distinct()
-    )
-
-    stale_ids = list(stale_qs.values_list('id', flat=True))
-    if stale_ids:
-        user.archived_tasks.add(*stale_ids)
 
 
 def _open_obligations(user):
@@ -131,14 +110,9 @@ def _get_feed_task(user, completion='not_completed', archive='not_archived', tas
     return None
 
 
-def _karma_rewards_by_type():
-    return dict(KARMA_REWARDS_BY_TASK_TYPE)
-
-
 def _reward_for_task(task):
-    rewards = _karma_rewards_by_type()
     try:
-        return int(rewards.get(task.type, 0))
+        return int(KARMA_REWARDS_BY_TASK_TYPE.get(task.type, 0))
     except (TypeError, ValueError):
         return 0
 
@@ -169,11 +143,10 @@ def _webhook_stats(task):
 
 
 def feed(request):
-    _expire_stale_cards_for_user(request.user)
-
     completion = request.GET.get('completion') or 'not_completed'
     archive = request.GET.get('archive') or 'not_archived'
     task_family = request.GET.get('task_family') or 'all'
+    checking_task_id = request.GET.get('checking_task') or ''
     obligations = _active_lock_obligations(request.user, _open_obligations(request.user))
 
     task = _get_feed_task(
@@ -194,12 +167,25 @@ def feed(request):
             ).values_list('task_id', flat=True)
         )
 
-    karma_rewards = _karma_rewards_by_type()
+    is_checking = False
+    if task and request.user.is_authenticated and checking_task_id:
+        try:
+            target_check_id = int(checking_task_id)
+        except ValueError:
+            target_check_id = 0
+
+        if target_check_id == task.id:
+            is_checking = TaskCompletion.objects.filter(
+                task=task,
+                tester=request.user,
+                state=TaskCompletion.State.PENDING,
+            ).exists()
+
     webhook_stats = _webhook_stats(task) if task else None
 
     return render(request, 'feed/index.html', {
         'task': task,
-        'task_reward': karma_rewards.get(task.type, '?') if task else '?',
+        'task_reward': _reward_for_task(task) if task else '?',
         'completed_task_ids': completed_task_ids,
         'feed_empty': task is None,
         'completion': completion,
@@ -208,15 +194,19 @@ def feed(request):
         'obligation_mode': bool(obligations),
         'open_obligations_count': len(obligations),
         'webhook_stats': webhook_stats,
+        'checking_task_id': task.id if is_checking else '',
     })
 
 
-def _redirect_to_feed_with_filters(request):
+def _redirect_to_feed_with_filters(request, extra_params=None):
     params = {}
     for key in ('completion', 'archive', 'task_family'):
         value = (request.POST.get(key) or '').strip()
         if value:
             params[key] = value
+
+    if extra_params:
+        params.update(extra_params)
 
     url = reverse('feed')
     if params:
@@ -244,13 +234,11 @@ def done(request, task_id):
 
 @require_POST
 def check(request, task_id):
-    """Run verification for current user on a task and record completion state."""
+    """Queue async verification for current user on a task."""
     if not request.user.is_authenticated:
         return redirect('account_login')
 
-    from karma.models import KarmaTransaction
-    from karma.services import credit_karma, debit_karma
-    from tasks.services import verify_task_with_details, settle_or_create_obligation
+    from feed.tasks import process_task_check
 
     task = get_object_or_404(Task, pk=task_id, is_deleted=False, hidden=False)
     if task.owner_id == request.user.id:
@@ -263,44 +251,39 @@ def check(request, task_id):
         defaults={'state': TaskCompletion.State.PENDING},
     )
 
-    task.tried_count += 1
+    if completion.state == TaskCompletion.State.CONFIRMED:
+        messages.info(request, 'Task already confirmed for you.')
+        return _redirect_to_feed_with_filters(request)
 
-    ok, detail = verify_task_with_details(task, request.user)
-    if ok:
-        if completion.state != TaskCompletion.State.CONFIRMED:
-            completion.state = TaskCompletion.State.CONFIRMED
-            completion.save(update_fields=['state'])
+    if completion.state == TaskCompletion.State.PENDING:
+        messages.info(request, 'Check already in progress...')
+        return _redirect_to_feed_with_filters(request, extra_params={'checking_task': str(task.pk)})
 
-            reward = _reward_for_task(task)
-            if reward > 0:
-                credit_karma(
-                    user=request.user,
-                    delta=reward,
-                    reason=KarmaTransaction.Reason.TASK_EARNED,
-                    related_object_id=task.pk,
-                )
-                debit_karma(
-                    user=task.owner,
-                    delta=reward,
-                    reason=KarmaTransaction.Reason.TASK_COST,
-                    related_object_id=task.pk,
-                )
+    completion.state = TaskCompletion.State.PENDING
+    completion.save(update_fields=['state'])
 
-            settle_or_create_obligation(
-                actor=request.user,
-                counterparty=task.owner,
-                task_type=task.type,
-                completed_task=task,
-            )
-
-            task.succeed_count += 1
-            messages.success(request, detail or 'Task check passed. Reward applied.')
-        else:
-            messages.info(request, 'Task already confirmed for you.')
-    else:
+    try:
+        process_task_check.defer(task_id=task.pk, tester_id=request.user.pk)
+    except Exception:
         completion.state = TaskCompletion.State.FAILED
         completion.save(update_fields=['state'])
-        messages.error(request, detail or 'Task check failed. Please verify target/action and try again.')
+        messages.error(request, 'Could not queue async check. Please try again.')
+        return _redirect_to_feed_with_filters(request)
 
-    task.save(update_fields=['tried_count', 'succeed_count'])
-    return _redirect_to_feed_with_filters(request)
+    messages.info(request, 'Check started. Waiting for result...')
+    return _redirect_to_feed_with_filters(request, extra_params={'checking_task': str(task.pk)})
+
+
+def check_status(request, task_id):
+    """Return async check state for the current user and task."""
+    if not request.user.is_authenticated:
+        return JsonResponse({'state': 'UNAUTHENTICATED'}, status=401)
+
+    completion = TaskCompletion.objects.filter(
+        task_id=task_id,
+        tester=request.user,
+    ).first()
+    if completion is None:
+        return JsonResponse({'state': 'NOT_STARTED'})
+
+    return JsonResponse({'state': completion.state})

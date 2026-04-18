@@ -3,7 +3,6 @@ from django.contrib import admin
 from billing.models import BillingProfile
 
 
-@admin.register(BillingProfile)
 class BillingProfileAdmin(admin.ModelAdmin):
     list_display = (
         'user',
@@ -13,3 +12,6 @@ class BillingProfileAdmin(admin.ModelAdmin):
         'current_period_end',
     )
     search_fields = ('user__username', 'user__email', 'stripe_customer_id', 'stripe_subscription_id')
+
+
+admin.site.register(BillingProfile, BillingProfileAdmin)

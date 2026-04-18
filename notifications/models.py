@@ -8,6 +8,7 @@ class Notification(models.Model):
         TASK_CONFIRMED     = 'TASK_CONFIRMED'
         TASK_HEALTH_FAILED = 'TASK_HEALTH_FAILED'
         KARMA_LOW          = 'KARMA_LOW'
+        KARMA_RESTORED     = 'KARMA_RESTORED'
         PROJECT_STATE      = 'PROJECT_STATE'
         APPRECIATION       = 'APPRECIATION'
         FLAG_UP_RECEIVED   = 'FLAG_UP_RECEIVED'

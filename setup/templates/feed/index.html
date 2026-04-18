@@ -84,6 +84,12 @@
   {% endif %}
   <p class="text-muted">by {{ task.owner.username }}</p>
 
+  {% if checking_task_id %}
+    <div class="alert alert-info py-2" id="check-loading-banner">
+      Checking in progress... this card will refresh when done.
+    </div>
+  {% endif %}
+
   <div class="d-flex gap-2">
     <form method="post" action="{% url 'feed_check' task.id %}">
       {% csrf_token %}
@@ -111,6 +117,41 @@
     </div>
   {% endif %}
 
+{% endif %}
+
+{% if checking_task_id %}
+  <script>
+    (function () {
+      const statusUrl = "{% url 'feed_check_status' checking_task_id %}";
+      const pollMs = 1200;
+      const maxMs = 30000;
+      let elapsed = 0;
+
+      const timer = setInterval(async function () {
+        elapsed += pollMs;
+        try {
+          const response = await fetch(statusUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+          if (!response.ok) {
+            return;
+          }
+          const data = await response.json();
+          if (data.state && data.state !== 'PENDING') {
+            clearInterval(timer);
+            const url = new URL(window.location.href);
+            url.searchParams.delete('checking_task');
+            window.location.href = url.toString();
+            return;
+          }
+        } catch (e) {
+          // Keep trying until timeout.
+        }
+
+        if (elapsed >= maxMs) {
+          clearInterval(timer);
+        }
+      }, pollMs);
+    })();
+  </script>
 {% endif %}
 
 {% endblock %}

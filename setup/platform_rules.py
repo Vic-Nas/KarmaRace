@@ -4,10 +4,10 @@ KARMA_REWARDS_BY_TASK_TYPE = {
     'GITHUB_STAR': 5,
     'GITHUB_FORK': 5,
     'PH_COMMENT': 5,
-    'WEBHOOK': 8,
+    'WEBHOOK': 10,
 }
 
-KARMA_LOW_THRESHOLD = 10
+KARMA_LOW_THRESHOLD = 20
 
 # Webhook tasks are intentionally excluded from reciprocity obligations.
 WEBHOOK_OBLIGATIONS_ENABLED = False

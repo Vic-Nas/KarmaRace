@@ -18,7 +18,7 @@
     <li>Create a task in My Tasks (new tasks start hidden).</li>
     <li>Publish explicitly (publish runs configuration checks and can fail with a reason).</li>
     <li>A tester opens the feed and gets one card at a time.</li>
-    <li>Check verifies the action server-side and marks completion as CONFIRMED or FAILED.</li>
+    <li>Check queues async verification and shows loading until completion state updates.</li>
     <li>On CONFIRMED, tester earns karma and owner pays karma.</li>
   </ol>
 </div>
@@ -28,6 +28,7 @@
   <p>
     Feed is ranked by owner karma (descending), then creation time.
     Owners never see their own tasks in feed.
+    Tasks do not auto-expire from feed by age.
   </p>
   <ul>
     <li>Completion filter: Not Completed / Completed</li>
@@ -99,7 +100,7 @@ Authorization: Bearer {task.webhook_secret}  # only if secret is set
 <div class="mb-4">
   <h2 class="h5">Reward and Threshold Config</h2>
   <p>
-    Reward values and low-balance threshold are defined in setup/platform_rules.py,
+    Fixed reward values per task type and low-balance threshold are defined in setup/platform_rules.py,
     with optional per-user overrides through UserPreference.
   </p>
 </div>
