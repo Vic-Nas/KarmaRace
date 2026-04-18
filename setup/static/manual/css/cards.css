@@ -124,7 +124,6 @@
 
 .type-chip-input:focus-visible + .type-chip {
   outline: 2px solid var(--accent);
-  outline: 2px solid color-mix(in srgb, var(--accent) 45%, white);
   outline-offset: 2px;
 }
 
