@@ -26,7 +26,7 @@ def verify_task_with_details(task, tester):
     dispatch = {
         Task.Type.GITHUB_STAR: verify_github_with_details,
         Task.Type.GITHUB_FORK: verify_github_with_details,
-        Task.Type.PH_COMMENT:  verify_ph_with_details,
+        Task.Type.PH_ENGAGEMENT:  verify_ph_with_details,
         Task.Type.WEBHOOK:     verify_webhook_with_details,
     }
     verifier = dispatch.get(task.type)
@@ -115,11 +115,11 @@ def verify_ph(task, tester) -> bool:
 
 def verify_ph_with_details(task, tester):
     """
-    Check Product Hunt upvote or comment presence via PH GraphQL API.
+    Check Product Hunt upvote and comment presence via PH GraphQL API.
     Uses tester's stored access_token for user-scoped queries.
     task.target_id must be a PH post slug.
 
-    Either an upvote (isVoted) or a comment by the tester passes.
+    Both an upvote (isVoted) and a comment by the tester are required.
     Paginates through all comments using GraphQL cursor-based pagination.
     """
     try:
@@ -146,6 +146,7 @@ def verify_ph_with_details(task, tester):
         'query(' + _ph_query_signature(post_vars) + ') '
         '{ post(' + _ph_query_arg(post_vars) + ') { isVoted } }'
     )
+    is_voted = False
     try:
         response = requests.post(
             'https://api.producthunt.com/v2/api/graphql',
@@ -159,13 +160,12 @@ def verify_ph_with_details(task, tester):
         if not post:
             logger.warning('verify_ph: post target %s not found', task.target_id)
             return False, 'Product Hunt post not found. Use post slug.'
-        if post.get('isVoted'):
-            return True, 'Verified Product Hunt upvote.'
+        is_voted = bool(post.get('isVoted'))
     except requests.RequestException as exc:
         logger.error('verify_ph: vote check failed for task %s: %s', task.pk, exc)
         return False, f'Product Hunt vote check failed: {exc}'
 
-    # isVoted is False — check comments with cursor-based pagination.
+    # Check comments with cursor-based pagination.
     comments_query = (
         'query(' + _ph_query_signature(post_vars, include_cursor=True) + ') '
         '{ post(' + _ph_query_arg(post_vars) + ') '
@@ -173,6 +173,7 @@ def verify_ph_with_details(task, tester):
         '{ edges { node { user { id username } } } pageInfo { hasNextPage endCursor } } } }'
     )
     cursor = None
+    has_comment = False
     try:
         while True:
             response = requests.post(
@@ -190,16 +191,25 @@ def verify_ph_with_details(task, tester):
             edges    = comments.get('edges', [])
 
             if any(_matches_ph_user(edge, ph_user_id, ph_username) for edge in edges):
-                return True, 'Verified Product Hunt comment.'
+                has_comment = True
+                break
 
             page_info = comments.get('pageInfo', {})
             if not page_info.get('hasNextPage'):
-                return False, 'No upvote/comment detected for your Product Hunt account.'
+                break
             cursor = page_info.get('endCursor')
 
     except requests.RequestException as exc:
         logger.error('verify_ph: comment check failed for task %s: %s', task.pk, exc)
         return False, f'Product Hunt comment check failed: {exc}'
+
+    if is_voted and has_comment:
+        return True, 'Verified Product Hunt upvote and comment.'
+    if not is_voted and not has_comment:
+        return False, 'Both Product Hunt upvote and comment are required.'
+    if not is_voted:
+        return False, 'Product Hunt upvote is required in addition to your comment.'
+    return False, 'Product Hunt comment is required in addition to your upvote.'
 
 
 def verify_webhook(task, tester) -> bool:
@@ -331,7 +341,7 @@ def get_task_configuration_failure(task):
     """Return None when valid, otherwise a human-readable reason."""
     if task.type in (Task.Type.GITHUB_STAR, Task.Type.GITHUB_FORK):
         return _check_github_repo_public_detailed(task)
-    elif task.type == Task.Type.PH_COMMENT:
+    elif task.type == Task.Type.PH_ENGAGEMENT:
         return _check_ph_post_exists_detailed(task)
     elif task.type == Task.Type.WEBHOOK:
         pro_gate = _check_webhook_owner_plan_detailed(task)
@@ -595,7 +605,7 @@ def _check_task_health(task) -> bool:
                 return False
             return not response.json().get('private', True)
 
-        elif task.type == Task.Type.PH_COMMENT:
+        elif task.type == Task.Type.PH_ENGAGEMENT:
             ok, post_vars, _ = _resolve_ph_post_query_vars(task.target_id)
             if not ok:
                 return False
@@ -696,7 +706,7 @@ def _task_slug(task):
     platform_map = {
         Task.Type.GITHUB_STAR: 'github-star',
         Task.Type.GITHUB_FORK: 'github-fork',
-        Task.Type.PH_COMMENT: 'ph',
+        Task.Type.PH_ENGAGEMENT: 'ph',
         Task.Type.WEBHOOK: 'webhook',
     }
     platform = platform_map.get(task.type, 'task')

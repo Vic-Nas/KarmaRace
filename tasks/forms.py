@@ -56,8 +56,8 @@ class TaskForm(forms.ModelForm):
             return f'Star GitHub repo {target_id}'
         if task_type == Task.Type.GITHUB_FORK:
             return f'Fork GitHub repo {target_id}'
-        if task_type == Task.Type.PH_COMMENT:
-            return f'Comment on Product Hunt post {target_id}'
+        if task_type == Task.Type.PH_ENGAGEMENT:
+            return f'Upvote and comment on Product Hunt post {target_id}'
         return ''
 
     def clean_description(self):
