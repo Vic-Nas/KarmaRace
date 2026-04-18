@@ -7,7 +7,7 @@ from django.urls import reverse
 from django.utils.http import urlencode
 from django.utils import timezone
 from django.views.decorators.http import require_POST
-from django.db.models import Sum, Value, Q
+from django.db.models import Sum, Value, Q, Case, When, IntegerField
 from django.db.models.functions import Coalesce
 from datetime import timedelta
 
@@ -18,6 +18,67 @@ from setup.platform_rules import (
     WEBHOOK_FAILURE_RATE_EPSILON,
     WEBHOOK_OBLIGATIONS_ENABLED,
 )
+
+
+SESSION_FEED_PIN_KEY = 'feed_pinned_task_id'
+DEFAULT_COMPLETION = 'not_completed'
+DEFAULT_ARCHIVE = 'not_archived'
+
+ALL_TASK_TYPES = [
+    Task.Type.GITHUB_STAR,
+    Task.Type.GITHUB_FORK,
+    Task.Type.PH_ENGAGEMENT,
+    Task.Type.WEBHOOK,
+]
+
+TASK_TYPE_LABELS = {
+    Task.Type.GITHUB_STAR: 'GitHub Star',
+    Task.Type.GITHUB_FORK: 'GitHub Fork',
+    Task.Type.PH_ENGAGEMENT: 'Product Hunt',
+    Task.Type.WEBHOOK: 'Webhook',
+}
+
+
+def _normalize_task_types(values):
+    valid = set(ALL_TASK_TYPES)
+    normalized = []
+    seen = set()
+
+    for raw in values or []:
+        for item in str(raw or '').split(','):
+            task_type = item.strip()
+            if task_type and task_type in valid and task_type not in seen:
+                seen.add(task_type)
+                normalized.append(task_type)
+
+    return normalized or list(ALL_TASK_TYPES)
+
+
+def _task_types_csv(task_types):
+    return ','.join(task_types)
+
+
+def _build_filter_params(completion, archive, task_types, extra_params=None):
+    """Return compact feed query params (omit defaults/all-types)."""
+    params = {}
+
+    if completion != DEFAULT_COMPLETION:
+        params['completion'] = completion
+
+    if archive != DEFAULT_ARCHIVE:
+        params['archive'] = archive
+
+    normalized_types = _normalize_task_types(task_types)
+    if normalized_types != ALL_TASK_TYPES:
+        params['task_types'] = normalized_types
+
+    if extra_params:
+        for key, value in extra_params.items():
+            if value in (None, '', []):
+                continue
+            params[key] = value
+
+    return params
 
 
 def _open_obligations(user):
@@ -46,17 +107,13 @@ def _active_lock_obligations(user, obligations):
     return obligations if candidate else []
 
 
-def _feed_queryset(user, completion='not_completed', archive='not_archived', task_family='not_webhook', obligations=None):
+def _feed_queryset(user, completion='not_completed', archive='not_archived', task_types=None, obligations=None):
     """Visible tasks ranked by owner karma balance (descending)."""
+    task_types = _normalize_task_types(task_types)
     qs = Task.objects.filter(is_deleted=False, hidden=False).select_related('owner')
 
     if user.is_authenticated:
         qs = qs.exclude(owner=user)
-
-        if task_family == 'webhook':
-            qs = qs.filter(type=Task.Type.WEBHOOK)
-        else:
-            qs = qs.exclude(type=Task.Type.WEBHOOK)
 
         if obligations:
             allowed_pairs = Q(pk__in=[])
@@ -86,32 +143,65 @@ def _feed_queryset(user, completion='not_completed', archive='not_archived', tas
                     completions__state=TaskCompletion.State.CONFIRMED,
                 )
 
+            qs = qs.filter(type__in=task_types)
+    else:
+        qs = qs.filter(type__in=task_types)
+
     qs = qs.annotate(
-        owner_balance=Coalesce(Sum('owner__karma_transactions__delta'), Value(0))
-    ).order_by('-owner_balance', 'created_at')
+        owner_balance=Coalesce(Sum('owner__karma_transactions__delta'), Value(0)),
+        reward_points=Case(
+            *[
+                When(type=task_type, then=Value(int(KARMA_REWARDS_BY_TASK_TYPE.get(task_type, 0) or 0)))
+                for task_type in ALL_TASK_TYPES
+            ],
+            default=Value(0),
+            output_field=IntegerField(),
+        ),
+    ).order_by('-owner_balance', '-reward_points', 'created_at')
 
     return qs
 
 
-def _get_feed_task(user, completion='not_completed', archive='not_archived', task_family='not_webhook', obligations=None):
-    """Pick first healthy task candidate from the ranked task feed."""
-    from tasks.services import run_health_check
-
+def _get_feed_task(user, completion='not_completed', archive='not_archived', task_types=None, obligations=None):
+    """Pick the first ranked visible task without mutating task health state."""
     qs = _feed_queryset(
         user,
         completion=completion,
         archive=archive,
-        task_family=task_family,
+        task_types=task_types,
         obligations=obligations,
     )
+    return qs.first()
 
-    for task in qs.iterator():
-        if run_health_check(task):
-            task.refresh_from_db()
-            if not task.is_deleted and not task.hidden:
-                return task
 
-    return None
+def _get_pinned_task(request, archive='not_archived', task_types=None, obligations=None):
+    """Return pinned task for current session when still actionable."""
+    task_types = _normalize_task_types(task_types)
+    if not request.user.is_authenticated or obligations or archive != 'not_archived':
+        return None
+
+    pinned_id = request.session.get(SESSION_FEED_PIN_KEY)
+    if not pinned_id:
+        return None
+
+    task = Task.objects.filter(pk=pinned_id, is_deleted=False, hidden=False).select_related('owner').first()
+    if task is None:
+        request.session.pop(SESSION_FEED_PIN_KEY, None)
+        return None
+
+    if task.owner_id == request.user.id:
+        request.session.pop(SESSION_FEED_PIN_KEY, None)
+        return None
+
+    if task.archived_by.filter(pk=request.user.pk).exists():
+        request.session.pop(SESSION_FEED_PIN_KEY, None)
+        return None
+
+    if task.type not in task_types:
+        request.session.pop(SESSION_FEED_PIN_KEY, None)
+        return None
+
+    return task
 
 
 def _reward_for_task(task):
@@ -155,21 +245,46 @@ def feed(request):
         elif check_result == TaskCompletion.State.FAILED:
             messages.error(request, check_detail or msg('CHECK_FAILED_GENERIC'))
 
-    completion = request.GET.get('completion') or 'not_completed'
-    archive = request.GET.get('archive') or 'not_archived'
-    task_family = request.GET.get('task_family') or 'not_webhook'
-    if task_family not in ('webhook', 'not_webhook'):
-        task_family = 'not_webhook'
+    completion = request.GET.get('completion') or DEFAULT_COMPLETION
+    archive = request.GET.get('archive') or DEFAULT_ARCHIVE
+    selected_task_types = _normalize_task_types(request.GET.getlist('task_types'))
     checking_task_id = request.GET.get('checking_task') or ''
-    obligations = _active_lock_obligations(request.user, _open_obligations(request.user))
 
-    task = _get_feed_task(
-        request.user,
+    canonical_params = _build_filter_params(
         completion=completion,
         archive=archive,
-        task_family=task_family,
+        task_types=selected_task_types,
+        extra_params={'checking_task': checking_task_id},
+    )
+    canonical_qs = urlencode(canonical_params, doseq=True)
+    current_qs = request.GET.urlencode()
+    if current_qs != canonical_qs:
+        base_url = reverse('feed')
+        if canonical_qs:
+            return redirect(f'{base_url}?{canonical_qs}')
+        return redirect(base_url)
+
+    obligations = _active_lock_obligations(request.user, _open_obligations(request.user))
+
+    task = _get_pinned_task(
+        request,
+        archive=archive,
+        task_types=selected_task_types,
         obligations=obligations,
     )
+    if task is None:
+        task = _get_feed_task(
+            request.user,
+            completion=completion,
+            archive=archive,
+            task_types=selected_task_types,
+            obligations=obligations,
+        )
+        if request.user.is_authenticated and not obligations and archive == 'not_archived':
+            if task is not None:
+                request.session[SESSION_FEED_PIN_KEY] = task.id
+            else:
+                request.session.pop(SESSION_FEED_PIN_KEY, None)
     completed_task_ids = set()
 
     if task and request.user.is_authenticated:
@@ -204,7 +319,12 @@ def feed(request):
         'feed_empty': task is None,
         'completion': completion,
         'archive': archive,
-        'task_family': task_family,
+        'selected_task_types': selected_task_types,
+        'selected_task_types_csv': _task_types_csv(selected_task_types),
+        'all_task_types': [
+            {'value': task_type, 'label': TASK_TYPE_LABELS.get(task_type, task_type.replace('_', ' ').title())}
+            for task_type in ALL_TASK_TYPES
+        ],
         'obligation_mode': bool(obligations),
         'open_obligations_count': len(obligations),
         'webhook_stats': webhook_stats,
@@ -213,18 +333,22 @@ def feed(request):
 
 
 def _redirect_to_feed_with_filters(request, extra_params=None):
-    params = {}
-    for key in ('completion', 'archive', 'task_family'):
-        value = (request.POST.get(key) or '').strip()
-        if value:
-            params[key] = value
+    completion = (request.POST.get('completion') or DEFAULT_COMPLETION).strip() or DEFAULT_COMPLETION
+    archive = (request.POST.get('archive') or DEFAULT_ARCHIVE).strip() or DEFAULT_ARCHIVE
+    selected_task_types = _normalize_task_types(request.POST.getlist('task_types'))
+    params = _build_filter_params(
+        completion=completion,
+        archive=archive,
+        task_types=selected_task_types,
+        extra_params=extra_params,
+    )
 
     if extra_params:
         params.update(extra_params)
 
     url = reverse('feed')
     if params:
-        return redirect(f'{url}?{urlencode(params)}')
+        return redirect(f'{url}?{urlencode(params, doseq=True)}')
     return redirect(url)
 
 
@@ -255,6 +379,8 @@ def done(request, task_id):
     task = get_object_or_404(Task, pk=task_id, is_deleted=False, hidden=False)
     if task.owner_id != request.user.id:
         task.archived_by.add(request.user)
+        if request.session.get(SESSION_FEED_PIN_KEY) == task.id:
+            request.session.pop(SESSION_FEED_PIN_KEY, None)
 
     return _redirect_to_feed_with_filters(request)
 
@@ -305,7 +431,15 @@ def check(request, task_id):
     )
 
     if completion.state == TaskCompletion.State.CONFIRMED:
-        return respond(TaskCompletion.State.CONFIRMED, msg('ALREADY_CONFIRMED'))
+        from karma.services import get_balance
+        return respond(
+            TaskCompletion.State.CONFIRMED,
+            msg('ALREADY_CONFIRMED'),
+            extra_params={
+                'karma_delta': 0,
+                'karma_balance': get_balance(request.user),
+            },
+        )
 
     if completion.state == TaskCompletion.State.PENDING and not created:
         if completion.created_at <= timezone.now() - timedelta(seconds=45):
@@ -329,7 +463,16 @@ def check(request, task_id):
             process_task_check(task_id=task.pk, tester_id=request.user.pk)
             completion.refresh_from_db(fields=['state', 'result_detail'])
             if completion.state == TaskCompletion.State.CONFIRMED:
-                return respond(TaskCompletion.State.CONFIRMED, msg('QUEUE_UNAVAILABLE_CONFIRMED'))
+                from karma.services import get_balance
+                reward = int(KARMA_REWARDS_BY_TASK_TYPE.get(task.type, 0) or 0)
+                return respond(
+                    TaskCompletion.State.CONFIRMED,
+                    msg('QUEUE_UNAVAILABLE_CONFIRMED'),
+                    extra_params={
+                        'karma_delta': reward,
+                        'karma_balance': get_balance(request.user),
+                    },
+                )
             else:
                 return respond(TaskCompletion.State.FAILED, completion.result_detail or msg('QUEUE_UNAVAILABLE_FAILED'))
         except Exception:
@@ -369,6 +512,17 @@ def check_status(request, task_id):
         return JsonResponse({
             'state': completion.state,
             'detail': completion.result_detail or msg('CHECK_FAILED_GENERIC'),
+        })
+
+    if completion.state == TaskCompletion.State.CONFIRMED:
+        from karma.services import get_balance
+        task = Task.objects.filter(pk=task_id).first()
+        reward = int(KARMA_REWARDS_BY_TASK_TYPE.get(task.type, 0) or 0) if task else 0
+        return JsonResponse({
+            'state': completion.state,
+            'detail': msg('CHECK_CONFIRMED'),
+            'karma_delta': reward,
+            'karma_balance': get_balance(request.user),
         })
 
     return JsonResponse({'state': completion.state})

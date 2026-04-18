@@ -1,4 +1,47 @@
 var FeedCheck = (function () {
+  function readRewardDelta() {
+    var rewardValue = document.querySelector('.task-card__reward strong');
+    if (!rewardValue) return 0;
+    var parsed = parseInt((rewardValue.textContent || '').trim(), 10);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  function updateKarmaBadgeByDelta(delta) {
+    if (typeof delta !== 'number' || delta === 0) return;
+    var badge = document.getElementById('karma-badge');
+    if (!badge) return;
+    var current = parseInt((badge.textContent || '').replace(/[^0-9-]/g, ''), 10);
+    if (!Number.isFinite(current)) return;
+    badge.textContent = '☵ ' + (current + delta);
+  }
+
+  function updateKarmaBadge(balance) {
+    if (typeof balance !== 'number') return;
+    var badge = document.getElementById('karma-badge');
+    if (!badge) return;
+    badge.textContent = '☵ ' + balance;
+  }
+
+  function triggerKarmaFx(delta) {
+    if (typeof delta !== 'number' || delta === 0) return;
+    if (window.KarmaFX && typeof window.KarmaFX.fire === 'function') {
+      var anchor = document.getElementById('karma-badge');
+      window.KarmaFX.fire(delta, anchor);
+    }
+  }
+
+  function applyKarmaUpdate(data) {
+    if (!data) return;
+    var delta = (typeof data.karma_delta === 'number') ? data.karma_delta : readRewardDelta();
+    triggerKarmaFx(delta);
+
+    if (typeof data.karma_balance === 'number') {
+      updateKarmaBadge(data.karma_balance);
+    } else {
+      updateKarmaBadgeByDelta(delta);
+    }
+  }
+
   function setBanner(kind, text) {
     var banner = document.getElementById('check-loading-banner');
     if (!banner) return;
@@ -8,6 +51,8 @@ var FeedCheck = (function () {
     banner.classList.remove('alert-info', 'alert-success', 'alert-danger', 'alert-warning');
     if (kind === 'success') {
       banner.classList.add('alert-success');
+    } else if (kind === 'info') {
+      banner.classList.add('alert-info');
     } else if (kind === 'warning') {
       banner.classList.add('alert-warning');
     } else {
@@ -43,7 +88,7 @@ var FeedCheck = (function () {
 
   function start(statusUrl) {
     var pollMs = 1200;
-    var maxMs = 30000;
+    var maxMs = 120000;
     var elapsed = 0;
 
     setCheckButtonDisabled(true);
@@ -58,6 +103,7 @@ var FeedCheck = (function () {
             if (data.state === 'CONFIRMED') {
               setBanner('success', 'Check confirmed. Karma transferred.');
               addCompletedBadge();
+              applyKarmaUpdate(data);
             } else if (data.state === 'FAILED') {
               setBanner('danger', data.detail || 'Check failed. Please retry.');
             } else {
@@ -116,6 +162,7 @@ var FeedCheck = (function () {
           if (data.state === 'CONFIRMED') {
             setBanner('success', data.detail || 'Check confirmed. Karma transferred.');
             addCompletedBadge();
+            applyKarmaUpdate(data);
           } else {
             setBanner('danger', data.detail || 'Check failed. Please retry.');
           }

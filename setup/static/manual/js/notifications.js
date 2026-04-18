@@ -1,9 +1,19 @@
 (function () {
   const POLL_MS = 5000;
   const KARMA_EVENTS = ['TASK_CONFIRMED', 'KARMA_LOW', 'KARMA_RESTORED'];
-  const KARMA_DELTAS = { TASK_CONFIRMED: 1, KARMA_LOW: -1, KARMA_RESTORED: 1 };
+  const LAST_SEEN_KEY = 'kr_last_seen_notif_id';
   const seen = new Set();
   let bellBtn, dotEl, countEl, dropdown, dropList;
+
+  function getLastSeenId() {
+    const value = parseInt(window.sessionStorage.getItem(LAST_SEEN_KEY) || '0', 10);
+    return Number.isFinite(value) ? value : 0;
+  }
+
+  function setLastSeenId(id) {
+    if (!Number.isFinite(id) || id <= 0) return;
+    window.sessionStorage.setItem(LAST_SEEN_KEY, String(id));
+  }
 
   function eventLabel(ev) {
     return {
@@ -85,15 +95,28 @@
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (data) {
         if (!data) return;
-        const fresh = (data.notifications || []).filter(function (n) { return !seen.has(n.id); });
+
+        const notifications = (data.notifications || []);
+        const lastSeen = getLastSeenId();
+        let maxId = lastSeen;
+        notifications.forEach(function (n) {
+          if (!seen.has(n.id)) seen.add(n.id);
+          if (typeof n.id === 'number' && n.id > maxId) maxId = n.id;
+        });
+
+        const fresh = notifications.filter(function (n) {
+          return typeof n.id === 'number' && n.id > lastSeen;
+        });
+
         fresh.forEach(function (n) {
-          seen.add(n.id);
           showToast(n);
           if (KARMA_EVENTS.includes(n.event)) {
-            const delta = n.karma_delta || KARMA_DELTAS[n.event] || 0;
+            const delta = (typeof n.karma_delta === 'number') ? n.karma_delta : 0;
             if (delta !== 0) KarmaFX.fire(delta, document.querySelector('.kr-nav__karma'));
           }
         });
+
+        setLastSeenId(maxId);
         updateBell(data.unread_count || 0);
         if (dropList && dropdown && dropdown.classList.contains('open')) {
           refreshDropdown();

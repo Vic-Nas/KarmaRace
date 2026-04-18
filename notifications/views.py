@@ -27,12 +27,9 @@ def _notif_summary(notif):
 
 def _karma_delta(notif):
     p = notif.payload or {}
-    if notif.event == Notification.Event.TASK_CONFIRMED:
-        return p.get('delta', 5)
-    if notif.event == Notification.Event.KARMA_LOW:
-        return p.get('delta', -1)
-    if notif.event == Notification.Event.KARMA_RESTORED:
-        return p.get('delta', 1)
+    delta = p.get('delta')
+    if isinstance(delta, (int, float)):
+        return int(delta)
     return 0
 
 
