@@ -42,7 +42,7 @@ def _active_lock_obligations(user, obligations):
     return obligations if candidate else []
 
 
-def _feed_queryset(user, completion='not_completed', archive='not_archived', task_family='all', obligations=None):
+def _feed_queryset(user, completion='not_completed', archive='not_archived', task_family='not_webhook', obligations=None):
     """Visible tasks ranked by owner karma balance (descending)."""
     qs = Task.objects.filter(is_deleted=False, hidden=False).select_related('owner')
 
@@ -51,7 +51,7 @@ def _feed_queryset(user, completion='not_completed', archive='not_archived', tas
 
         if task_family == 'webhook':
             qs = qs.filter(type=Task.Type.WEBHOOK)
-        elif task_family == 'not_webhook':
+        else:
             qs = qs.exclude(type=Task.Type.WEBHOOK)
 
         if obligations:
@@ -89,7 +89,7 @@ def _feed_queryset(user, completion='not_completed', archive='not_archived', tas
     return qs
 
 
-def _get_feed_task(user, completion='not_completed', archive='not_archived', task_family='all', obligations=None):
+def _get_feed_task(user, completion='not_completed', archive='not_archived', task_family='not_webhook', obligations=None):
     """Pick first healthy task candidate from the ranked task feed."""
     from tasks.services import run_health_check
 
@@ -145,7 +145,9 @@ def _webhook_stats(task):
 def feed(request):
     completion = request.GET.get('completion') or 'not_completed'
     archive = request.GET.get('archive') or 'not_archived'
-    task_family = request.GET.get('task_family') or 'all'
+    task_family = request.GET.get('task_family') or 'not_webhook'
+    if task_family not in ('webhook', 'not_webhook'):
+        task_family = 'not_webhook'
     checking_task_id = request.GET.get('checking_task') or ''
     obligations = _active_lock_obligations(request.user, _open_obligations(request.user))
 

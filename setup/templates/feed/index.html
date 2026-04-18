@@ -29,9 +29,6 @@
   <div>
     <div class="small text-muted mb-1">Task Type</div>
     <div class="btn-group" role="group" aria-label="Task type filter">
-      <input type="radio" class="btn-check" name="task_family" id="task_family_all" value="all" {% if task_family == 'all' %}checked{% endif %}>
-      <label class="btn btn-outline-dark btn-sm" for="task_family_all">All</label>
-
       <input type="radio" class="btn-check" name="task_family" id="task_family_webhook" value="webhook" {% if task_family == 'webhook' %}checked{% endif %}>
       <label class="btn btn-outline-dark btn-sm" for="task_family_webhook">Webhook</label>
 
