@@ -17,7 +17,12 @@ var FeedCheck = (function () {
           }
         })
         .catch(function () {});
-      if (elapsed >= maxMs) clearInterval(timer);
+      if (elapsed >= maxMs) {
+        clearInterval(timer);
+        var fallbackUrl = new URL(window.location.href);
+        fallbackUrl.searchParams.delete('checking_task');
+        window.location.href = fallbackUrl.toString();
+      }
     }, pollMs);
   }
   return { start: start };

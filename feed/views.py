@@ -4,9 +4,11 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse
 from django.urls import reverse
 from django.utils.http import urlencode
+from django.utils import timezone
 from django.views.decorators.http import require_POST
 from django.db.models import Sum, Value, Q
 from django.db.models.functions import Coalesce
+from datetime import timedelta
 
 from tasks.models import Task, TaskCompletion, ReciprocityObligation
 from setup.platform_rules import (
@@ -216,6 +218,19 @@ def _redirect_to_feed_with_filters(request, extra_params=None):
     return redirect(url)
 
 
+def _precheck_linked_account(user, task):
+    """Return user-facing error text when a required linked account is missing."""
+    if task.type in (Task.Type.GITHUB_STAR, Task.Type.GITHUB_FORK):
+        if not user.linked_accounts.filter(platform='github').exists():
+            return 'Connect your GitHub account in Accounts before checking GitHub tasks.'
+
+    if task.type == Task.Type.PH_ENGAGEMENT:
+        if not user.linked_accounts.filter(platform='producthunt').exists():
+            return 'Connect your Product Hunt account in Accounts before checking Product Hunt tasks.'
+
+    return None
+
+
 @require_POST
 def done(request, task_id):
     """Archive this task for the current user and advance the feed."""
@@ -247,7 +262,12 @@ def check(request, task_id):
         messages.error(request, 'You cannot check your own task.')
         return redirect('feed')
 
-    completion, _ = TaskCompletion.objects.get_or_create(
+    precheck_error = _precheck_linked_account(request.user, task)
+    if precheck_error:
+        messages.error(request, precheck_error)
+        return _redirect_to_feed_with_filters(request)
+
+    completion, created = TaskCompletion.objects.get_or_create(
         task=task,
         tester=request.user,
         defaults={'state': TaskCompletion.State.PENDING},
@@ -257,12 +277,17 @@ def check(request, task_id):
         messages.info(request, 'Task already confirmed for you.')
         return _redirect_to_feed_with_filters(request)
 
-    if completion.state == TaskCompletion.State.PENDING:
-        messages.info(request, 'Check already in progress...')
-        return _redirect_to_feed_with_filters(request, extra_params={'checking_task': str(task.pk)})
+    if completion.state == TaskCompletion.State.PENDING and not created:
+        if completion.created_at <= timezone.now() - timedelta(seconds=45):
+            completion.state = TaskCompletion.State.FAILED
+            completion.save(update_fields=['state'])
+        else:
+            messages.info(request, 'Check already in progress...')
+            return _redirect_to_feed_with_filters(request, extra_params={'checking_task': str(task.pk)})
 
-    completion.state = TaskCompletion.State.PENDING
-    completion.save(update_fields=['state'])
+    if not created:
+        completion.state = TaskCompletion.State.PENDING
+        completion.save(update_fields=['state'])
 
     try:
         process_task_check.defer(task_id=task.pk, tester_id=request.user.pk)
@@ -287,5 +312,16 @@ def check_status(request, task_id):
     ).first()
     if completion is None:
         return JsonResponse({'state': 'NOT_STARTED'})
+
+    if (
+        completion.state == TaskCompletion.State.PENDING
+        and completion.created_at <= timezone.now() - timedelta(seconds=45)
+    ):
+        completion.state = TaskCompletion.State.FAILED
+        completion.save(update_fields=['state'])
+        return JsonResponse({
+            'state': TaskCompletion.State.FAILED,
+            'detail': 'Verification timed out. Please retry.',
+        })
 
     return JsonResponse({'state': completion.state})
