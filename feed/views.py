@@ -292,10 +292,16 @@ def check(request, task_id):
     try:
         process_task_check.defer(task_id=task.pk, tester_id=request.user.pk)
     except Exception:
-        completion.state = TaskCompletion.State.FAILED
-        completion.save(update_fields=['state'])
-        messages.error(request, 'Could not queue async check. Please try again.')
-        return _redirect_to_feed_with_filters(request)
+        # Fallback: process immediately so checks still work when queueing is unavailable.
+        try:
+            process_task_check(task_id=task.pk, tester_id=request.user.pk)
+            messages.info(request, 'Queue unavailable, processed check immediately.')
+            return _redirect_to_feed_with_filters(request)
+        except Exception:
+            completion.state = TaskCompletion.State.FAILED
+            completion.save(update_fields=['state'])
+            messages.error(request, 'Could not queue async check. Please try again.')
+            return _redirect_to_feed_with_filters(request)
 
     messages.info(request, 'Check started. Waiting for result...')
     return _redirect_to_feed_with_filters(request, extra_params={'checking_task': str(task.pk)})

@@ -2,13 +2,11 @@
 import logging
 import requests
 
-import procrastinate
+from procrastinate.contrib.django import app
 
 from notifications.models import Notification, NotificationPreference, NotificationDelivery
 
 logger = logging.getLogger(__name__)
-
-app = procrastinate.App(connector=procrastinate.SyncPsycopgConnector())
 
 
 @app.task

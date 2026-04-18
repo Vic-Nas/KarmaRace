@@ -1,6 +1,6 @@
 import logging
 
-import procrastinate
+from procrastinate.contrib.django import app
 from django.db import transaction
 
 from karma.models import KarmaTransaction
@@ -10,8 +10,6 @@ from tasks.models import Task, TaskCompletion
 from tasks.services import verify_task_with_details, settle_or_create_obligation
 
 logger = logging.getLogger(__name__)
-
-app = procrastinate.App(connector=procrastinate.SyncPsycopgConnector())
 
 
 @app.task
