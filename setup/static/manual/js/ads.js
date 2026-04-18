@@ -9,7 +9,7 @@
   };
   var KOHO = {
     url: 'https://referral.koho.ca/mzHiGL4',
-    logo: 'https://www.koho.ca/wp-content/themes/koho/assets/images/koho-logo.svg',
+    logo: 'https://www.koho.ca/favicon-32x32.png',
     name: 'KOHO',
     tag: 'Spend smarter',
   };
