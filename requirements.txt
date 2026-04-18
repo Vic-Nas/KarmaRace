@@ -3,6 +3,7 @@ dj_database_url
 django
 django-environ
 environ
+PyJWT>=2.0.0
 procrastinate
 psycopg[binary]>=3.1
 psycopg2-binary>=2.9
