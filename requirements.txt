@@ -3,6 +3,6 @@ dj_database_url
 django
 django-environ
 environ
-procratinate
+procrastinate
 whitenoise
 stripe
