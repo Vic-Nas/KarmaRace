@@ -295,7 +295,9 @@ def check(request, task_id):
 
     if not created:
         completion.state = TaskCompletion.State.PENDING
-        completion.save(update_fields=['state'])
+        # Reuse row for retries but reset pending start timestamp for timeout logic.
+        completion.created_at = timezone.now()
+        completion.save(update_fields=['state', 'created_at'])
 
     try:
         process_task_check.defer(task_id=task.pk, tester_id=request.user.pk)
