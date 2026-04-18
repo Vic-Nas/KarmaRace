@@ -6,12 +6,10 @@ from django.shortcuts import render, get_object_or_404
 from django.views.decorators.http import require_POST
 from django.utils import timezone
 
-from accounts.models import UserPreference
 from notifications.models import Notification, NotificationPreference
 
 
 def _notif_summary(notif):
-    """Return a short human-readable summary from notification payload."""
     p = notif.payload or {}
     event = notif.event
     if event == Notification.Event.TASK_CONFIRMED:
@@ -28,7 +26,6 @@ def _notif_summary(notif):
 
 
 def _karma_delta(notif):
-    """Return signed karma delta if event carries one, else 0."""
     p = notif.payload or {}
     if notif.event == Notification.Event.TASK_CONFIRMED:
         return p.get('delta', 5)
@@ -52,7 +49,6 @@ def _serialize(notif):
 
 @login_required
 def unread_poll(request):
-    """Polled by JS every 5s. Returns new unread notifications since last seen id."""
     since_id = request.GET.get('since', 0)
     try:
         since_id = int(since_id)
@@ -72,7 +68,6 @@ def unread_poll(request):
 
 @login_required
 def recent_poll(request):
-    """Returns last 10 notifications for dropdown display."""
     qs = Notification.objects.filter(user=request.user).order_by('-created_at')[:10]
     return JsonResponse({'notifications': [_serialize(n) for n in qs]})
 
@@ -97,25 +92,26 @@ def mark_all_read(request):
 @login_required
 def inbox(request):
     notifications = Notification.objects.filter(user=request.user).order_by('-created_at')[:50]
-    # Mark all read on inbox visit
     Notification.objects.filter(user=request.user, read_at__isnull=True).update(read_at=timezone.now())
 
-    # Notification preferences (Pro only)
     prefs = {}
+    webhook_url = ''
+    webhook_secret = ''
+
     if request.user.is_pro:
         for pref in NotificationPreference.objects.filter(user=request.user):
             prefs[pref.event] = pref
-
-    # UserPreference-driven: check if user has opted out of in-app notifications
-    try:
-        muted = UserPreference.objects.get(user=request.user, key='notifications_muted').value == 'true'
-    except UserPreference.DoesNotExist:
-        muted = False
+            # Use first found webhook_url/secret as the shared value
+            if not webhook_url and pref.webhook_url:
+                webhook_url = pref.webhook_url
+            if not webhook_secret and getattr(pref, 'webhook_secret', ''):
+                webhook_secret = pref.webhook_secret
 
     return render(request, 'notifications/inbox.html', {
         'notifications': notifications,
         'prefs': prefs,
-        'muted': muted,
+        'webhook_url': webhook_url,
+        'webhook_secret': webhook_secret,
         'all_events': Notification.Event.choices,
         'summaries': {n.pk: _notif_summary(n) for n in notifications},
     })
@@ -124,23 +120,32 @@ def inbox(request):
 @login_required
 @require_POST
 def save_preferences(request):
-    """Save notification preferences. Stores email/webhook per event for Pro users.
-    Also stores mute preference via UserPreference."""
-    muted = request.POST.get('muted') == '1'
-    UserPreference.objects.update_or_create(
-        user=request.user,
-        key='notifications_muted',
-        defaults={'value': 'true' if muted else 'false'},
-    )
+    """Save notification preferences for Pro users. Email + webhook per event,
+    shared webhook URL and secret across all events."""
+    if not request.user.is_pro:
+        return JsonResponse({'ok': False, 'error': 'Pro required'}, status=403)
 
-    if request.user.is_pro:
-        for event, _ in Notification.Event.choices:
-            email_enabled = request.POST.get(f'email_{event}') == '1'
-            webhook_url = request.POST.get(f'webhook_{event}', '').strip()
-            NotificationPreference.objects.update_or_create(
-                user=request.user,
-                event=event,
-                defaults={'email_enabled': email_enabled, 'webhook_url': webhook_url},
-            )
+    webhook_url = request.POST.get('webhook_url', '').strip()
+    webhook_secret = request.POST.get('webhook_secret', '').strip()
+
+    for event, _ in Notification.Event.choices:
+        email_enabled = request.POST.get(f'email_{event}') == '1'
+        webhook_enabled = request.POST.get(f'webhook_{event}') == '1'
+        defaults = {
+            'email_enabled': email_enabled,
+            'webhook_url': webhook_url if webhook_enabled else '',
+        }
+        # Store secret if model supports it
+        if hasattr(NotificationPreference, 'webhook_secret'):
+            defaults['webhook_secret'] = webhook_secret if webhook_enabled else ''
+        # Store webhook_enabled flag if model has it
+        if hasattr(NotificationPreference, 'webhook_enabled'):
+            defaults['webhook_enabled'] = webhook_enabled
+
+        NotificationPreference.objects.update_or_create(
+            user=request.user,
+            event=event,
+            defaults=defaults,
+        )
 
     return JsonResponse({'ok': True})

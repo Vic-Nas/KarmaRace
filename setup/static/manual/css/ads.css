@@ -4,33 +4,46 @@
   align-items: flex-start;
 }
 
+/* Main content: centered between the two ad columns */
 .kr-main {
   flex: 1;
   min-width: 0;
   padding: 1.5rem 1.25rem;
-  max-width: 720px;
-  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
+.kr-main > * {
+  width: 100%;
+  max-width: 680px;
+}
+
+/* ── Side ad columns ────────────────────────────────────────── */
 .kr-ads {
   width: calc(var(--ad-w) + var(--ad-gap) * 2);
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: var(--ad-gap);
   padding: var(--ad-gap);
   position: sticky;
   top: var(--nav-h);
-  max-height: calc(100vh - var(--nav-h) - var(--foot-h));
+  height: calc(100vh - var(--nav-h) - var(--foot-h));
   overflow: hidden;
+  justify-content: center;
 }
 
-.kr-ads--left { order: -1; }
-.kr-ads--right { order: 1; }
+.kr-ads--left  { order: -1; }
+.kr-ads--right { order:  1; }
 
+/* ── Individual ad box ──────────────────────────────────────── */
 .ad-box {
   width: var(--ad-w);
-  height: 600px;
+  flex: 1 1 0;
+  max-height: 600px;
+  min-height: 60px;
   overflow: hidden;
   border-radius: 4px;
   border: 1px solid var(--border);
@@ -38,12 +51,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
 }
 
-/* When 3 boxes don't fit vertically, collapse gracefully */
-.kr-ads .ad-box:nth-child(3) { flex-shrink: 1; min-height: 0; }
-
+/* ── Fallback ad content ────────────────────────────────────── */
 .ad-fallback {
   width: 100%;
   height: 100%;
@@ -59,15 +69,27 @@
   transition: background 0.15s;
 }
 .ad-fallback:hover { background: var(--accent-light); text-decoration: none; color: var(--text); }
-.ad-fallback img { width: 100px; height: auto; }
-.ad-fallback__name { font-size: 0.9rem; font-weight: 700; }
-.ad-fallback__tagline { font-size: 0.75rem; color: var(--text-muted); }
+.ad-fallback img  { width: 80px; height: auto; }
+.ad-fallback__name    { font-size: 0.85rem; font-weight: 700; }
+.ad-fallback__tagline { font-size: 0.72rem; color: var(--text-muted); }
 
-/* Pro: hide ads but keep layout stable */
 body.is-pro .ad-box { visibility: hidden; }
 
-/* Mobile: stack ads top/bottom, full width */
-@media (max-width: 900px) {
+/* ── Responsive breakpoints: shrink ads as window narrows ───── */
+
+/* Medium: ad column narrower, boxes smaller */
+@media (max-width: 1100px) {
+  :root { --ad-w: 130px; }
+}
+
+@media (max-width: 960px) {
+  :root { --ad-w: 100px; }
+  .ad-fallback img { width: 56px; }
+  .ad-fallback__tagline { display: none; }
+}
+
+/* Below 800px: collapse to horizontal strips top + bottom */
+@media (max-width: 800px) {
   .kr-layout { flex-direction: column; }
 
   .kr-ads {
@@ -75,19 +97,35 @@ body.is-pro .ad-box { visibility: hidden; }
     flex-direction: row;
     flex-wrap: nowrap;
     overflow-x: auto;
+    height: auto;
     max-height: none;
     position: static;
-    padding: 0.5rem;
+    padding: 0.4rem 0.75rem;
     gap: 0.5rem;
+    justify-content: center;
+    align-items: center;
   }
 
+  /* Fill row equally, fixed short height */
   .ad-box {
-    width: 160px;
-    height: 160px;
-    flex-shrink: 0;
+    flex: 1 1 0;
+    max-width: 200px;
+    height: 72px;
+    min-height: 72px;
+    max-height: 72px;
   }
 
-  .kr-ads--left { order: -1; }
-  .kr-ads--right { order: 1; }
-  .kr-main { order: 0; width: 100%; max-width: 100%; }
+  .ad-fallback { flex-direction: row; gap: 0.5rem; padding: 0.5rem 0.75rem; }
+  .ad-fallback img { width: 32px; flex-shrink: 0; }
+  .ad-fallback__name { font-size: 0.75rem; text-align: left; }
+  .ad-fallback__tagline { display: none; }
+
+  .kr-ads--left  { order: -1; }
+  .kr-ads--right { order:  1; }
+  .kr-main {
+    order: 0;
+    width: 100%;
+    align-items: stretch;
+  }
+  .kr-main > * { max-width: 100%; }
 }

@@ -61,16 +61,6 @@
 </div>
 {% endif %}
 
-{% if messages %}
-<div style="position:fixed;top:calc(var(--nav-h) + 8px);left:50%;transform:translateX(-50%);z-index:1050;width:min(480px,90vw)">
-  {% for message in messages %}
-    <div class="alert {% if message.tags == 'error' %}alert-danger{% elif message.tags == 'success' %}alert-success{% elif message.tags == 'warning' %}alert-warning{% else %}alert-info{% endif %}">
-      {{ message }}
-    </div>
-  {% endfor %}
-</div>
-{% endif %}
-
 <div class="kr-layout">
   <aside class="kr-ads kr-ads--left" aria-label="Sponsored">
     <div class="ad-box" id="ad-l1"></div>
@@ -79,6 +69,16 @@
   </aside>
 
   <main class="kr-main">
+    {% if messages %}
+    <div class="kr-messages" id="kr-messages">
+      {% for message in messages %}
+        <div class="kr-toast kr-toast--{% if message.tags == 'error' %}danger{% elif message.tags == 'success' %}success{% elif message.tags == 'warning' %}warning{% else %}info{% endif %}">
+          <span class="kr-toast__text">{{ message }}</span>
+          <button class="kr-toast__close" onclick="this.parentElement.remove()" aria-label="Dismiss">&times;</button>
+        </div>
+      {% endfor %}
+    </div>
+    {% endif %}
     {% block content %}{% endblock %}
   </main>
 
@@ -111,5 +111,17 @@ window.KR_ADS = {
 <script src="{% static 'js/notifications.js' %}"></script>
 {% endif %}
 {% block extra_js %}{% endblock %}
+<script>
+/* Auto-dismiss toasts after 4 s */
+(function(){
+  var msgs = document.getElementById('kr-messages');
+  if (!msgs) return;
+  setTimeout(function(){
+    msgs.style.transition = 'opacity 0.4s';
+    msgs.style.opacity = '0';
+    setTimeout(function(){ msgs.remove(); }, 420);
+  }, 4000);
+})();
+</script>
 </body>
 </html>

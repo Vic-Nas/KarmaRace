@@ -10,19 +10,13 @@
 {% block content %}
 <div class="page-header">
   <h1>Notifications</h1>
-  <div style="display:flex;gap:0.5rem;align-items:center">
-    {% if notifications %}
-    <form method="post" action="{% url 'notifications_mark_all_read' %}">
-      {% csrf_token %}
-      <button type="submit" class="btn btn-secondary btn-sm">Mark all read</button>
-    </form>
-    {% endif %}
-  </div>
+  {% if notifications %}
+  <form method="post" action="{% url 'notifications_mark_all_read' %}">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-secondary btn-sm">Mark all read</button>
+  </form>
+  {% endif %}
 </div>
-
-{% if muted %}
-<div class="alert alert-warning">In-app notifications are muted. You can unmute them in preferences below.</div>
-{% endif %}
 
 {% if notifications %}
 <div class="notif-list">
@@ -54,44 +48,93 @@
 <hr>
 
 <div class="notif-prefs">
-  <div class="notif-prefs__title">Preferences</div>
+  <div class="notif-prefs__title">Delivery Preferences</div>
+
+  {% if user.is_pro %}
+  <p class="small text-muted" style="margin-bottom:1rem">
+    Configure email and webhook delivery per event type. Webhook URL and secret are shared across all events that have webhook enabled.
+  </p>
 
   <form id="prefs-form">
     {% csrf_token %}
-    <div class="pref-row">
-      <span>Mute all in-app notifications</span>
-      <label class="toggle">
-        <input type="checkbox" name="muted" value="1" {% if muted %}checked{% endif %} id="pref-muted">
-        <span class="toggle__track"><span class="toggle__thumb"></span></span>
-      </label>
+
+    <div class="pref-webhook-global" style="margin-bottom:1.25rem;padding:1rem;background:var(--surface);border:1px solid var(--border);border-radius:5px">
+      <div class="form-group" style="margin-bottom:0.75rem">
+        <label>Webhook URL</label>
+        <input type="url" name="webhook_url" id="webhook-url" placeholder="https://your-server.com/hook"
+          value="{{ webhook_url }}">
+      </div>
+      <div class="form-group" style="margin-bottom:0">
+        <label>Webhook Secret <span class="text-muted" style="font-weight:400;text-transform:none;letter-spacing:0">(optional — sent as Bearer token)</span></label>
+        <input type="text" name="webhook_secret" id="webhook-secret" placeholder="your-secret"
+          value="{{ webhook_secret }}">
+      </div>
     </div>
 
-    {% if user.is_pro %}
-    <p class="small text-muted" style="margin-top:0.75rem;margin-bottom:0.5rem">Pro: configure email delivery per event.</p>
-    {% for event_key, event_label in all_events %}
-    <div class="pref-row">
-      <span>{{ event_label }} — email</span>
-      <label class="toggle">
-        <input type="checkbox" name="email_{{ event_key }}" value="1"
-          {% if prefs|get_item:event_key and prefs|get_item:event_key.email_enabled %}checked{% endif %}>
-        <span class="toggle__track"><span class="toggle__thumb"></span></span>
-      </label>
+    <div class="pref-table">
+      <div class="pref-table__head">
+        <span>Event</span>
+        <span>Email</span>
+        <span>Webhook</span>
+      </div>
+      {% for event_key, event_label in all_events %}
+      {% with pref=prefs|get_item:event_key %}
+      <div class="pref-table__row">
+        <span class="pref-table__label">{{ event_label }}</span>
+        <label class="toggle">
+          <input type="checkbox" name="email_{{ event_key }}" value="1" {% if pref and pref.email_enabled %}checked{% endif %}>
+          <span class="toggle__track"><span class="toggle__thumb"></span></span>
+        </label>
+        <label class="toggle">
+          <input type="checkbox" name="webhook_{{ event_key }}" value="1" {% if pref and pref.webhook_enabled %}checked{% endif %}>
+          <span class="toggle__track"><span class="toggle__thumb"></span></span>
+        </label>
+      </div>
+      {% endwith %}
+      {% endfor %}
     </div>
-    {% endfor %}
-    {% else %}
-    <p class="small text-muted" style="margin-top:0.75rem">
-      <a href="{% url 'billing_plan' %}">Upgrade to Pro</a> to enable email and webhook delivery per event.
-    </p>
-    {% endif %}
 
     <div style="margin-top:1rem">
       <button type="submit" class="btn btn-primary btn-sm">Save preferences</button>
       <span id="prefs-saved" style="display:none;font-size:0.8rem;color:var(--success);margin-left:0.5rem">&#10003; Saved</span>
     </div>
   </form>
+
+  {% else %}
+  <p class="small text-muted" style="margin-bottom:1rem">
+    <a href="{% url 'billing_plan' %}">Upgrade to Pro</a> to enable email and webhook delivery per event.
+  </p>
+
+  <div class="pref-table">
+    <div class="pref-table__head">
+      <span>Event</span>
+      <span>Email</span>
+      <span>Webhook</span>
+    </div>
+    {% for event_key, event_label in all_events %}
+    <div class="pref-table__row pref-table__row--locked">
+      <span class="pref-table__label">{{ event_label }}</span>
+      <label class="toggle toggle--locked" title="Pro feature">
+        <input type="checkbox" disabled>
+        <span class="toggle__track"><span class="toggle__thumb"></span></span>
+      </label>
+      <label class="toggle toggle--locked" title="Pro feature">
+        <input type="checkbox" disabled>
+        <span class="toggle__track"><span class="toggle__thumb"></span></span>
+      </label>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div style="margin-top:1rem">
+    <a href="{% url 'billing_plan' %}" class="btn btn-primary btn-sm">Upgrade to Pro</a>
+  </div>
+  {% endif %}
 </div>
 {% endblock %}
 
 {% block extra_js %}
+{% if user.is_pro %}
 <script src="{% static 'js/notifications-prefs.js' %}"></script>
+{% endif %}
 {% endblock %}

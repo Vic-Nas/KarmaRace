@@ -78,3 +78,46 @@
 }
 .toggle input:checked ~ .toggle__track { background: var(--accent); }
 .toggle input:checked ~ .toggle__track .toggle__thumb { transform: translateX(16px); }
+
+.pref-row--locked {
+  opacity: 0.5;
+}
+.toggle--locked {
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* ── Prefs table ─────────────────────────────────────────────── */
+.pref-table {
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.pref-table__head {
+  display: grid;
+  grid-template-columns: 1fr 64px 64px;
+  padding: 0.45rem 1rem;
+  background: var(--accent2-light);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  gap: 0.5rem;
+}
+.pref-table__head span:not(:first-child) { text-align: center; }
+
+.pref-table__row {
+  display: grid;
+  grid-template-columns: 1fr 64px 64px;
+  align-items: center;
+  padding: 0.6rem 1rem;
+  border-top: 1px solid var(--border);
+  gap: 0.5rem;
+  font-size: 0.88rem;
+}
+.pref-table__row .toggle { margin: 0 auto; }
+
+.pref-table__row--locked { opacity: 0.45; }
+.toggle--locked { cursor: not-allowed; pointer-events: none; }
