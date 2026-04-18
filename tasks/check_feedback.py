@@ -20,7 +20,7 @@ MESSAGES = {
     'PH_UPVOTE_REQUIRED': 'Product Hunt upvote is required in addition to your comment.',
     'PH_COMMENT_REQUIRED': 'Product Hunt comment is required in addition to your upvote.',
     'WEBHOOK_VERIFIED': 'Webhook verified successfully.',
-    'WEBHOOK_NOT_VERIFIED': 'Webhook responded but did not verify. Sent: {sent}; Expected: {expected}; Got: {got}',
+    'WEBHOOK_NOT_VERIFIED': 'Webhook return was invalid for verification. Sent: {sent}; Expected: {expected}; Got preview: {got}',
     'WEBHOOK_REQUEST_FAILED': 'Webhook request failed. Sent: {sent}; Expected: {expected}; Error: {error}',
     'WEBHOOK_BAD_JSON': 'Webhook response is not valid JSON. Expected {expected}.',
     'CHECK_CONFIRMED': 'Check confirmed. Karma transferred.',

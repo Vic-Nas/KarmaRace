@@ -23,6 +23,9 @@ from setup.platform_rules import (
 SESSION_FEED_PIN_KEY = 'feed_pinned_task_id'
 DEFAULT_COMPLETION = 'not_completed'
 DEFAULT_ARCHIVE = 'not_archived'
+PREF_FEED_COMPLETION = 'feed_filter_completion'
+PREF_FEED_ARCHIVE = 'feed_filter_archive'
+PREF_FEED_TASK_TYPES = 'feed_filter_task_types'
 
 ALL_TASK_TYPES = [
     Task.Type.GITHUB_STAR,
@@ -58,27 +61,43 @@ def _task_types_csv(task_types):
     return ','.join(task_types)
 
 
-def _build_filter_params(completion, archive, task_types, extra_params=None):
-    """Return compact feed query params (omit defaults/all-types)."""
-    params = {}
+def _load_filter_preferences(user):
+    if not user.is_authenticated:
+        return DEFAULT_COMPLETION, DEFAULT_ARCHIVE, list(ALL_TASK_TYPES)
 
-    if completion != DEFAULT_COMPLETION:
-        params['completion'] = completion
+    from accounts.models import UserPreference
 
-    if archive != DEFAULT_ARCHIVE:
-        params['archive'] = archive
+    prefs = dict(
+        UserPreference.objects.filter(
+            user=user,
+            key__in=[PREF_FEED_COMPLETION, PREF_FEED_ARCHIVE, PREF_FEED_TASK_TYPES],
+        ).values_list('key', 'value')
+    )
 
-    normalized_types = _normalize_task_types(task_types)
-    if normalized_types != ALL_TASK_TYPES:
-        params['task_types'] = normalized_types
+    completion = prefs.get(PREF_FEED_COMPLETION) or DEFAULT_COMPLETION
+    archive = prefs.get(PREF_FEED_ARCHIVE) or DEFAULT_ARCHIVE
+    task_types = _normalize_task_types((prefs.get(PREF_FEED_TASK_TYPES) or '').split(','))
+    return completion, archive, task_types
 
-    if extra_params:
-        for key, value in extra_params.items():
-            if value in (None, '', []):
-                continue
-            params[key] = value
 
-    return params
+def _save_filter_preferences(user, completion, archive, task_types):
+    if not user.is_authenticated:
+        return
+
+    from accounts.models import UserPreference
+
+    entries = {
+        PREF_FEED_COMPLETION: completion,
+        PREF_FEED_ARCHIVE: archive,
+        PREF_FEED_TASK_TYPES: _task_types_csv(_normalize_task_types(task_types)),
+    }
+
+    for key, value in entries.items():
+        UserPreference.objects.update_or_create(
+            user=user,
+            key=key,
+            defaults={'value': value},
+        )
 
 
 def _open_obligations(user):
@@ -245,23 +264,25 @@ def feed(request):
         elif check_result == TaskCompletion.State.FAILED:
             messages.error(request, check_detail or msg('CHECK_FAILED_GENERIC'))
 
-    completion = request.GET.get('completion') or DEFAULT_COMPLETION
-    archive = request.GET.get('archive') or DEFAULT_ARCHIVE
-    selected_task_types = _normalize_task_types(request.GET.getlist('task_types'))
+    has_filter_overrides = any(k in request.GET for k in ('completion', 'archive', 'task_types'))
+
+    if has_filter_overrides:
+        completion = request.GET.get('completion') or DEFAULT_COMPLETION
+        archive = request.GET.get('archive') or DEFAULT_ARCHIVE
+        selected_task_types = _normalize_task_types(request.GET.getlist('task_types'))
+    else:
+        completion, archive, selected_task_types = _load_filter_preferences(request.user)
+
     checking_task_id = request.GET.get('checking_task') or ''
 
-    canonical_params = _build_filter_params(
-        completion=completion,
-        archive=archive,
-        task_types=selected_task_types,
-        extra_params={'checking_task': checking_task_id},
-    )
-    canonical_qs = urlencode(canonical_params, doseq=True)
-    current_qs = request.GET.urlencode()
-    if current_qs != canonical_qs:
+    if has_filter_overrides:
+        _save_filter_preferences(request.user, completion, archive, selected_task_types)
+
+        # Keep URLs clean by persisting filters server-side and redirecting to
+        # base feed URL (preserving only transient checking_task when present).
         base_url = reverse('feed')
-        if canonical_qs:
-            return redirect(f'{base_url}?{canonical_qs}')
+        if checking_task_id:
+            return redirect(f'{base_url}?{urlencode({"checking_task": checking_task_id})}')
         return redirect(base_url)
 
     obligations = _active_lock_obligations(request.user, _open_obligations(request.user))
@@ -336,15 +357,14 @@ def _redirect_to_feed_with_filters(request, extra_params=None):
     completion = (request.POST.get('completion') or DEFAULT_COMPLETION).strip() or DEFAULT_COMPLETION
     archive = (request.POST.get('archive') or DEFAULT_ARCHIVE).strip() or DEFAULT_ARCHIVE
     selected_task_types = _normalize_task_types(request.POST.getlist('task_types'))
-    params = _build_filter_params(
-        completion=completion,
-        archive=archive,
-        task_types=selected_task_types,
-        extra_params=extra_params,
-    )
+    _save_filter_preferences(request.user, completion, archive, selected_task_types)
 
+    params = {}
     if extra_params:
-        params.update(extra_params)
+        for key, value in extra_params.items():
+            if value in (None, '', []):
+                continue
+            params[key] = value
 
     url = reverse('feed')
     if params:
@@ -415,10 +435,20 @@ def check(request, task_id):
         return redirect('account_login')
 
     from feed.tasks import process_task_check
+    from tasks.services import run_health_check
 
     task = get_object_or_404(Task, pk=task_id, is_deleted=False, hidden=False)
     if task.owner_id == request.user.id:
         return respond(TaskCompletion.State.FAILED, 'You cannot check your own task.')
+
+    # Always validate task health at check-time so testers see explicit runtime
+    # failures even when feed selection is kept stable/pinned.
+    if not run_health_check(task):
+        task.refresh_from_db(fields=['hidden', 'health_last_failure_reason'])
+        return respond(
+            TaskCompletion.State.FAILED,
+            task.health_last_failure_reason or msg('CHECK_FAILED_GENERIC'),
+        )
 
     precheck_error = _precheck_linked_account(request.user, task)
     if precheck_error:

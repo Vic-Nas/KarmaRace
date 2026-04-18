@@ -247,11 +247,14 @@ def verify_webhook_with_details(task, tester):
         verified = body.get('verified', False)
         if verified:
             return True, msg('WEBHOOK_VERIFIED')
+        got_preview = str(body)
+        if len(got_preview) > 300:
+            got_preview = got_preview[:300] + '...'
         return False, msg(
             'WEBHOOK_NOT_VERIFIED',
             sent=f'{{"task_slug": "{task_slug}", "platform_username": "{platform_username}"}}',
             expected='{"verified": true}',
-            got=body,
+            got=got_preview,
         )
     except requests.RequestException as exc:
         logger.error('verify_webhook: request failed for task %s: %s', task.pk, exc)
@@ -653,9 +656,9 @@ def _check_task_health_with_reason(task):
             return True, ''
 
         elif task.type == Task.Type.PH_ENGAGEMENT:
-            ok, post_vars, _ = _resolve_ph_post_query_vars(task.target_id)
+            ok, post_vars, reason = _resolve_ph_post_query_vars(task.target_id)
             if not ok:
-                return False, 'Product Hunt target is invalid.'
+                return False, reason or msg('PH_POST_NOT_FOUND')
             query = 'query($postSlug: String!) { post(slug: $postSlug) { id } }'
             response = requests.post(
                 'https://api.producthunt.com/v2/api/graphql',
@@ -668,7 +671,7 @@ def _check_task_health_with_reason(task):
             )
             response.raise_for_status()
             if not bool(response.json().get('data', {}).get('post')):
-                return False, 'Product Hunt post no longer exists.'
+                return False, msg('PH_POST_NOT_FOUND')
             return True, ''
 
         elif task.type == Task.Type.WEBHOOK:
@@ -677,7 +680,7 @@ def _check_task_health_with_reason(task):
             webhook_reason = _check_webhook_endpoint_contract_detailed(task)
             if webhook_reason is None:
                 return True, ''
-            return False, webhook_reason
+            return False, _webhook_user_facing_reason(webhook_reason)
 
     except requests.RequestException as exc:
         logger.error('run_health_check: request failed for task %s: %s', task.pk, exc)
