@@ -4,5 +4,7 @@ django
 django-environ
 environ
 procrastinate
+psycopg[binary]>=3.1
+psycopg2-binary>=2.9
 whitenoise
 stripe
