@@ -1,14 +1,18 @@
 # tasks/services.py
 import logging
 import requests
+from django.utils import timezone
 from django.db import transaction
 
 from django.conf import settings
 
 from tasks.models import Task, TaskCompletion, ReciprocityObligation
+from tasks.check_feedback import msg
 from setup.platform_rules import WEBHOOK_OBLIGATIONS_ENABLED
 
 logger = logging.getLogger(__name__)
+
+HEALTH_HIDE_THRESHOLD = 2
 
 
 # ---------------------------------------------------------------------------
@@ -32,7 +36,7 @@ def verify_task_with_details(task, tester):
     verifier = dispatch.get(task.type)
     if verifier is None:
         logger.error('verify_task: unknown task type %s', task.type)
-        return False, 'Unknown task type.'
+        return False, msg('UNKNOWN_TASK_TYPE')
     return verifier(task, tester)
 
 
@@ -54,17 +58,17 @@ def verify_github_with_details(task, tester):
     username, user_token = _get_github_identity(tester)
     if not username:
         logger.info('verify_github: tester %s has no linked GitHub account', tester.pk)
-        return False, 'Your GitHub account is not linked. Connect GitHub in Linked Accounts and try again.'
+        return False, msg('GITHUB_LINK_REQUIRED')
 
     repo     = task.target_id
 
     if not _is_valid_github_repo_target(repo):
-        return False, 'Target must be in owner/repo format.'
+        return False, msg('TARGET_OWNER_REPO_REQUIRED')
 
     try:
         if task.type == Task.Type.GITHUB_STAR:
             if not user_token:
-                return False, 'Linked GitHub token is missing. Reconnect your GitHub account and try again.'
+                return False, msg('GITHUB_TOKEN_RECONNECT')
 
             response = requests.get(
                 f'https://api.github.com/user/starred/{repo}',
@@ -72,19 +76,16 @@ def verify_github_with_details(task, tester):
                 timeout=10,
             )
             if response.status_code == 204:
-                return True, 'Verified GitHub star.'
+                return True, msg('GITHUB_STAR_VERIFIED')
             if response.status_code == 404:
-                return False, (
-                    f"We couldn't verify the star for @{username} yet. "
-                    'Please star the public repo with your linked GitHub account, wait a minute, then press Check again.'
-                )
+                return False, msg('GITHUB_STAR_NOT_FOUND', username=username)
             if response.status_code in (401, 403):
-                return False, 'GitHub token is invalid or missing scope. Reconnect your GitHub account and try again.'
-            return False, f'GitHub returned status {response.status_code} while checking star.'
+                return False, msg('GITHUB_TOKEN_INVALID')
+            return False, msg('GITHUB_STATUS_STAR', status=response.status_code)
 
         else:
             if not user_token:
-                return False, 'Linked GitHub token is missing. Reconnect your GitHub account and try again.'
+                return False, msg('GITHUB_TOKEN_RECONNECT')
 
             # One-path check: ask the authenticated linked user for the specific repo.
             response = requests.get(
@@ -93,19 +94,16 @@ def verify_github_with_details(task, tester):
                 timeout=10,
             )
             if response.status_code == 200 and response.json().get('fork') is True:
-                return True, 'Verified GitHub fork.'
+                return True, msg('GITHUB_FORK_VERIFIED')
             if response.status_code == 404:
-                return False, (
-                    f"We couldn't verify a fork for @{username} yet. "
-                    'Please fork the repo with your linked GitHub account, wait a minute, then press Check again.'
-                )
+                return False, msg('GITHUB_FORK_NOT_FOUND', username=username)
             if response.status_code in (401, 403):
-                return False, 'GitHub token is invalid or missing scope. Reconnect your GitHub account and try again.'
-            return False, f'GitHub returned status {response.status_code} while checking fork.'
+                return False, msg('GITHUB_TOKEN_INVALID')
+            return False, msg('GITHUB_STATUS_FORK', status=response.status_code)
 
     except requests.RequestException as exc:
         logger.error('verify_github: request failed for task %s: %s', task.pk, exc)
-        return False, f'GitHub verification request failed: {exc}'
+        return False, msg('GITHUB_REQUEST_FAILED', error=exc)
 
 
 def verify_ph(task, tester) -> bool:
@@ -126,7 +124,7 @@ def verify_ph_with_details(task, tester):
         linked = tester.linked_accounts.get(platform='producthunt')
     except tester.linked_accounts.model.DoesNotExist:
         logger.info('verify_ph: tester %s has no linked Product Hunt account', tester.pk)
-        return False, 'Your Product Hunt account is not linked.'
+        return False, msg('PH_LINK_REQUIRED')
 
     access_token = linked.access_token
     ph_user_id = (linked.platform_id or '').strip()
@@ -159,11 +157,11 @@ def verify_ph_with_details(task, tester):
         post = data.get('data', {}).get('post')
         if not post:
             logger.warning('verify_ph: post target %s not found', task.target_id)
-            return False, 'Product Hunt post not found. Use post slug.'
+            return False, msg('PH_POST_NOT_FOUND')
         is_voted = bool(post.get('isVoted'))
     except requests.RequestException as exc:
         logger.error('verify_ph: vote check failed for task %s: %s', task.pk, exc)
-        return False, f'Product Hunt vote check failed: {exc}'
+        return False, msg('PH_VOTE_CHECK_FAILED', error=exc)
 
     # Check comments with cursor-based pagination.
     comments_query = (
@@ -201,15 +199,15 @@ def verify_ph_with_details(task, tester):
 
     except requests.RequestException as exc:
         logger.error('verify_ph: comment check failed for task %s: %s', task.pk, exc)
-        return False, f'Product Hunt comment check failed: {exc}'
+        return False, msg('PH_COMMENT_CHECK_FAILED', error=exc)
 
     if is_voted and has_comment:
-        return True, 'Verified Product Hunt upvote and comment.'
+        return True, msg('PH_ENGAGEMENT_VERIFIED')
     if not is_voted and not has_comment:
-        return False, 'Both Product Hunt upvote and comment are required.'
+        return False, msg('PH_BOTH_REQUIRED')
     if not is_voted:
-        return False, 'Product Hunt upvote is required in addition to your comment.'
-    return False, 'Product Hunt comment is required in addition to your upvote.'
+        return False, msg('PH_UPVOTE_REQUIRED')
+    return False, msg('PH_COMMENT_REQUIRED')
 
 
 def verify_webhook(task, tester) -> bool:
@@ -248,21 +246,23 @@ def verify_webhook_with_details(task, tester):
         body = response.json()
         verified = body.get('verified', False)
         if verified:
-            return True, 'Webhook verified successfully.'
-        return False, (
-            'Webhook responded but did not verify. '
-            f'Sent: {{"task_slug": "{task_slug}", "platform_username": "{platform_username}"}}; '
-            f'Expected: {{"verified": true}}; Got: {body}'
+            return True, msg('WEBHOOK_VERIFIED')
+        return False, msg(
+            'WEBHOOK_NOT_VERIFIED',
+            sent=f'{{"task_slug": "{task_slug}", "platform_username": "{platform_username}"}}',
+            expected='{"verified": true}',
+            got=body,
         )
     except requests.RequestException as exc:
         logger.error('verify_webhook: request failed for task %s: %s', task.pk, exc)
-        return False, (
-            'Webhook request failed. '
-            f'Sent: {{"task_slug": "{task_slug}", "platform_username": "{platform_username}"}}; '
-            f'Expected: {{"verified": true}}; Error: {exc}'
+        return False, msg(
+            'WEBHOOK_REQUEST_FAILED',
+            sent=f'{{"task_slug": "{task_slug}", "platform_username": "{platform_username}"}}',
+            expected='{"verified": true}',
+            error=exc,
         )
     except ValueError:
-        return False, 'Webhook response is not valid JSON. Expected {"verified": true}.'
+        return False, msg('WEBHOOK_BAD_JSON', expected='{"verified": true}')
 
 
 # ---------------------------------------------------------------------------
@@ -281,7 +281,10 @@ def soft_delete_task(task):
     TaskCompletion.objects.filter(
         task=task,
         state=TaskCompletion.State.PENDING,
-    ).update(state=TaskCompletion.State.FAILED)
+    ).update(
+        state=TaskCompletion.State.FAILED,
+        result_detail=msg('ARCHIVED_DURING_CHECK'),
+    )
 
 
 @transaction.atomic
@@ -579,20 +582,62 @@ def on_task_unhidden(task):
 def run_health_check(task) -> bool:
     """
     Runs the appropriate health check for a task.
-    On failure: sets hidden=True and fires a TASK_HEALTH_FAILED owner notification
-    via a procrastinate background job (deduplicated — task is already hidden on
-    the next feed fetch so no re-check runs).
+    Two-strike policy:
+    - First consecutive failure marks suspect but does not hide.
+    - Second consecutive failure hides task and notifies owner.
+    - A healthy check resets streak and auto-unhides tasks hidden by health checks.
+
     Returns True if healthy, False if failed.
     """
-    healthy = _check_task_health(task)
-    if not healthy:
+    healthy, reason = _check_task_health_with_reason(task)
+
+    update_fields = ['health_last_checked_at']
+    task.health_last_checked_at = timezone.now()
+
+    if healthy:
+        was_health_hidden = task.hidden and task.health_failure_streak >= HEALTH_HIDE_THRESHOLD
+        if task.health_failure_streak != 0:
+            task.health_failure_streak = 0
+            update_fields.append('health_failure_streak')
+        if task.health_last_failure_reason:
+            task.health_last_failure_reason = ''
+            update_fields.append('health_last_failure_reason')
+        if was_health_hidden:
+            task.hidden = False
+            update_fields.append('hidden')
+
+        task.save(update_fields=update_fields)
+
+        if was_health_hidden:
+            on_task_unhidden(task)
+
+        return True
+
+    task.health_failure_streak += 1
+    task.health_last_failure_reason = reason or 'Health check failed.'
+    update_fields.extend(['health_failure_streak', 'health_last_failure_reason'])
+
+    should_hide = task.health_failure_streak >= HEALTH_HIDE_THRESHOLD
+    transitioned_to_hidden = should_hide and not task.hidden
+    if transitioned_to_hidden:
         task.hidden = True
-        task.save(update_fields=['hidden'])
+        update_fields.append('hidden')
+
+    task.save(update_fields=update_fields)
+
+    if transitioned_to_hidden:
         _schedule_health_failed_notification(task)
-    return healthy
+
+    return False
 
 
 def _check_task_health(task) -> bool:
+    """Backwards-compatible bool-only health check wrapper."""
+    healthy, _ = _check_task_health_with_reason(task)
+    return healthy
+
+
+def _check_task_health_with_reason(task):
     """Returns True if the external resource is still reachable / valid."""
     try:
         if task.type in (Task.Type.GITHUB_STAR, Task.Type.GITHUB_FORK):
@@ -602,13 +647,15 @@ def _check_task_health(task) -> bool:
                 timeout=10,
             )
             if response.status_code != 200:
-                return False
-            return not response.json().get('private', True)
+                return False, f'GitHub health check returned status {response.status_code}.'
+            if response.json().get('private', True):
+                return False, 'GitHub repo is private.'
+            return True, ''
 
         elif task.type == Task.Type.PH_ENGAGEMENT:
             ok, post_vars, _ = _resolve_ph_post_query_vars(task.target_id)
             if not ok:
-                return False
+                return False, 'Product Hunt target is invalid.'
             query = 'query($postSlug: String!) { post(slug: $postSlug) { id } }'
             response = requests.post(
                 'https://api.producthunt.com/v2/api/graphql',
@@ -620,18 +667,23 @@ def _check_task_health(task) -> bool:
                 timeout=10,
             )
             response.raise_for_status()
-            return bool(response.json().get('data', {}).get('post'))
+            if not bool(response.json().get('data', {}).get('post')):
+                return False, 'Product Hunt post no longer exists.'
+            return True, ''
 
         elif task.type == Task.Type.WEBHOOK:
             if _check_webhook_owner_plan_detailed(task) is not None:
-                return False
-            return _check_webhook_endpoint_contract_detailed(task) is None
+                return False, 'Webhook tasks are Pro-only.'
+            webhook_reason = _check_webhook_endpoint_contract_detailed(task)
+            if webhook_reason is None:
+                return True, ''
+            return False, webhook_reason
 
     except requests.RequestException as exc:
         logger.error('run_health_check: request failed for task %s: %s', task.pk, exc)
-        return False
+        return False, f'External request failed: {exc}'
 
-    return True
+    return False, 'Unknown task type for health check.'
 
 
 def _schedule_health_failed_notification(task):

@@ -1,4 +1,5 @@
 # feed/views.py
+from django.conf import settings
 from django.contrib import messages
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse
@@ -10,6 +11,7 @@ from django.db.models import Sum, Value, Q
 from django.db.models.functions import Coalesce
 from datetime import timedelta
 
+from tasks.check_feedback import msg
 from tasks.models import Task, TaskCompletion, ReciprocityObligation
 from setup.platform_rules import (
     KARMA_REWARDS_BY_TASK_TYPE,
@@ -149,9 +151,9 @@ def feed(request):
     check_detail = (request.GET.get('check_detail') or '').strip()
     if check_result:
         if check_result == TaskCompletion.State.CONFIRMED:
-            messages.success(request, 'Check confirmed. Karma transferred.')
+            messages.success(request, msg('CHECK_CONFIRMED'))
         elif check_result == TaskCompletion.State.FAILED:
-            messages.error(request, check_detail or 'Check failed. Please verify the task requirements and try again.')
+            messages.error(request, check_detail or msg('CHECK_FAILED_GENERIC'))
 
     completion = request.GET.get('completion') or 'not_completed'
     archive = request.GET.get('archive') or 'not_archived'
@@ -230,11 +232,11 @@ def _precheck_linked_account(user, task):
     """Return user-facing error text when a required linked account is missing."""
     if task.type in (Task.Type.GITHUB_STAR, Task.Type.GITHUB_FORK):
         if not user.linked_accounts.filter(platform='github').exists():
-            return 'Connect your GitHub account in Accounts before checking GitHub tasks.'
+            return msg('GITHUB_LINK_REQUIRED')
 
     if task.type == Task.Type.PH_ENGAGEMENT:
         if not user.linked_accounts.filter(platform='producthunt').exists():
-            return 'Connect your Product Hunt account in Accounts before checking Product Hunt tasks.'
+            return msg('PH_LINK_REQUIRED')
 
     return None
 
@@ -247,7 +249,7 @@ def done(request, task_id):
 
     obligations = _active_lock_obligations(request.user, _open_obligations(request.user))
     if obligations:
-        messages.error(request, 'Archive is disabled while you have open obligations.')
+        messages.error(request, msg('ARCHIVE_DISABLED_OBLIGATIONS'))
         return _redirect_to_feed_with_filters(request)
 
     task = get_object_or_404(Task, pk=task_id, is_deleted=False, hidden=False)
@@ -260,20 +262,41 @@ def done(request, task_id):
 @require_POST
 def check(request, task_id):
     """Queue async verification for current user on a task."""
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+
+    def respond(state, detail='', extra_params=None):
+        if is_ajax:
+            payload = {'state': state}
+            if detail:
+                payload['detail'] = detail
+            if extra_params:
+                payload.update(extra_params)
+            return JsonResponse(payload)
+        if state == TaskCompletion.State.CONFIRMED:
+            messages.success(request, detail or msg('CHECK_CONFIRMED'))
+            return _redirect_to_feed_with_filters(request)
+        if state == TaskCompletion.State.FAILED:
+            messages.error(request, detail or msg('CHECK_FAILED_GENERIC'))
+            return _redirect_to_feed_with_filters(request)
+        if state == TaskCompletion.State.PENDING:
+            messages.info(request, detail or msg('CHECK_STARTED'))
+            return _redirect_to_feed_with_filters(request, extra_params={'checking_task': str(task.pk)})
+        return _redirect_to_feed_with_filters(request)
+
     if not request.user.is_authenticated:
+        if is_ajax:
+            return JsonResponse({'state': 'UNAUTHENTICATED', 'detail': 'Sign in required.'}, status=401)
         return redirect('account_login')
 
     from feed.tasks import process_task_check
 
     task = get_object_or_404(Task, pk=task_id, is_deleted=False, hidden=False)
     if task.owner_id == request.user.id:
-        messages.error(request, 'You cannot check your own task.')
-        return redirect('feed')
+        return respond(TaskCompletion.State.FAILED, 'You cannot check your own task.')
 
     precheck_error = _precheck_linked_account(request.user, task)
     if precheck_error:
-        messages.error(request, precheck_error)
-        return _redirect_to_feed_with_filters(request)
+        return respond(TaskCompletion.State.FAILED, precheck_error)
 
     completion, created = TaskCompletion.objects.get_or_create(
         task=task,
@@ -282,22 +305,21 @@ def check(request, task_id):
     )
 
     if completion.state == TaskCompletion.State.CONFIRMED:
-        messages.info(request, 'Task already confirmed for you.')
-        return _redirect_to_feed_with_filters(request)
+        return respond(TaskCompletion.State.CONFIRMED, msg('ALREADY_CONFIRMED'))
 
     if completion.state == TaskCompletion.State.PENDING and not created:
         if completion.created_at <= timezone.now() - timedelta(seconds=45):
             completion.state = TaskCompletion.State.FAILED
             completion.save(update_fields=['state'])
         else:
-            messages.info(request, 'Check already in progress...')
-            return _redirect_to_feed_with_filters(request, extra_params={'checking_task': str(task.pk)})
+            return respond(TaskCompletion.State.PENDING, msg('CHECK_IN_PROGRESS'))
 
     if not created:
         completion.state = TaskCompletion.State.PENDING
+        completion.result_detail = ''
         # Reuse row for retries but reset pending start timestamp for timeout logic.
         completion.created_at = timezone.now()
-        completion.save(update_fields=['state', 'created_at'])
+        completion.save(update_fields=['state', 'result_detail', 'created_at'])
 
     try:
         process_task_check.defer(task_id=task.pk, tester_id=request.user.pk)
@@ -305,20 +327,18 @@ def check(request, task_id):
         # Fallback: process immediately so checks still work when queueing is unavailable.
         try:
             process_task_check(task_id=task.pk, tester_id=request.user.pk)
-            completion.refresh_from_db(fields=['state'])
+            completion.refresh_from_db(fields=['state', 'result_detail'])
             if completion.state == TaskCompletion.State.CONFIRMED:
-                messages.success(request, 'Queue unavailable, but check confirmed immediately.')
+                return respond(TaskCompletion.State.CONFIRMED, msg('QUEUE_UNAVAILABLE_CONFIRMED'))
             else:
-                messages.error(request, 'Queue unavailable, and check failed.')
-            return _redirect_to_feed_with_filters(request)
+                return respond(TaskCompletion.State.FAILED, completion.result_detail or msg('QUEUE_UNAVAILABLE_FAILED'))
         except Exception:
             completion.state = TaskCompletion.State.FAILED
-            completion.save(update_fields=['state'])
-            messages.error(request, 'Could not queue async check. Please try again.')
-            return _redirect_to_feed_with_filters(request)
+            completion.result_detail = msg('QUEUE_FAILED')
+            completion.save(update_fields=['state', 'result_detail'])
+            return respond(TaskCompletion.State.FAILED, msg('QUEUE_FAILED'))
 
-    messages.info(request, 'Check started. Waiting for result...')
-    return _redirect_to_feed_with_filters(request, extra_params={'checking_task': str(task.pk)})
+    return respond(TaskCompletion.State.PENDING, msg('CHECK_STARTED'))
 
 
 def check_status(request, task_id):
@@ -338,16 +358,17 @@ def check_status(request, task_id):
         and completion.created_at <= timezone.now() - timedelta(seconds=45)
     ):
         completion.state = TaskCompletion.State.FAILED
-        completion.save(update_fields=['state'])
+        completion.result_detail = msg('CHECK_TIMEOUT_WORKER_HINT') if settings.DEBUG else msg('CHECK_TIMEOUT')
+        completion.save(update_fields=['state', 'result_detail'])
         return JsonResponse({
             'state': TaskCompletion.State.FAILED,
-            'detail': 'Verification timed out. Please retry.',
+            'detail': completion.result_detail,
         })
 
     if completion.state == TaskCompletion.State.FAILED:
         return JsonResponse({
             'state': completion.state,
-            'detail': 'Verification failed. Make sure you completed the required action with your linked account, then retry.',
+            'detail': completion.result_detail or msg('CHECK_FAILED_GENERIC'),
         })
 
     return JsonResponse({'state': completion.state})

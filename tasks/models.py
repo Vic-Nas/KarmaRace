@@ -20,6 +20,9 @@ class Task(models.Model):
     tried_count    = models.PositiveIntegerField(default=0)
     is_deleted     = models.BooleanField(default=False)
     hidden         = models.BooleanField(default=False)
+    health_failure_streak = models.PositiveSmallIntegerField(default=0)
+    health_last_failure_reason = models.TextField(blank=True, default='')
+    health_last_checked_at = models.DateTimeField(null=True, blank=True)
     archived_by    = models.ManyToManyField(User, blank=True, related_name='archived_tasks')
     created_at     = models.DateTimeField(auto_now_add=True)
 
@@ -55,6 +58,7 @@ class TaskCompletion(models.Model):
     task       = models.ForeignKey(Task, on_delete=models.CASCADE, related_name='completions')
     tester     = models.ForeignKey(User, on_delete=models.CASCADE, related_name='task_completions')
     state      = models.CharField(max_length=10, choices=State.choices, default=State.PENDING)
+    result_detail = models.TextField(blank=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

@@ -41,20 +41,38 @@ def notify(user, event, payload: dict):
 def _queue_email_delivery(pref, payload: dict):
     try:
         from notifications.tasks import deliver_notification_email
-        deliver_notification_email.defer(preference_id=pref.pk, payload=payload)
+        deliver_notification_email.defer(preference_id=pref.pk, payload=payload, attempt=1, max_attempts=3)
     except Exception as exc:
         logger.error(
             'notify: failed to queue email delivery for preference %s: %s',
             pref.pk, exc,
         )
+        try:
+            # Last-resort fallback so notifications are not silently dropped.
+            from notifications.tasks import deliver_notification_email
+            deliver_notification_email(preference_id=pref.pk, payload=payload, attempt=1, max_attempts=1)
+        except Exception as fallback_exc:
+            logger.error(
+                'notify: fallback email delivery failed for preference %s: %s',
+                pref.pk, fallback_exc,
+            )
 
 
 def _queue_webhook_delivery(pref, payload: dict):
     try:
         from notifications.tasks import deliver_notification_webhook
-        deliver_notification_webhook.defer(preference_id=pref.pk, payload=payload)
+        deliver_notification_webhook.defer(preference_id=pref.pk, payload=payload, attempt=1, max_attempts=3)
     except Exception as exc:
         logger.error(
             'notify: failed to queue webhook delivery for preference %s: %s',
             pref.pk, exc,
         )
+        try:
+            # Last-resort fallback so notifications are not silently dropped.
+            from notifications.tasks import deliver_notification_webhook
+            deliver_notification_webhook(preference_id=pref.pk, payload=payload, attempt=1, max_attempts=1)
+        except Exception as fallback_exc:
+            logger.error(
+                'notify: fallback webhook delivery failed for preference %s: %s',
+                pref.pk, fallback_exc,
+            )

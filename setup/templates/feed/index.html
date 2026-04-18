@@ -93,10 +93,12 @@
     <div class="alert alert-info" id="check-loading-banner">
       Verification in progress &mdash; this card will refresh automatically&hellip;
     </div>
+    {% else %}
+    <div class="alert alert-info" id="check-loading-banner" style="display:none"></div>
     {% endif %}
 
     <div class="card__actions">
-      <form method="post" action="{% url 'feed_check' task.id %}">
+      <form method="post" action="{% url 'feed_check' task.id %}" id="feed-check-form">
         {% csrf_token %}
         <input type="hidden" name="completion" value="{{ completion }}">
         <input type="hidden" name="archive" value="{{ archive }}">
@@ -127,8 +129,17 @@
 {% endblock %}
 
 {% block extra_js %}
-{% if checking_task_id %}
 <script src="{% static 'js/feed-check.js' %}"></script>
+{% if checking_task_id %}
 <script>FeedCheck.start("{% url 'feed_check_status' checking_task_id %}");</script>
+{% endif %}
+{% if task %}
+<script>
+FeedCheck.bindForm(
+  "#feed-check-form",
+  "{% url 'feed_check' task.id %}",
+  "{% url 'feed_check_status' task.id %}"
+);
+</script>
 {% endif %}
 {% endblock %}

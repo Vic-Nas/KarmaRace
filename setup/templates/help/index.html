@@ -25,6 +25,18 @@
   </div>
 
   <div class="kr-help-section">
+    <h2>Background Worker Requirement</h2>
+    <p>
+      Async checks and notification deliveries require a Procrastinate worker process.
+      In local development, run a worker alongside runserver:
+    </p>
+    <pre><code>python manage.py procrastinate worker</code></pre>
+    <p>
+      If worker capacity is temporarily unavailable, jobs remain queued in the database and are processed when workers resume.
+    </p>
+  </div>
+
+  <div class="kr-help-section">
     <h2>Feed Selection and Filters</h2>
     <p>
       Feed is ranked by owner karma (descending), then creation time.
@@ -34,6 +46,18 @@
       <li>Completion filter: Not Completed / Completed</li>
       <li>Archive filter: Not Archived / Archived</li>
       <li>Task Type filter: Webhook / Not Webhook</li>
+    </ul>
+  </div>
+
+  <div class="kr-help-section">
+    <h2>Health Checks and Visibility</h2>
+    <p>
+      Feed selection runs task health checks. Visibility uses a two-strike policy:
+    </p>
+    <ul>
+      <li>First consecutive health failure: task is marked suspect but remains visible.</li>
+      <li>Second consecutive health failure: task is hidden and owner receives a health-failed notification.</li>
+      <li>A later successful health check resets failure streak and can auto-unhide a task hidden by health checks.</li>
     </ul>
   </div>
 
@@ -105,6 +129,33 @@ Authorization: Bearer {task.webhook_secret}  # only if secret is set
       <li>GitHub repo is private or missing.</li>
       <li>Product Hunt slug is invalid or post not found.</li>
       <li>Webhook endpoint is unreachable or does not return JSON with a boolean <code>verified</code> field.</li>
+    </ul>
+  </div>
+
+  <div class="kr-help-section">
+    <h2>Check Result Messages</h2>
+    <p>Checks now return precise result text. Typical failure messages include:</p>
+    <ul>
+      <li>GitHub star/fork not detected yet for your linked account.</li>
+      <li>Product Hunt upvote missing, comment missing, or both missing.</li>
+      <li>Webhook returned unexpected JSON or unreachable endpoint errors.</li>
+      <li>Verification timed out.</li>
+      <li>Task was archived/unpublished before verification completed.</li>
+    </ul>
+  </div>
+
+  <div class="kr-help-section">
+    <h2>Notification Payloads By Event</h2>
+    <p>In-app notifications store event-specific payload JSON. Current payload shapes:</p>
+    <ul>
+      <li><strong>TASK_CONFIRMED</strong>: <code>{"task_id": number, "delta": number}</code> (delta optional depending on producer)</li>
+      <li><strong>TASK_HEALTH_FAILED</strong>: <code>{"task_id": number, "task_type": string, "target_id": string, "owner_id": number}</code></li>
+      <li><strong>KARMA_LOW</strong>: <code>{"delta": number, "balance": number, "threshold": number}</code> (fields may vary by producer)</li>
+      <li><strong>KARMA_RESTORED</strong>: <code>{"delta": number, "balance": number, "threshold": number}</code> (fields may vary by producer)</li>
+      <li><strong>APPRECIATION</strong>: <code>{"message": string}</code></li>
+      <li><strong>PROJECT_STATE</strong>: app-defined JSON object for project state updates</li>
+      <li><strong>FLAG_UP_RECEIVED</strong>: app-defined JSON object for received flag-up events</li>
+      <li><strong>FLAG_UP_SENT</strong>: app-defined JSON object for sent flag-up events</li>
     </ul>
   </div>
 </div>

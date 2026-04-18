@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 @app.task
-def deliver_notification_email(preference_id: int, payload: dict):
+def deliver_notification_email(preference_id: int, payload: dict, attempt: int = 1, max_attempts: int = 3):
     """Send an email delivery for a notification preference."""
     from django.conf import settings
 
@@ -33,20 +33,34 @@ def deliver_notification_email(preference_id: int, payload: dict):
         state = NotificationDelivery.State.SUCCESS
     except Exception as exc:
         logger.error(
-            'deliver_notification_email: failed for preference %s: %s',
-            preference_id, exc,
+            'deliver_notification_email: attempt %s/%s failed for preference %s: %s',
+            attempt, max_attempts, preference_id, exc,
         )
+        if attempt < max_attempts:
+            try:
+                deliver_notification_email.defer(
+                    preference_id=preference_id,
+                    payload=payload,
+                    attempt=attempt + 1,
+                    max_attempts=max_attempts,
+                )
+            except Exception as defer_exc:
+                logger.error(
+                    'deliver_notification_email: retry enqueue failed for preference %s: %s',
+                    preference_id, defer_exc,
+                )
 
     NotificationDelivery.objects.create(
         preference=pref,
         channel=NotificationDelivery.Channel.EMAIL,
         payload=payload,
         state=state,
+        attempts=attempt,
     )
 
 
 @app.task
-def deliver_notification_webhook(preference_id: int, payload: dict):
+def deliver_notification_webhook(preference_id: int, payload: dict, attempt: int = 1, max_attempts: int = 3):
     """POST a webhook delivery for a notification preference."""
     try:
         pref = NotificationPreference.objects.get(pk=preference_id)
@@ -61,15 +75,29 @@ def deliver_notification_webhook(preference_id: int, payload: dict):
         state = NotificationDelivery.State.SUCCESS
     except Exception as exc:
         logger.error(
-            'deliver_notification_webhook: failed for preference %s: %s',
-            preference_id, exc,
+            'deliver_notification_webhook: attempt %s/%s failed for preference %s: %s',
+            attempt, max_attempts, preference_id, exc,
         )
+        if attempt < max_attempts:
+            try:
+                deliver_notification_webhook.defer(
+                    preference_id=preference_id,
+                    payload=payload,
+                    attempt=attempt + 1,
+                    max_attempts=max_attempts,
+                )
+            except Exception as defer_exc:
+                logger.error(
+                    'deliver_notification_webhook: retry enqueue failed for preference %s: %s',
+                    preference_id, defer_exc,
+                )
 
     NotificationDelivery.objects.create(
         preference=pref,
         channel=NotificationDelivery.Channel.WEBHOOK,
         payload=payload,
         state=state,
+        attempts=attempt,
     )
 
 
