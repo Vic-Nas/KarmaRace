@@ -9,6 +9,11 @@ from django.db.models import Sum, Value, Q
 from django.db.models.functions import Coalesce
 
 from tasks.models import Task, TaskCompletion, ReciprocityObligation
+from setup.platform_rules import (
+    KARMA_REWARDS_BY_TASK_TYPE,
+    WEBHOOK_FAILURE_RATE_EPSILON,
+    WEBHOOK_OBLIGATIONS_ENABLED,
+)
 
 
 def _expire_stale_cards_for_user(user):
@@ -35,12 +40,13 @@ def _expire_stale_cards_for_user(user):
 def _open_obligations(user):
     if not user.is_authenticated:
         return []
-    return list(
-        ReciprocityObligation.objects.filter(
+    queryset = ReciprocityObligation.objects.filter(
             debtor=user,
             state=ReciprocityObligation.State.OPEN,
-        ).select_related('creditor')
-    )
+        )
+    if not WEBHOOK_OBLIGATIONS_ENABLED:
+        queryset = queryset.exclude(task_type=Task.Type.WEBHOOK)
+    return list(queryset.select_related('creditor'))
 
 
 def _active_lock_obligations(user, obligations):
@@ -57,12 +63,17 @@ def _active_lock_obligations(user, obligations):
     return obligations if candidate else []
 
 
-def _feed_queryset(user, completion='not_completed', archive='not_archived', obligations=None):
+def _feed_queryset(user, completion='not_completed', archive='not_archived', task_family='all', obligations=None):
     """Visible tasks ranked by owner karma balance (descending)."""
     qs = Task.objects.filter(is_deleted=False, hidden=False).select_related('owner')
 
     if user.is_authenticated:
         qs = qs.exclude(owner=user)
+
+        if task_family == 'webhook':
+            qs = qs.filter(type=Task.Type.WEBHOOK)
+        elif task_family == 'not_webhook':
+            qs = qs.exclude(type=Task.Type.WEBHOOK)
 
         if obligations:
             allowed_pairs = Q(pk__in=[])
@@ -99,11 +110,17 @@ def _feed_queryset(user, completion='not_completed', archive='not_archived', obl
     return qs
 
 
-def _get_feed_task(user, completion='not_completed', archive='not_archived', obligations=None):
+def _get_feed_task(user, completion='not_completed', archive='not_archived', task_family='all', obligations=None):
     """Pick first healthy task candidate from the ranked task feed."""
     from tasks.services import run_health_check
 
-    qs = _feed_queryset(user, completion=completion, archive=archive, obligations=obligations)
+    qs = _feed_queryset(
+        user,
+        completion=completion,
+        archive=archive,
+        task_family=task_family,
+        obligations=obligations,
+    )
 
     for task in qs.iterator():
         if run_health_check(task):
@@ -115,17 +132,7 @@ def _get_feed_task(user, completion='not_completed', archive='not_archived', obl
 
 
 def _karma_rewards_by_type():
-    from accounts.models import PlatformConfig
-
-    reward_keys = {
-        'GITHUB_STAR': 'karma_reward_github_star',
-        'GITHUB_FORK': 'karma_reward_github_fork',
-        'PH_COMMENT': 'karma_reward_ph',
-        'WEBHOOK': 'karma_reward_webhook',
-    }
-    configs = PlatformConfig.objects.filter(key__in=reward_keys.values())
-    config_map = {c.key: c.value for c in configs}
-    return {task_type: config_map.get(cfg_key, '?') for task_type, cfg_key in reward_keys.items()}
+    return dict(KARMA_REWARDS_BY_TASK_TYPE)
 
 
 def _reward_for_task(task):
@@ -136,17 +143,44 @@ def _reward_for_task(task):
         return 0
 
 
+def _webhook_stats(task):
+    if task.type != Task.Type.WEBHOOK:
+        return None
+
+    completion_qs = TaskCompletion.objects.filter(task=task)
+    tried_failed = completion_qs.filter(state=TaskCompletion.State.FAILED).count()
+    completed = completion_qs.filter(state=TaskCompletion.State.CONFIRMED).count()
+    not_tried = (
+        task.archived_by
+        .exclude(task_completions__task=task)
+        .exclude(id=task.owner_id)
+        .distinct()
+        .count()
+    )
+    denominator = completed + tried_failed + not_tried + WEBHOOK_FAILURE_RATE_EPSILON
+    failure_rate = tried_failed / denominator
+
+    return {
+        'tried_failed': tried_failed,
+        'completed': completed,
+        'not_tried': not_tried,
+        'failure_rate': failure_rate,
+    }
+
+
 def feed(request):
     _expire_stale_cards_for_user(request.user)
 
     completion = request.GET.get('completion') or 'not_completed'
     archive = request.GET.get('archive') or 'not_archived'
+    task_family = request.GET.get('task_family') or 'all'
     obligations = _active_lock_obligations(request.user, _open_obligations(request.user))
 
     task = _get_feed_task(
         request.user,
         completion=completion,
         archive=archive,
+        task_family=task_family,
         obligations=obligations,
     )
     completed_task_ids = set()
@@ -161,6 +195,7 @@ def feed(request):
         )
 
     karma_rewards = _karma_rewards_by_type()
+    webhook_stats = _webhook_stats(task) if task else None
 
     return render(request, 'feed/index.html', {
         'task': task,
@@ -169,14 +204,16 @@ def feed(request):
         'feed_empty': task is None,
         'completion': completion,
         'archive': archive,
+        'task_family': task_family,
         'obligation_mode': bool(obligations),
         'open_obligations_count': len(obligations),
+        'webhook_stats': webhook_stats,
     })
 
 
 def _redirect_to_feed_with_filters(request):
     params = {}
-    for key in ('completion', 'archive'):
+    for key in ('completion', 'archive', 'task_family'):
         value = (request.POST.get(key) or '').strip()
         if value:
             params[key] = value

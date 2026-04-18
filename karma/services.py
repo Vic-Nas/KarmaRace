@@ -2,6 +2,7 @@
 from django.db.models import Sum
 
 from karma.models import KarmaTransaction
+from setup.platform_rules import KARMA_LOW_THRESHOLD
 
 
 def get_balance(user) -> int:
@@ -12,14 +13,14 @@ def get_balance(user) -> int:
 def _karma_low_threshold(user) -> int:
     """
     Resolve the karma-low threshold for a user.
-    Checks UserPreference first; falls back to PlatformConfig.
+    Checks UserPreference first; falls back to static platform rules.
     """
-    from accounts.models import UserPreference, PlatformConfig
+    from accounts.models import UserPreference
 
     pref = UserPreference.objects.filter(user=user, key='karma_low_threshold').first()
     if pref is not None:
         return int(pref.value)
-    return int(PlatformConfig.objects.get(key='karma_low_threshold').value)
+    return int(KARMA_LOW_THRESHOLD)
 
 
 def credit_karma(user, delta: int, reason: str, related_object_id: int = None):
@@ -56,7 +57,7 @@ def debit_karma(user, delta: int, reason: str, related_object_id: int = None):
     try:
         threshold = _karma_low_threshold(user)
     except Exception:
-        return  # PlatformConfig missing — skip notification rather than crash
+        return  # Invalid per-user threshold — skip notification rather than crash
 
     if new_balance < threshold:
         from notifications.services import notify

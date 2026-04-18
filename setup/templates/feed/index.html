@@ -27,6 +27,20 @@
   </div>
 
   <div>
+    <div class="small text-muted mb-1">Task Type</div>
+    <div class="btn-group" role="group" aria-label="Task type filter">
+      <input type="radio" class="btn-check" name="task_family" id="task_family_all" value="all" {% if task_family == 'all' %}checked{% endif %}>
+      <label class="btn btn-outline-dark btn-sm" for="task_family_all">All</label>
+
+      <input type="radio" class="btn-check" name="task_family" id="task_family_webhook" value="webhook" {% if task_family == 'webhook' %}checked{% endif %}>
+      <label class="btn btn-outline-dark btn-sm" for="task_family_webhook">Webhook</label>
+
+      <input type="radio" class="btn-check" name="task_family" id="task_family_not_webhook" value="not_webhook" {% if task_family == 'not_webhook' %}checked{% endif %}>
+      <label class="btn btn-outline-dark btn-sm" for="task_family_not_webhook">Not Webhook</label>
+    </div>
+  </div>
+
+  <div>
     {% if obligation_mode %}
       <div class="alert alert-warning py-2 mb-0">
         You have {{ open_obligations_count }} open obligation{{ open_obligations_count|pluralize }}.
@@ -54,10 +68,20 @@
     {% else %}
       {{ task.get_type_display }}
     {% endif %}
+    {% if obligation_mode %}
+      <span class="badge text-bg-warning ms-2">Obligation</span>
+    {% endif %}
   </h1>
   <p>{{ task.description }}</p>
   <p><strong>Target:</strong> {{ task.target_id }}</p>
   <p><strong>Reward:</strong> {{ task_reward }} karma {% if task.id in completed_task_ids %}✓{% endif %}</p>
+  {% if webhook_stats %}
+    <p>
+      <strong>Webhook Failure Rate:</strong>
+      {{ webhook_stats.tried_failed }} / ({{ webhook_stats.completed }} + {{ webhook_stats.tried_failed }} + {{ webhook_stats.not_tried }} + epsilon)
+      = {{ webhook_stats.failure_rate|floatformat:2 }}
+    </p>
+  {% endif %}
   <p class="text-muted">by {{ task.owner.username }}</p>
 
   <div class="d-flex gap-2">
@@ -65,12 +89,14 @@
       {% csrf_token %}
       <input type="hidden" name="completion" value="{{ completion }}">
       <input type="hidden" name="archive" value="{{ archive }}">
+      <input type="hidden" name="task_family" value="{{ task_family }}">
       <button type="submit" class="btn btn-primary">Check</button>
     </form>
     <form method="post" action="{% url 'feed_done' task.id %}">
       {% csrf_token %}
       <input type="hidden" name="completion" value="{{ completion }}">
       <input type="hidden" name="archive" value="{{ archive }}">
+      <input type="hidden" name="task_family" value="{{ task_family }}">
       <button type="submit" class="btn btn-outline-secondary" {% if obligation_mode %}disabled{% endif %}>Archive</button>
     </form>
   </div>

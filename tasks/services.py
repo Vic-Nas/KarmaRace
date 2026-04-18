@@ -6,6 +6,7 @@ from django.db import transaction
 from django.conf import settings
 
 from tasks.models import Task, TaskCompletion, ReciprocityObligation
+from setup.platform_rules import WEBHOOK_OBLIGATIONS_ENABLED
 
 logger = logging.getLogger(__name__)
 
@@ -278,6 +279,9 @@ def settle_or_create_obligation(actor, counterparty, task_type, completed_task):
     """Settle existing debt first; otherwise create reverse obligation."""
     if actor.pk == counterparty.pk:
         return None
+
+    if task_type == Task.Type.WEBHOOK and not WEBHOOK_OBLIGATIONS_ENABLED:
+        return 'ignored_webhook'
 
     debt = ReciprocityObligation.objects.select_for_update().filter(
         debtor=actor,

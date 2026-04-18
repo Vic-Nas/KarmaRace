@@ -2,7 +2,7 @@
 
 {% block content %}
 <h1>Help Center</h1>
-<p class="text-muted">What KarmaRace is, how it works, and API expectations.</p>
+<p class="text-muted">Current app behavior, verification rules, and feed mechanics.</p>
 
 <div class="mb-4">
   <h2 class="h5">What Is KarmaRace?</h2>
@@ -15,35 +15,59 @@
 <div class="mb-4">
   <h2 class="h5">How It Works</h2>
   <ol>
-    <li>Create a task in My Tasks.</li>
-    <li>Publish the task (must pass configuration and health checks).</li>
-    <li>A tester opens the feed and presses Check.</li>
-    <li>If verification succeeds, tester gains karma and owner pays the task reward.</li>
-    <li>Completion also settles or creates reciprocity obligations by task type (settled obligations are removed).</li>
+    <li>Create a task in My Tasks (new tasks start hidden).</li>
+    <li>Publish explicitly (publish runs configuration checks and can fail with a reason).</li>
+    <li>A tester opens the feed and gets one card at a time.</li>
+    <li>Check verifies the action server-side and marks completion as CONFIRMED or FAILED.</li>
+    <li>On CONFIRMED, tester earns karma and owner pays karma.</li>
   </ol>
 </div>
 
 <div class="mb-4">
-  <h2 class="h5">Reciprocity Lock</h2>
+  <h2 class="h5">Feed Selection and Filters</h2>
   <p>
-    Reciprocity is always on. If you have open obligations and matching cards are currently available,
-    your feed is restricted to tasks that can satisfy those obligations, and archive/skip is disabled.
-    If no matching obligation card is available, feed falls back to normal cards.
+    Feed is ranked by owner karma (descending), then creation time.
+    Owners never see their own tasks in feed.
   </p>
-</div>
-
-<div class="mb-4">
-  <h2 class="h5">Task Types</h2>
   <ul>
-    <li>GitHub Star: target format owner/repo.</li>
-    <li>GitHub Fork: target format owner/repo.</li>
-    <li>Product Hunt Comment/Upvote: target format slug.</li>
-    <li>Webhook: target format full URL (Pro only).</li>
+    <li>Completion filter: Not Completed / Completed</li>
+    <li>Archive filter: Not Archived / Archived</li>
+    <li>Task Type filter: All / Webhook / Not Webhook</li>
   </ul>
 </div>
 
 <div class="mb-4">
-  <h2 class="h5">API Calls and Expected Return</h2>
+  <h2 class="h5">Reciprocity Obligations</h2>
+  <p>
+    Reciprocity is always on. If you have open obligations and matching cards are currently available,
+    your feed is restricted to tasks that can satisfy those obligations, and archive/skip is disabled.
+    If no matching obligation card is available, feed falls back to normal cards.
+    Cards shown in this mode are tagged as Obligation.
+  </p>
+  <p>
+    On successful checks for GitHub/Product Hunt task types:
+  </p>
+  <ul>
+    <li>If a matching open obligation exists, it is settled and removed.</li>
+    <li>Otherwise, a reverse obligation is created.</li>
+  </ul>
+  <p>
+    Webhook tasks are excluded from obligation creation and settlement.
+  </p>
+</div>
+
+<div class="mb-4">
+  <h2 class="h5">Task Types and Verification</h2>
+  <ul>
+    <li>GitHub Star: target format owner/repo, verified against tester linked GitHub account.</li>
+    <li>GitHub Fork: target format owner/repo, verified against tester linked GitHub account.</li>
+    <li>Product Hunt Comment/Upvote: target format slug only, verified with tester linked Product Hunt account.</li>
+    <li>Webhook: target format full URL, publish is Pro-only, verified by endpoint JSON response.</li>
+  </ul>
+</div>
+
+<div class="mb-4">
+  <h2 class="h5">Webhook Contract</h2>
   <p>When a webhook task is checked (and during publish health checks), KarmaRace sends:</p>
   <pre class="bg-light border rounded p-3"><code>POST {task.target_id}
 Content-Type: application/json
@@ -66,6 +90,18 @@ Authorization: Bearer {task.webhook_secret}  # only if secret is set
 }</code></pre>
 
   <p>If verification fails, KarmaRace reports Sent/Expected/Got diagnostics to help debugging.</p>
+  <p>
+    Webhook cards show a failure signal for testers:
+    tried_failed / (completed + tried_failed + not_tried + epsilon).
+  </p>
+</div>
+
+<div class="mb-4">
+  <h2 class="h5">Reward and Threshold Config</h2>
+  <p>
+    Reward values and low-balance threshold are defined in setup/platform_rules.py,
+    with optional per-user overrides through UserPreference.
+  </p>
 </div>
 
 <div class="mb-4">
