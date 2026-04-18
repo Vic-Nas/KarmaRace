@@ -1,11 +1,12 @@
+cryptography
 django-allauth
 dj_database_url
 django
 django-environ
 environ
+gunicorn
 PyJWT>=2.0.0
 procrastinate
 psycopg[binary]>=3.1
-psycopg2-binary>=2.9
 whitenoise
 stripe
