@@ -6,7 +6,7 @@ from django.views.decorators.http import require_POST
 
 from .forms import TaskForm
 from .models import Task
-from .services import on_task_created, on_task_unhidden, soft_delete_task
+from .services import on_task_unhidden, soft_delete_task
 from .services import get_task_configuration_failure
 
 
@@ -24,11 +24,11 @@ def task_create(request):
         task = form.save(commit=False)
         task.owner = request.user
         task.hidden = True
+        task.owner_unpublished = True  # stays hidden until owner explicitly publishes
         if task.type != Task.Type.WEBHOOK:
             task.webhook_secret = ''
         task.save()
-
-        on_task_created(task)
+        # Validation runs at publish time, not here.
         return redirect('my_tasks')
 
     return render(request, 'tasks/edit.html', {
@@ -48,9 +48,6 @@ def task_edit(request, task_pk):
         if task.type != Task.Type.WEBHOOK:
             task.webhook_secret = ''
         task.save()
-
-        # Save/edit should not auto-publish. Keep hidden state untouched here.
-
         return redirect('my_tasks')
 
     return render(request, 'tasks/edit.html', {
@@ -61,11 +58,10 @@ def task_edit(request, task_pk):
 
 
 @login_required
+@require_POST
 def task_delete(request, task_pk):
     task = get_object_or_404(Task, pk=task_pk, owner=request.user, is_deleted=False)
-
-    if request.method == 'POST':
-        soft_delete_task(task)
+    soft_delete_task(task)
     return redirect('my_tasks')
 
 
@@ -73,9 +69,10 @@ def task_delete(request, task_pk):
 @require_POST
 def task_unpublish(request, task_pk):
     task = get_object_or_404(Task, pk=task_pk, owner=request.user, is_deleted=False)
-    if not task.hidden:
+    if not task.owner_unpublished:
+        task.owner_unpublished = True
         task.hidden = True
-        task.save(update_fields=['hidden'])
+        task.save(update_fields=['owner_unpublished', 'hidden'])
     return redirect('my_tasks')
 
 
@@ -83,11 +80,12 @@ def task_unpublish(request, task_pk):
 @require_POST
 def task_publish(request, task_pk):
     task = get_object_or_404(Task, pk=task_pk, owner=request.user, is_deleted=False)
-    if task.hidden:
+    if task.owner_unpublished or task.hidden:
         reason = get_task_configuration_failure(task)
         if reason is None:
+            task.owner_unpublished = False
             task.hidden = False
-            task.save(update_fields=['hidden'])
+            task.save(update_fields=['owner_unpublished', 'hidden'])
             on_task_unhidden(task)
             messages.success(request, 'Task published.')
         else:

@@ -18,8 +18,9 @@ class Task(models.Model):
     webhook_secret = models.CharField(max_length=255, blank=True, default='')
     succeed_count  = models.PositiveIntegerField(default=0)
     tried_count    = models.PositiveIntegerField(default=0)
-    is_deleted     = models.BooleanField(default=False)
-    hidden         = models.BooleanField(default=False)
+    is_deleted          = models.BooleanField(default=False)
+    hidden              = models.BooleanField(default=False)   # system-controlled (health, creation)
+    owner_unpublished   = models.BooleanField(default=False)   # owner-controlled; blocks auto-publish
     health_failure_streak = models.PositiveSmallIntegerField(default=0)
     health_last_failure_reason = models.TextField(blank=True, default='')
     health_last_checked_at = models.DateTimeField(null=True, blank=True)

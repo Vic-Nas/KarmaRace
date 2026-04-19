@@ -13,6 +13,7 @@ from setup.platform_rules import WEBHOOK_OBLIGATIONS_ENABLED
 logger = logging.getLogger(__name__)
 
 HEALTH_HIDE_THRESHOLD = 2
+HEALTH_CHECK_ATTEMPTS = 3  # retries within a single run before counting as failure
 
 
 # ---------------------------------------------------------------------------
@@ -43,11 +44,6 @@ def verify_task_with_details(task, tester):
 # ---------------------------------------------------------------------------
 # Platform verifiers
 # ---------------------------------------------------------------------------
-
-def verify_github(task, tester) -> bool:
-    ok, _ = verify_github_with_details(task, tester)
-    return ok
-
 
 def verify_github_with_details(task, tester):
     """
@@ -104,11 +100,6 @@ def verify_github_with_details(task, tester):
     except requests.RequestException as exc:
         logger.error('verify_github: request failed for task %s: %s', task.pk, exc)
         return False, msg('GITHUB_REQUEST_FAILED', error=exc)
-
-
-def verify_ph(task, tester) -> bool:
-    ok, _ = verify_ph_with_details(task, tester)
-    return ok
 
 
 def verify_ph_with_details(task, tester):
@@ -210,11 +201,6 @@ def verify_ph_with_details(task, tester):
     return False, msg('PH_COMMENT_REQUIRED')
 
 
-def verify_webhook(task, tester) -> bool:
-    ok, _ = verify_webhook_with_details(task, tester)
-    return ok
-
-
 def verify_webhook_with_details(task, tester):
     """
     POST {"task_slug": ..., "platform_username": ...} to owner endpoint.
@@ -307,7 +293,10 @@ def settle_or_create_obligation(actor, counterparty, task_type, completed_task):
     ).order_by('created_at').first()
 
     if debt:
-        debt.delete()
+        debt.state = ReciprocityObligation.State.FULFILLED
+        debt.fulfilled_by_task = completed_task
+        debt.fulfilled_at = timezone.now()
+        debt.save(update_fields=['state', 'fulfilled_by_task', 'fulfilled_at'])
         return 'settled'
 
     ReciprocityObligation.objects.create(
@@ -321,27 +310,8 @@ def settle_or_create_obligation(actor, counterparty, task_type, completed_task):
 
 
 # ---------------------------------------------------------------------------
-# Creation hook
+# Configuration check (runs at publish time)
 # ---------------------------------------------------------------------------
-
-def on_task_created(task):
-    """
-    Called after a new task is saved.
-    - Runs upfront validity checks appropriate to the task type.
-    """
-    # Upfront validity checks: invalid tasks are auto-hidden.
-    if not is_task_configuration_valid(task):
-        task.hidden = True
-        task.save(update_fields=['hidden'])
-
-
-def is_task_configuration_valid(task) -> bool:
-    """
-    Returns True when a task appears externally valid/reachable.
-    Used to gate activation and to auto-hide invalid tasks on creation/edit.
-    """
-    return get_task_configuration_failure(task) is None
-
 
 def get_task_configuration_failure(task):
     """Return None when valid, otherwise a human-readable reason."""
@@ -355,11 +325,11 @@ def get_task_configuration_failure(task):
             return pro_gate
         detail = _check_webhook_endpoint_contract_detailed(task)
         if detail is not None:
-            logger.warning('webhook validation failed for task %s: %s', task.pk, detail)
+            logger.warning('get_task_configuration_failure: webhook check failed for task %s: %s', task.pk, detail)
             return _webhook_user_facing_reason(detail)
         return None
 
-    logger.warning('is_task_configuration_valid: unknown task type %s', task.type)
+    logger.warning('get_task_configuration_failure: unknown task type %s', task.type)
     return 'Unknown task type.'
 
 
@@ -368,10 +338,6 @@ def _is_valid_github_repo_target(target):
         return False
     owner, repo = target.split('/')
     return bool(owner.strip()) and bool(repo.strip())
-
-
-def _check_github_repo_public(task) -> bool:
-    return _check_github_repo_public_detailed(task) is None
 
 
 def _check_github_repo_public_detailed(task):
@@ -403,10 +369,6 @@ def _check_github_repo_public_detailed(task):
     except requests.RequestException as exc:
         logger.error('on_task_created: GitHub check failed for task %s: %s', task.pk, exc)
         return f'GitHub repo check failed: {exc}'
-
-
-def _check_ph_post_exists(task) -> bool:
-    return _check_ph_post_exists_detailed(task) is None
 
 
 def _check_ph_post_exists_detailed(task):
@@ -584,15 +546,15 @@ def on_task_unhidden(task):
 
 def run_health_check(task) -> bool:
     """
-    Runs the appropriate health check for a task.
-    Two-strike policy:
-    - First consecutive failure marks suspect but does not hide.
-    - Second consecutive failure hides task and notifies owner.
-    - A healthy check resets streak and auto-unhides tasks hidden by health checks.
+    Retries the health check up to HEALTH_CHECK_ATTEMPTS times before counting a failure.
+    Two-strike policy on consecutive failed runs:
+    - First run failure: marks suspect, does not hide.
+    - Second run failure: hides task and notifies owner.
+    - A healthy run resets streak and auto-unhides — unless owner manually unpublished.
 
     Returns True if healthy, False if failed.
     """
-    healthy, reason = _check_task_health_with_reason(task)
+    healthy, reason = _check_task_health_with_retry(task)
 
     update_fields = ['health_last_checked_at']
     task.health_last_checked_at = timezone.now()
@@ -605,13 +567,13 @@ def run_health_check(task) -> bool:
         if task.health_last_failure_reason:
             task.health_last_failure_reason = ''
             update_fields.append('health_last_failure_reason')
-        if was_health_hidden:
+        if was_health_hidden and not task.owner_unpublished:
             task.hidden = False
             update_fields.append('hidden')
 
         task.save(update_fields=update_fields)
 
-        if was_health_hidden:
+        if was_health_hidden and not task.owner_unpublished:
             on_task_unhidden(task)
 
         return True
@@ -634,10 +596,21 @@ def run_health_check(task) -> bool:
     return False
 
 
-def _check_task_health(task) -> bool:
-    """Backwards-compatible bool-only health check wrapper."""
-    healthy, _ = _check_task_health_with_reason(task)
-    return healthy
+def _check_task_health_with_retry(task):
+    """
+    Attempts the health check up to HEALTH_CHECK_ATTEMPTS times.
+    Returns (True, '') on first success; (False, last_reason) if all attempts fail.
+    Exponential backoff between attempts (1s, 2s, …).
+    """
+    import time
+    reason = 'Health check failed.'
+    for attempt in range(1, HEALTH_CHECK_ATTEMPTS + 1):
+        healthy, reason = _check_task_health_with_reason(task)
+        if healthy:
+            return True, ''
+        if attempt < HEALTH_CHECK_ATTEMPTS:
+            time.sleep(2 ** (attempt - 1))
+    return False, reason
 
 
 def _check_task_health_with_reason(task):
@@ -787,4 +760,3 @@ def _github_headers(token_override=None) -> dict:
     if token:
         headers['Authorization'] = f'Bearer {token}'
     return headers
-
