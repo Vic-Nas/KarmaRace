@@ -1,0 +1,55 @@
+/* forms.css — Inputs, selects, labels, alerts */
+input[type="text"], input[type="email"], input[type="url"],
+input[type="number"], input[type="password"],
+select, textarea, .form-control, .form-select {
+  font-family: var(--font-body);
+  font-size: .9rem;
+  width: 100%;
+  padding: .5rem .75rem;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  transition: border-color var(--transition), box-shadow var(--transition);
+  outline: none;
+  appearance: none;
+}
+input:focus, select:focus, textarea:focus,
+.form-control:focus, .form-select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(61,140,46,.12);
+}
+textarea { min-height: 6rem; resize: vertical; }
+select, .form-select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23888' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right .75rem center;
+  padding-right: 2rem;
+  cursor: pointer;
+}
+.form-group { margin-bottom: 1rem; }
+.form-group label {
+  display: block; font-size: .78rem; font-weight: 600;
+  color: var(--text-muted); margin-bottom: .3rem;
+  text-transform: uppercase; letter-spacing: .05em;
+}
+.form-text { font-size: .76rem; color: var(--text-muted); margin-top: .22rem; }
+
+/* Alerts */
+.alert {
+  padding: .75rem 1rem; border-radius: var(--radius-sm);
+  border: 1px solid; font-size: .88rem; margin-bottom: .9rem;
+}
+.alert-info    { background: var(--info-light);    color: var(--info);    border-color: rgba(26,106,150,.2); }
+.alert-success { background: var(--success-light); color: var(--success); border-color: rgba(45,125,34,.2); }
+.alert-warning { background: var(--warning-light); color: var(--warning); border-color: rgba(154,112,16,.2); }
+.alert-danger  { background: var(--danger-light);  color: var(--danger);  border-color: rgba(192,57,43,.2); }
+.alert-light   { background: var(--surface-alt);   color: var(--text);    border-color: var(--border); }
+.alert-dismissible { display: flex; justify-content: space-between; align-items: flex-start; gap: .5rem; }
+.btn-close { background: none; border: none; cursor: pointer; color: inherit; opacity: .45; font-size: 1rem; padding: 0; line-height: 1; }
+.btn-close:hover { opacity: .9; }
+/* Col grid compat */
+.row { display: flex; flex-wrap: wrap; gap: .65rem; }
+.col-md-2 { flex: 0 0 auto; min-width: 100px; }
+.col-md-3 { flex: 1 1 160px; }
+.col-md-4 { flex: 1 1 200px; }

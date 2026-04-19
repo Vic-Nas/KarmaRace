@@ -1,0 +1,29 @@
+/* prose.css — Help, legal, long-form content */
+.kr-prose { max-width: 780px; margin: 0 auto; }
+.kr-prose h1 {
+  font-size: 2rem; color: var(--primary);
+  border-bottom: 3px solid var(--accent);
+  padding-bottom: .45rem; margin-bottom: .35rem;
+}
+.kr-prose__sub {
+  display: block; font-size: .9rem; color: var(--text-muted);
+  font-style: italic; margin-bottom: 1.75rem;
+}
+.kr-help-section {
+  margin-bottom: 1.75rem; padding: 1.1rem 1.3rem;
+  background: var(--surface); border: 1.5px solid var(--border);
+  border-left: 4px solid var(--primary); border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+.kr-help-section h2 { font-size: 1.1rem; color: var(--primary); margin-bottom: .55rem; }
+.kr-prose h2 {
+  font-size: 1.25rem; color: var(--primary); margin-top: 1.65rem; margin-bottom: .55rem;
+  padding-bottom: .22rem; border-bottom: 1px solid var(--border);
+}
+.kr-prose p  { color: var(--text); line-height: 1.7; }
+.kr-prose ul,.kr-prose ol { margin-bottom: .9rem; padding-left: 1.5rem; }
+.kr-prose li { margin-bottom: .3rem; color: var(--text); line-height: 1.6; }
+.kr-prose pre { margin: .7rem 0 .9rem; }
+.kr-prose code { color: var(--accent); }
+.kr-prose pre code { color: var(--text); }
+.kr-prose strong { color: var(--primary); }

@@ -1,0 +1,90 @@
+/* notifications.css — Dropdown, toast, inbox list */
+.kr-notif-dropdown {
+  display: none;
+  position: absolute;
+  right: 1rem;
+  top: 56px;
+  width: 26rem;
+  max-width: calc(100vw - 2rem);
+  z-index: 1050;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+.kr-notif-dropdown.open { display: block; }
+.kr-notif-dropdown__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: .65rem 1rem;
+  background: var(--surface-alt);
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+  font-size: .82rem;
+  color: var(--text);
+  letter-spacing: .02em;
+  text-transform: uppercase;
+}
+.kr-notif-dropdown__list { max-height: 20rem; overflow-y: auto; }
+.kr-notif-dropdown__footer {
+  padding: .5rem 1rem;
+  background: var(--surface-alt);
+  border-top: 1px solid var(--border);
+  text-align: center;
+  font-size: .8rem;
+}
+.kr-notif-item {
+  padding: .55rem .9rem;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background var(--transition);
+  font-size: .85rem;
+  color: var(--text);
+}
+.kr-notif-item:hover { background: var(--surface-alt); }
+.kr-notif-item.unread {
+  background: var(--accent-light);
+  border-left: 2px solid var(--accent);
+}
+.kr-notif-item__time { font-size: .72rem; color: var(--text-muted); margin-top: .1rem; }
+
+/* Toast */
+.kr-toast {
+  position: fixed;
+  right: 1rem;
+  bottom: calc(var(--footer-h) + .75rem);
+  z-index: 1100;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: .7rem 1rem;
+  max-width: 22rem;
+  box-shadow: var(--shadow-lg);
+  font-size: .85rem;
+  cursor: pointer;
+}
+.kr-toast__event { font-size: .74rem; color: var(--text-muted); margin-bottom: .1rem; }
+.kr-toast.fading { animation: toastFade .3s ease forwards; }
+@keyframes toastFade { to { opacity: 0; transform: translateY(.75rem); } }
+
+/* Inbox */
+.list-group { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.list-group-item {
+  display: block;
+  padding: .8rem 1rem;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  font-size: .88rem;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+.list-group-item:last-child { border-bottom: none; }
+.list-group-item:hover { background: var(--surface-alt); }
+.list-group-item-warning { background: var(--warning-light); }
+.list-group-item summary { list-style: none; display: flex; justify-content: space-between; align-items: flex-start; }
+.list-group-item summary::-webkit-details-marker { display: none; }
+
+.notif-filters { margin-bottom: 1.25rem; }

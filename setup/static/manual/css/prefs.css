@@ -1,0 +1,28 @@
+/* prefs.css — Preferences page: pref table, webhook section */
+.pref-table { border: 1.5px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.pref-table__head {
+  display: grid; grid-template-columns: 1fr 80px 80px;
+  padding: .45rem 1rem;
+  background: var(--surface-alt); border-bottom: 1px solid var(--border);
+  font-size: .73rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--primary);
+}
+.pref-table__row {
+  display: grid; grid-template-columns: 1fr 80px 80px;
+  align-items: center; padding: .52rem 1rem;
+  border-bottom: 1px solid var(--border); background: var(--surface);
+  transition: background var(--transition);
+}
+.pref-table__row:last-child { border-bottom: none; }
+.pref-table__row:hover { background: var(--surface-alt); }
+.pref-table__row--locked { opacity: .5; }
+.pref-table__label { font-size: .87rem; color: var(--text); }
+.pref-webhook-global {
+  padding: 1rem; background: var(--surface-alt);
+  border: 1.5px solid var(--border); border-radius: var(--radius); margin-bottom: 1rem;
+}
+.prefs-threshold-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: .75rem;
+}
+/* Prefs save indicator */
+#prefs-saved { display: none; color: var(--success); font-size: .85rem; font-weight: 700; margin-left: .5rem; }

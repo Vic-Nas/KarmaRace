@@ -3,6 +3,10 @@
 
 {% block title %}Feed — KarmaRace{% endblock %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/feed.css' %}">
+{% endblock %}
+
 {% block content %}
 
 <form method="get" class="feed-filters">
@@ -10,18 +14,18 @@
     <div class="filter-group">
       <label>Completion</label>
       <div class="btn-group">
-        <input type="radio" name="completion" id="c_not" value="not_completed" {% if completion == 'not_completed' %}checked{% endif %}>
+        <input type="radio" name="completion" id="c_not"  value="not_completed" {% if completion == 'not_completed' %}checked{% endif %}>
         <label for="c_not">Not done</label>
-        <input type="radio" name="completion" id="c_done" value="completed" {% if completion == 'completed' %}checked{% endif %}>
+        <input type="radio" name="completion" id="c_done" value="completed"     {% if completion == 'completed' %}checked{% endif %}>
         <label for="c_done">Done</label>
       </div>
     </div>
     <div class="filter-group">
       <label>Archive</label>
       <div class="btn-group">
-        <input type="radio" name="archive" id="a_not" value="not_archived" {% if archive == 'not_archived' %}checked{% endif %}>
+        <input type="radio" name="archive" id="a_not"  value="not_archived" {% if archive == 'not_archived' %}checked{% endif %}>
         <label for="a_not">Active</label>
-        <input type="radio" name="archive" id="a_arch" value="archived" {% if archive == 'archived' %}checked{% endif %}>
+        <input type="radio" name="archive" id="a_arch" value="archived"     {% if archive == 'archived' %}checked{% endif %}>
         <label for="a_arch">Archived</label>
       </div>
     </div>
@@ -35,17 +39,10 @@
     <span class="filter-row__title">Type</span>
     <div class="type-chip-group">
       {% for type_option in all_task_types %}
-      <input
-        type="checkbox"
-        class="type-chip-input"
-        id="tt_{{ forloop.counter }}"
-        name="task_types"
-        value="{{ type_option.value }}"
-        {% if type_option.value in selected_task_types %}checked{% endif %}
-      >
-      <label class="type-chip" for="tt_{{ forloop.counter }}">
-        {{ type_option.label }}
-      </label>
+      <input type="checkbox" class="type-chip-input" id="tt_{{ forloop.counter }}"
+             name="task_types" value="{{ type_option.value }}"
+             {% if type_option.value in selected_task_types %}checked{% endif %}>
+      <label class="type-chip" for="tt_{{ forloop.counter }}">{{ type_option.label }}</label>
       {% endfor %}
     </div>
   </div>
@@ -59,7 +56,7 @@
 {% endif %}
 
 {% if feed_empty %}
-  <div style="padding:3rem 0;text-align:center;color:var(--text-muted)">
+  <div class="feed-empty">
     {% if obligation_mode %}
       <p>No eligible tasks available to clear your obligations right now. Check back soon.</p>
     {% else %}
@@ -87,41 +84,37 @@
     </div>
 
     {% if webhook_stats %}
-    <p class="small text-muted" style="margin-top:0.5rem">
-      Webhook failure rate: {{ webhook_stats.failure_rate|floatformat:2 }}
+    <p class="small text-muted mt-1">
+      Webhook failure rate: {{ webhook_stats.failure_rate_percent }}%
       ({{ webhook_stats.tried_failed }} failed / {{ webhook_stats.completed }} completed)
     </p>
     {% endif %}
 
-    <p class="small text-muted" style="margin-top:0.35rem">by {{ task.owner.username }}</p>
+    <p class="small text-muted mt-1">by {{ task.owner.username }}</p>
 
-    {% if checking_task_id %}
-    <div class="alert alert-info" id="check-loading-banner">
-      Verification in progress &mdash; this card will refresh automatically&hellip;
+    <div class="alert alert-info" id="check-loading-banner"{% if not checking_task_id %} style="display:none"{% endif %}>
+      {% if checking_task_id %}Verification in progress &mdash; this card will refresh automatically&hellip;{% endif %}
     </div>
-    {% else %}
-    <div class="alert alert-info" id="check-loading-banner" style="display:none"></div>
-    {% endif %}
 
     <div class="card__actions">
       <form method="post" action="{% url 'feed_check' task.id %}" id="feed-check-form">
         {% csrf_token %}
-        <input type="hidden" name="completion" value="{{ completion }}">
-        <input type="hidden" name="archive" value="{{ archive }}">
-        <input type="hidden" name="task_types" value="{{ selected_task_types_csv }}">
+        <input type="hidden" name="completion"  value="{{ completion }}">
+        <input type="hidden" name="archive"     value="{{ archive }}">
+        <input type="hidden" name="task_types"  value="{{ selected_task_types_csv }}">
         <button type="submit" class="btn btn-primary">Check</button>
       </form>
       <form method="post" action="{% url 'feed_done' task.id %}">
         {% csrf_token %}
-        <input type="hidden" name="completion" value="{{ completion }}">
-        <input type="hidden" name="archive" value="{{ archive }}">
-        <input type="hidden" name="task_types" value="{{ selected_task_types_csv }}">
+        <input type="hidden" name="completion"  value="{{ completion }}">
+        <input type="hidden" name="archive"     value="{{ archive }}">
+        <input type="hidden" name="task_types"  value="{{ selected_task_types_csv }}">
         <button type="submit" class="btn btn-secondary" {% if obligation_mode %}disabled{% endif %}>Archive</button>
       </form>
     </div>
 
     {% if request.user.is_authenticated and request.user.id == task.owner_id %}
-    <div style="margin-top:0.75rem;display:flex;gap:0.5rem">
+    <div class="card__actions">
       <a href="{% url 'task_edit' task.slug %}" class="btn btn-secondary btn-sm">Edit</a>
       <form method="post" action="{% url 'task_delete' task.slug %}" onsubmit="return confirm('Delete this task?')">
         {% csrf_token %}

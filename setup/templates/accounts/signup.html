@@ -1,7 +1,14 @@
 {% extends "base.html" %}
+{% load static %}
+
 {% block title %}Sign Up — KarmaRace{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/accounts.css' %}">
+{% endblock %}
+
 {% block content %}
-<div style="max-width:400px;margin:3rem auto;text-align:center">
+<div class="auth-center">
   <h1>Create Account</h1>
   {% block inner %}{% endblock %}
 </div>

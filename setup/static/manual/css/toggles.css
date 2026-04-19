@@ -1,0 +1,19 @@
+/* toggles.css — Toggle switch component */
+.toggle { display: inline-flex; align-items: center; cursor: pointer; position: relative; }
+.toggle input[type="checkbox"] { position: absolute; opacity: 0; width: 0; height: 0; }
+.toggle__track {
+  width: 40px; height: 22px;
+  background: var(--border-strong);
+  border-radius: 99px; position: relative;
+  transition: background var(--transition); flex-shrink: 0;
+}
+.toggle input:checked + .toggle__track { background: var(--primary); }
+.toggle__thumb {
+  position: absolute; top: 3px; left: 3px;
+  width: 16px; height: 16px;
+  background: #fff; border-radius: 50%;
+  transition: transform var(--transition);
+  box-shadow: 0 1px 3px rgba(0,0,0,.2);
+}
+.toggle input:checked + .toggle__track .toggle__thumb { transform: translateX(18px); }
+.toggle--locked { opacity: .42; cursor: not-allowed; }

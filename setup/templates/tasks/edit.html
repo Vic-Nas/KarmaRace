@@ -3,37 +3,46 @@
 
 {% block title %}{% if is_create %}New Task{% else %}Edit Task{% endif %} — KarmaRace{% endblock %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/tasks.css' %}">
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
   <h1>{% if is_create %}New Task{% else %}Edit Task{% endif %}</h1>
-  <a href="{% url 'my_tasks' %}" class="btn btn-secondary btn-sm">← My Tasks</a>
+  <a href="{% url 'my_tasks' %}" class="btn btn-secondary btn-sm">&larr; My Tasks</a>
 </div>
 
-<div class="card" style="max-width:560px;margin:0 auto">
+<div class="card task-form-card">
   <form method="post" data-task-id="{% if task %}{{ task.pk }}{% endif %}">
     {% csrf_token %}
+
     <div class="form-group">
       <label for="id_type">Type</label>
       {{ form.type }}
     </div>
+
     <div class="form-group">
       <label for="id_slug">Slug</label>
       {{ form.slug }}
-      <div class="form-text">Custom URL slug for this task. Must be unique among your tasks.</div>
+      <div class="form-text">Custom URL slug. Must be unique among your tasks.</div>
       <div class="small mt-1" id="slug-availability" data-check-url="{% url 'task_slug_available' %}"></div>
     </div>
+
     <div class="form-group" id="target-input-row">
       <label for="id_target_id">Target</label>
       {{ form.target_id }}
       <div class="form-text" id="target-help-text">Webhook: full URL</div>
     </div>
-    <div class="form-group" id="github-target-row" style="display:none" data-has-choices="{% if form.github_repo_choices %}1{% else %}0{% endif %}">
-      <div class="d-flex justify-content-between align-items-center">
-        <label for="id_github_target_select" class="mb-0">GitHub Repository</label>
-        <a
-          class="btn btn-outline-secondary btn-sm"
-          href="{% if is_create %}{% url 'task_create' %}{% else %}{% url 'task_edit' task.slug %}{% endif %}?reload_repos=1"
-        >Reload repos</a>
+
+    <div class="form-group" id="github-target-row" style="display:none"
+         data-has-choices="{% if form.github_repo_choices %}1{% else %}0{% endif %}">
+      <div class="github-target-info">
+        <label for="id_github_target_select">GitHub Repository</label>
+        <a class="btn btn-secondary btn-sm"
+           href="{% if is_create %}{% url 'task_create' %}{% else %}{% url 'task_edit' task.slug %}{% endif %}?reload_repos=1">
+          Reload repos
+        </a>
       </div>
       <select id="id_github_target_select" class="form-select">
         <option value="">Select repository</option>
@@ -41,18 +50,18 @@
         <option value="{{ value }}" {% if value == form.github_repo_selected %}selected{% endif %}>{{ label }}</option>
         {% endfor %}
       </select>
-      <div class="form-text">Only public repos where your linked GitHub account has push access are available.</div>
+      <div class="form-text">Only public repos with push access are listed.</div>
       {% if form.github_repo_load_error %}
-      <div class="alert alert-warning" style="margin-top:0.5rem">
-        {{ form.github_repo_load_error }}
-      </div>
+      <div class="alert alert-warning mt-1">{{ form.github_repo_load_error }}</div>
       {% endif %}
     </div>
+
     <div class="form-group" id="webhook-secret-row" style="display:none">
-      <label for="id_webhook_secret">Webhook Secret <span class="text-muted" style="text-transform:none;font-weight:400">(optional)</span></label>
+      <label for="id_webhook_secret">Webhook Secret <span class="form-text" style="display:inline">(optional)</span></label>
       {{ form.webhook_secret }}
-      <div class="form-text">Used as auth when KarmaRace calls your webhook URL (sent as Bearer token).</div>
+      <div class="form-text">Sent as Bearer token when KarmaRace calls your webhook.</div>
     </div>
+
     <div class="form-group">
       <label for="id_description">Instructions for testers</label>
       {{ form.description }}
@@ -65,7 +74,7 @@
     </div>
     {% endif %}
 
-    <div style="display:flex;gap:0.5rem;margin-top:1rem">
+    <div class="card__actions">
       <button type="submit" class="btn btn-primary" id="task-save-btn">Save Task</button>
       <a href="{% url 'my_tasks' %}" class="btn btn-secondary">Cancel</a>
     </div>

@@ -1,0 +1,40 @@
+/* cards.css — Card component */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem 1.4rem;
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow var(--transition), border-color var(--transition);
+}
+.card:hover { box-shadow: var(--shadow); border-color: var(--border-strong); }
+.card-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: .65rem 1.1rem;
+  background: var(--surface-alt);
+  border-bottom: 1px solid var(--border);
+  font-weight: 600; font-size: .85rem; color: var(--text-muted);
+  letter-spacing: .02em; text-transform: uppercase;
+  border-radius: var(--radius) var(--radius) 0 0;
+  margin: -1.25rem -1.4rem .9rem;
+}
+.card-footer {
+  padding: .55rem 1.1rem;
+  background: var(--surface-alt); border-top: 1px solid var(--border);
+  text-align: center; font-size: .82rem;
+  margin: .9rem -1.4rem -1.25rem;
+  border-radius: 0 0 var(--radius) var(--radius);
+}
+/* Task card */
+.task-card { border-left: 3px solid var(--primary); }
+.task-card__type {
+  font-size: .72rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .08em; color: var(--text-muted); margin-bottom: .55rem;
+}
+.task-card__desc { font-size: .98rem; color: var(--text); margin-bottom: .7rem; line-height: 1.6; }
+.task-card__reward { font-size: .88rem; color: var(--text-muted); margin-bottom: .7rem; }
+.task-card__reward strong { color: var(--primary); font-size: .95rem; }
+.card__actions {
+  display: flex; gap: .5rem; flex-wrap: wrap;
+  margin-top: 1rem; padding-top: .75rem; border-top: 1px solid var(--border);
+}

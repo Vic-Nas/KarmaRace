@@ -244,12 +244,14 @@ def _webhook_stats(task):
     )
     denominator = completed + tried_failed + not_tried + WEBHOOK_FAILURE_RATE_EPSILON
     failure_rate = tried_failed / denominator
+    failure_rate_percent = int(round(failure_rate * 100))
 
     return {
         'tried_failed': tried_failed,
         'completed': completed,
         'not_tried': not_tried,
         'failure_rate': failure_rate,
+        'failure_rate_percent': failure_rate_percent,
     }
 
 

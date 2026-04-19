@@ -1,0 +1,39 @@
+/* accounts.css — Linked accounts page, signup, logout */
+.linked-accounts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1rem;
+  margin-top: .5rem;
+}
+.provider-card { border-top: 3px solid var(--primary); }
+.provider-card h3 { font-size: 1.1rem; color: var(--primary); margin-top: .5rem; }
+.provider-card__icon {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  margin-bottom: .25rem;
+  height: 44px;
+}
+.provider-card__icon--github { color: var(--text); }
+.provider-card__icon--discord { color: #5865f2; }
+.provider-card__actions {
+  display: flex; gap: .5rem; flex-wrap: wrap; margin-top: .75rem;
+}
+
+/* Signup / logout centered wrappers */
+.auth-center {
+  max-width: 420px;
+  margin: 3rem auto;
+  text-align: center;
+}
+.auth-center h1 { margin-bottom: .5rem; color: var(--primary); }
+.auth-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 2rem;
+  margin-top: 1.5rem;
+}
+.auth-box .btn { width: 100%; justify-content: center; }
+.auth-box .btn + * { margin-top: 1rem; }

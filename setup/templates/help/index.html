@@ -1,171 +1,103 @@
 {% extends "base.html" %}
+{% load static %}
+
+{% block title %}Help — KarmaRace{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/prose.css' %}">
+{% endblock %}
 
 {% block content %}
 <div class="kr-prose">
   <h1>Help Center</h1>
-  <span class="kr-prose__sub">Current app behavior, verification rules, and feed mechanics.</span>
+  <span class="kr-prose__sub">Everything you need to get started and earn karma.</span>
 
   <div class="kr-help-section">
     <h2>What Is KarmaRace?</h2>
-    <p>
-      KarmaRace is a task exchange app where users publish verifiable tasks and other users complete them to earn karma.
-      Feed visibility is influenced by owner karma, while task checks determine reward transfers.
-    </p>
+    <p>KarmaRace is a task exchange community. You post tasks for other developers to complete — like starring or forking your GitHub repository — and in return you complete tasks for others. Everyone earns karma, and karma determines how visible your tasks are in the feed.</p>
   </div>
 
   <div class="kr-help-section">
-    <h2>How It Works</h2>
+    <h2>Getting Started</h2>
     <ol>
-      <li>Create a task in My Tasks (new tasks start hidden).</li>
-      <li>Publish explicitly — publish runs lightweight configuration checks and can fail with a reason.</li>
-      <li>A tester opens the feed and gets one card at a time.</li>
-      <li>Check queues async verification and shows loading until completion state updates.</li>
-      <li>On CONFIRMED, tester earns karma and owner pays karma.</li>
+      <li><strong>Link your accounts.</strong> Go to <a href="{% url 'linked_accounts' %}">Accounts</a> and connect GitHub (required for GitHub tasks) and Discord (optional, gives you access to our community server).</li>
+      <li><strong>Create a task.</strong> Go to <a href="{% url 'my_tasks' %}">My Tasks</a> and create your first task — choose a GitHub repo to star or fork.</li>
+      <li><strong>Publish it.</strong> Hit Publish on your task to make it visible in the feed. New tasks start hidden until published.</li>
+      <li><strong>Complete tasks for others.</strong> Browse the feed, pick a task, and hit Check. Verification is automatic — your karma goes up on confirmation.</li>
     </ol>
   </div>
 
   <div class="kr-help-section">
-    <h2>Background Worker Requirement</h2>
-    <p>
-      Async checks and notification deliveries require a Procrastinate worker process.
-      In local development, run a worker alongside runserver:
-    </p>
-    <pre><code>python manage.py procrastinate worker</code></pre>
-    <p>
-      If worker capacity is temporarily unavailable, jobs remain queued in the database and are processed when workers resume.
-    </p>
+    <h2>The Feed</h2>
+    <p>The feed shows tasks from other users ranked by owner karma, then task reward, then creation time. You never see your own tasks in the feed.</p>
+    <p>Use the filters to narrow down by completion status, archive status, or task type (GitHub Star, GitHub Fork, Webhook).</p>
   </div>
 
   <div class="kr-help-section">
-    <h2>Feed Selection and Filters</h2>
-    <p>
-      Feed is ranked by owner karma (descending), then creation time.
-      Owners never see their own tasks in feed. Tasks do not auto-expire from feed by age.
-    </p>
-    <ul>
-      <li>Completion filter: Not Completed / Completed</li>
-      <li>Archive filter: Not Archived / Archived</li>
-      <li>Task Type filter: Webhook / Not Webhook</li>
-    </ul>
-  </div>
-
-  <div class="kr-help-section">
-    <h2>Health Checks and Visibility</h2>
-    <p>
-      Health checks are owner-driven from My Tasks via the Health Check button.
-      Feed selection and tester check requests do not run pre-flight webhook health probes.
-    </p>
-    <ul>
-      <li>Every webhook call outcome (check or manual health check) is counted as positive or negative health.</li>
-      <li>When negative ratio reaches configured threshold after minimum sample size, task is auto-unpublished and owner is notified.</li>
-      <li>Ratio is applied lazily on webhook calls; there is no background sweep loop.</li>
-      <li>Manual health checks are rate-limited per task.</li>
-    </ul>
-  </div>
-
-  <div class="kr-help-section">
-    <h2>Reciprocity Obligations</h2>
-    <p>
-      Reciprocity is always on. If you have open obligations and matching cards are currently available,
-      your feed is restricted to tasks that can satisfy those obligations, and archive/skip is disabled.
-      If no matching obligation card is available, feed falls back to normal cards.
-      Cards shown in this mode are tagged as Obligation.
-    </p>
-    <p>On successful checks for GitHub task types:</p>
-    <ul>
-      <li>If a matching open obligation exists, it is settled and removed.</li>
-      <li>Otherwise, a reverse obligation is created.</li>
-    </ul>
-    <p>Webhook tasks are excluded from obligation creation and settlement.</p>
+    <h2>Karma and Reciprocity</h2>
+    <p>When you complete a task, you earn karma and the task owner pays karma. Reciprocity is always on — if someone completes a task for you, a reverse obligation is created. When you have an open obligation and a matching task is available, your feed is restricted to that task until it's settled. If no matching task is available, the feed falls back to normal.</p>
   </div>
 
   <div class="kr-help-section">
     <h2>Task Types and Verification</h2>
     <ul>
-      <li><strong>GitHub Star:</strong> target format <code>owner/repo</code>, verified against tester linked GitHub account.</li>
-      <li><strong>GitHub Fork:</strong> target format <code>owner/repo</code>, verified against tester linked GitHub account.</li>
-      <li><strong>Webhook:</strong> target format full URL, publish is Pro-only, verified by endpoint JSON response.</li>
+      <li><strong>GitHub Star</strong> — target format <code>owner/repo</code>. Verified against the tester's linked GitHub account.</li>
+      <li><strong>GitHub Fork</strong> — target format <code>owner/repo</code>. Verified against the tester's linked GitHub account.</li>
+      <li><strong>Webhook</strong> — target is a full URL. Pro-only. Verified by your endpoint's JSON response (see below).</li>
     </ul>
+    <p>For GitHub tasks, the repo is selected from a dropdown of discovered repositories. Use <em>Reload repos</em> if a recently created repo isn't showing up.</p>
   </div>
 
   <div class="kr-help-section">
     <h2>Webhook Contract</h2>
-    <p>When a webhook task is checked (or owner runs manual health check), KarmaRace sends:</p>
-    <pre><code>POST {task.target_id}
+    <p>When a webhook task is checked, KarmaRace sends a POST request to your endpoint:</p>
+    <pre><code>POST {your_webhook_url}
 Content-Type: application/json
-Authorization: Bearer {task.webhook_secret}  # only if secret is set
+Authorization: Bearer {task.webhook_secret}
 
 {
-  "task_slug": "webhook-vic-https-example-com-verify",
+  "task_slug": "your-task-slug",
   "platform_username": "tester_username"
 }</code></pre>
-    <p>Expected response:</p>
+    <p>Your endpoint must respond with:</p>
     <pre><code>{ "verified": true }</code></pre>
-    <p>
-      If verification fails, testers get a privacy-safe message while owner receives detailed diagnostics in Notifications.
-      My Tasks shows positive/negative webhook health counts, latest check time, latest result, and latest reason.
-    </p>
+    <p>If verification fails, the tester sees a generic error. You receive detailed diagnostics in <a href="{% url 'notifications_inbox' %}">Notifications</a>.</p>
   </div>
 
   <div class="kr-help-section">
-    <h2>Reward and Threshold Config</h2>
-    <p>
-      Fixed reward values per task type and low-balance threshold are defined in <code>setup/platform_rules.py</code>,
-      with optional per-user overrides through UserPreference.
-    </p>
+    <h2>Notification Events</h2>
+    <ul>
+      <li><strong>TASK_CONFIRMED</strong> — <code>{"task_id": number, "delta": number}</code></li>
+      <li><strong>TASK_HEALTH_FAILED</strong> — <code>{"task_id": number, "task_type": string, "target_id": string}</code></li>
+      <li><strong>WEBHOOK_CHECK</strong> — <code>{"task_id": number, "phase": string, "status": string, ...}</code></li>
+      <li><strong>KARMA_LOW / KARMA_RESTORED</strong> — <code>{"delta": number, "balance": number, "threshold": number}</code></li>
+      <li><strong>APPRECIATION</strong> — <code>{"message": string}</code></li>
+    </ul>
+  </div>
+
+  <div class="kr-help-section">
+    <h2>Task Health</h2>
+    <p>Every webhook call outcome is counted toward a positive/negative health ratio. When the negative ratio exceeds the configured threshold (after a minimum sample size), the task is auto-unpublished and you're notified.</p>
   </div>
 
   <div class="kr-help-section">
     <h2>Linked Accounts</h2>
-    <p>
-      Connect GitHub and Discord from Linked Accounts. OAuth tokens are used for verification requests.
-      If checks fail due to missing token, disconnect and reconnect the provider.
-    </p>
-    <p>
-      Clicking Discord from the footer opens the server flow: if you are logged out you are sent to app login,
-      if your Discord link is valid you are sent directly to the guild, and if your link is stale (left server)
-      the old mapping is removed and relink is required.
-    </p>
-    <p>
-      On successful Discord link, KarmaRace joins your Discord account to the configured guild,
-      assigns the configured role, and syncs your guild nickname to your app username.
-      When you later change your app username, KarmaRace attempts to sync Discord nickname again.
-    </p>
+    <p>Go to <a href="{% url 'linked_accounts' %}">Accounts</a> to connect GitHub and Discord. OAuth tokens are used for verification. If checks start failing due to a token issue, disconnect and reconnect the provider. On Discord link, KarmaRace joins your account to the configured guild, assigns your role, and syncs your nickname to your app username.</p>
   </div>
 
   <div class="kr-help-section">
-    <h2>Common Publish Failures</h2>
+    <h2>Why Did My Publish Fail?</h2>
     <ul>
-      <li>Webhook tasks are Pro-only.</li>
-      <li>GitHub repo is private or missing.</li>
-      <li>Webhook URL is invalid (must be full http/https URL).</li>
+      <li>Webhook tasks require a Pro account.</li>
+      <li>GitHub repository is private or has been deleted.</li>
+      <li>Webhook URL is not a valid <code>http://</code> or <code>https://</code> address.</li>
     </ul>
   </div>
 
   <div class="kr-help-section">
-    <h2>Check Result Messages</h2>
-    <p>Checks now return precise result text. Typical failure messages include:</p>
-    <ul>
-      <li>GitHub star/fork not detected yet for your linked account.</li>
-      <li>Webhook returned unexpected JSON or unreachable endpoint errors.</li>
-      <li>Verification timed out.</li>
-      <li>Task was archived/unpublished before verification completed.</li>
-    </ul>
+    <h2>Pro Plan</h2>
+    <p>Pro removes ads and unlocks Webhook tasks. See the <a href="{% url 'billing_plan' %}">billing page</a> for details.</p>
   </div>
 
-  <div class="kr-help-section">
-    <h2>Notification Payloads By Event</h2>
-    <p>In-app notifications store event-specific payload JSON. Current payload shapes:</p>
-    <ul>
-      <li><strong>TASK_CONFIRMED</strong>: <code>{"task_id": number, "delta": number}</code> (delta optional depending on producer)</li>
-      <li><strong>TASK_HEALTH_FAILED</strong>: <code>{"task_id": number, "task_type": string, "target_id": string, "owner_id": number}</code></li>
-      <li><strong>KARMA_LOW</strong>: <code>{"delta": number, "balance": number, "threshold": number}</code> (fields may vary by producer)</li>
-      <li><strong>KARMA_RESTORED</strong>: <code>{"delta": number, "balance": number, "threshold": number}</code> (fields may vary by producer)</li>
-      <li><strong>APPRECIATION</strong>: <code>{"message": string}</code></li>
-      <li><strong>PROJECT_STATE</strong>: app-defined JSON object for project state updates</li>
-      <li><strong>FLAG_UP_RECEIVED</strong>: app-defined JSON object for received flag-up events</li>
-      <li><strong>FLAG_UP_SENT</strong>: app-defined JSON object for sent flag-up events</li>
-    </ul>
-  </div>
 </div>
 {% endblock %}

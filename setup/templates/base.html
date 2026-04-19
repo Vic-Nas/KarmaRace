@@ -6,31 +6,32 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="csrf-token" content="{{ csrf_token }}">
   <title>{% block title %}KarmaRace{% endblock %}</title>
-  <link rel="icon" type="image/png" href="/static/assets/favicon.png">
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
-  <style>
-    html, body { height: 100%; }
-    body { min-height: 100vh; display: flex; flex-direction: column; }
-    main { flex: 1 0 auto; }
-    .kr-notif-dropdown { display: none; position: absolute; right: 1rem; top: 3.5rem; width: 28rem; max-width: calc(100vw - 2rem); z-index: 1050; }
-    .kr-notif-dropdown.open { display: block; }
-    .kr-notif-dropdown__list { max-height: 20rem; overflow-y: auto; }
-    .kr-bell__dot, .kr-bell__count { display: none; }
-    .kr-bell__dot.visible, .kr-bell__count.visible { display: inline-block; }
-    .kr-toast { position: fixed; right: 1rem; bottom: 1rem; z-index: 1100; background: #fff; border: 1px solid #dee2e6; border-radius: .5rem; padding: .5rem .75rem; max-width: 24rem; box-shadow: 0 .25rem .75rem rgba(0, 0, 0, .08); }
-    .kr-toast__event { font-size: .875rem; color: #6c757d; }
-    .kr-notif-item { padding: .5rem .75rem; border-bottom: 1px solid #f0f0f0; cursor: pointer; }
-    .kr-notif-item.unread { background: #fff8e1; }
-    .kr-notif-item__time { font-size: .75rem; color: #6c757d; }
-  </style>
-  {% block extra_head %}{% endblock %}
+  <link rel="icon" type="image/png" href="{% static 'assets/favicon.png' %}">
+  <!-- Modern system font + Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Core CSS -->
+  <link rel="stylesheet" href="{% static 'css/tokens.css' %}">
+  <link rel="stylesheet" href="{% static 'css/base.css' %}">
+  <link rel="stylesheet" href="{% static 'css/nav.css' %}">
+  <link rel="stylesheet" href="{% static 'css/notifications.css' %}">
+  <link rel="stylesheet" href="{% static 'css/layout.css' %}">
+  <link rel="stylesheet" href="{% static 'css/buttons.css' %}">
+  <link rel="stylesheet" href="{% static 'css/forms.css' %}">
+  <link rel="stylesheet" href="{% static 'css/cards.css' %}">
+  <link rel="stylesheet" href="{% static 'css/ads.css' %}">
+  {% block extra_css %}{% endblock %}
 </head>
-<body>
+<body{% if user.is_pro %} class="is-pro"{% endif %}>
 
-<nav class="navbar navbar-expand-lg bg-light border-bottom">
-  <div class="container-fluid">
-    <a class="navbar-brand" href="/">KarmaRace</a>
-    <div class="d-flex align-items-center gap-2 ms-auto">
+<script src="{% static 'js/theme.js' %}"></script>
+
+<nav class="kr-nav">
+  <a class="kr-nav__brand" href="/" aria-label="KarmaRace home">
+    <img src="{% static 'assets/favicon.png' %}" alt="KarmaRace" class="kr-nav__logo">
+  </a>
+  <div class="kr-nav__links">
     {% if user.is_authenticated %}
       <a href="{% url 'my_tasks' %}" class="btn btn-outline-secondary btn-sm">My Tasks</a>
       <a href="{% url 'linked_accounts' %}" class="btn btn-outline-secondary btn-sm">Accounts</a>
@@ -39,73 +40,99 @@
         <a href="{% url 'admin:index' %}" class="btn btn-outline-secondary btn-sm">Admin</a>
       {% endif %}
       {% if user.is_pro %}
-        <a href="{% url 'billing_plan' %}" class="badge text-bg-success text-decoration-none">Pro</a>
+        <a href="{% url 'billing_plan' %}" class="badge badge-success">Pro</a>
       {% else %}
         <a href="{% url 'billing_plan' %}" class="btn btn-primary btn-sm">Upgrade</a>
       {% endif %}
-      <span class="badge text-bg-light border" id="karma-badge">&#9775; {{ navbar_karma|default:0 }}</span>
-      <button class="btn btn-outline-secondary btn-sm position-relative" id="notif-bell" aria-label="Notifications" title="Notifications">
-        &#128276;
-        <span class="kr-bell__dot position-absolute top-0 start-100 translate-middle p-1 bg-danger border border-light rounded-circle" id="notif-dot"></span>
-        <span class="kr-bell__count position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" id="notif-count"></span>
+      <span class="kr-nav__karma" id="karma-badge">&#9775; {{ navbar_karma|default:0 }}</span>
+      <button class="kr-nav__bell" id="notif-bell" aria-label="Notifications">
+        <svg class="kr-nav__bell-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/>
+          <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+        </svg>
+        <span class="kr-bell__dot" id="notif-dot"></span>
+        <span class="kr-bell__count" id="notif-count"></span>
       </button>
-      <span class="text-muted small">{{ user.username }}</span>
-      <a href="{% url 'account_logout' %}" class="btn btn-secondary btn-sm">Log out</a>
+      <span class="kr-nav__username">{{ user.username }}</span>
+      <a href="{% url 'account_logout' %}" class="btn btn-ghost btn-sm">Log out</a>
     {% else %}
       <a href="{% url 'google_login' %}" class="btn btn-primary btn-sm">Sign in with Google</a>
     {% endif %}
-    </div>
+    <button id="theme-toggle" aria-label="Toggle theme">&#9790; Dark</button>
   </div>
 </nav>
 
 {% if user.is_authenticated %}
-<div class="card kr-notif-dropdown" id="notif-dropdown">
-  <div class="card-header d-flex justify-content-between align-items-center">
+<div class="kr-notif-dropdown" id="notif-dropdown">
+  <div class="kr-notif-dropdown__header">
     <span>Notifications</span>
     <a href="{% url 'notifications_inbox' %}" class="small">View all</a>
   </div>
   <div class="kr-notif-dropdown__list" id="notif-drop-list">
     <div class="kr-notif-item text-muted">Loading&hellip;</div>
   </div>
-  <div class="card-footer">
+  <div class="kr-notif-dropdown__footer">
     <a href="{% url 'notifications_inbox' %}">Open inbox</a>
   </div>
 </div>
 {% endif %}
 
-<main class="container py-3">
-    {% if messages %}
-    <div id="kr-messages" class="mb-3">
-      {% for message in messages %}
-        <div class="alert alert-{% if message.tags == 'error' %}danger{% elif message.tags == 'success' %}success{% elif message.tags == 'warning' %}warning{% else %}info{% endif %} alert-dismissible fade show" role="alert">
-          {{ message }}
-          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-      {% endfor %}
-    </div>
-    {% endif %}
-    {% block content %}{% endblock %}
+<main>
+  <div class="kr-page">
+
+    <aside class="kr-ads--left">
+      <div class="ad-box"></div>
+      <div class="ad-box"></div>
+      <div class="ad-box"></div>
+    </aside>
+
+    <section class="kr-main">
+      {% if messages %}
+      <div id="kr-messages">
+        {% for message in messages %}
+          <div class="alert alert-{% if message.tags == 'error' %}danger{% elif message.tags == 'success' %}success{% elif message.tags == 'warning' %}warning{% else %}info{% endif %} alert-dismissible">
+            {{ message }}
+            <button type="button" class="btn-close" onclick="this.parentElement.remove()">&#10005;</button>
+          </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+      {% block content %}{% endblock %}
+    </section>
+
+    <aside class="kr-ads--right">
+      <div class="ad-box"></div>
+      <div class="ad-box"></div>
+      <div class="ad-box"></div>
+    </aside>
+
+  </div>
 </main>
 
-<footer class="container py-4 border-top d-flex flex-wrap gap-3 justify-content-center mt-auto">
+<footer class="kr-footer">
   <a href="https://github.com/Vic-Nas/KarmaRace" target="_blank" rel="noopener noreferrer">GitHub</a>
+  <span class="kr-footer__sep">&bull;</span>
   <a href="{% url 'discord_entry' %}">Discord</a>
+  <span class="kr-footer__sep">&bull;</span>
   <a href="{% url 'help_index' %}">Help</a>
+  <span class="kr-footer__sep">&bull;</span>
   <a href="{% url 'legal_privacy' %}">Privacy</a>
+  <span class="kr-footer__sep">&bull;</span>
   <a href="{% url 'legal_terms' %}">Terms</a>
 </footer>
 
 <script>
 window.KR_ADS = {
   client: "{{ adsense_client|escapejs }}",
-  slots: [{% for slot in adsense_slots %}"{{ slot|escapejs }}"{% if not forloop.last %},{% endif %}{% endfor %}]
+  slots: [{% for slot in adsense_slots %}"{{ slot|escapejs }}"{% if not forloop.last %},{% endif %}{% endfor %}],
+  isPro: {% if user.is_pro %}true{% else %}false{% endif %}
 };
 </script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
 {% if user.is_authenticated %}
 <script src="{% static 'js/karma.js' %}"></script>
 <script src="{% static 'js/notifications.js' %}"></script>
 {% endif %}
+<script src="{% static 'js/ads.js' %}"></script>
 {% block extra_js %}{% endblock %}
 </body>
 </html>

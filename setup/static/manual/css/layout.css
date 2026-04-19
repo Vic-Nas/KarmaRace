@@ -1,0 +1,111 @@
+/* layout.css — 3-column grid, fixed footer, sticky ads */
+.kr-page {
+  display: grid;
+  grid-template-columns: 180px 1fr 180px;
+  grid-template-areas: "left main right";
+  gap: 1.5rem;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 1.75rem 1.25rem;
+  width: 100%;
+  /* Align to bottom of content area, above fixed footer */
+  min-height: calc(100vh - var(--footer-h) - 52px); /* 52px = nav approx */
+}
+.kr-main      { grid-area: main; min-width: 0; }
+.kr-ads--left  { grid-area: left; }
+.kr-ads--right { grid-area: right; }
+
+/* Sticky ad columns — fixed relative to viewport scroll */
+.kr-ads--left,
+.kr-ads--right {
+  display: flex;
+  flex-direction: column;
+  gap: .75rem;
+  /* Stick while scrolling */
+  position: sticky;
+  top: 68px; /* height of nav */
+  align-self: start;
+  max-height: calc(100vh - 68px - var(--footer-h) - 2rem);
+  overflow: hidden;
+}
+
+/* Pro: hide sidebars */
+body.is-pro .kr-ads--left,
+body.is-pro .kr-ads--right { display: none; }
+body.is-pro .kr-page {
+  grid-template-columns: 1fr;
+  grid-template-areas: "main";
+  max-width: 860px;
+}
+
+/* ── Fixed Footer ── */
+.kr-footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: var(--footer-h);
+  z-index: 300;
+  background: var(--footer-bg);
+  border-top: 1px solid rgba(255,255,255,.08);
+  padding: 0 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  font-size: .8rem;
+  backdrop-filter: blur(8px);
+}
+.kr-footer a { color: var(--footer-text); transition: color var(--transition); }
+.kr-footer a:hover { color: #fff; text-decoration: none; }
+.kr-footer__sep { color: #444; }
+
+/* Page header */
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.75rem;
+  padding-bottom: .85rem;
+  border-bottom: 1px solid var(--border);
+}
+.page-header h1 { font-size: 1.55rem; color: var(--text); }
+
+#kr-messages { margin-bottom: 1rem; }
+
+/* ── Responsive ── */
+@media (max-width: 960px) {
+  .kr-page {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "main"
+      "left"
+      "right";
+  }
+  .kr-ads--left,
+  .kr-ads--right {
+    position: static; /* no sticky on mobile */
+    flex-direction: row;
+    flex-wrap: nowrap;
+    justify-content: center;
+    gap: .6rem;
+    overflow-x: auto;
+    max-height: none;
+    padding-bottom: .25rem;
+    scrollbar-width: none;
+  }
+  .kr-ads--left::-webkit-scrollbar,
+  .kr-ads--right::-webkit-scrollbar { display: none; }
+  .kr-ads--left .ad-box,
+  .kr-ads--right .ad-box {
+    flex: 0 0 160px;
+    min-height: 90px;
+  }
+}
+
+@media (max-width: 600px) {
+  .kr-page { padding: 1rem .75rem; gap: .75rem; }
+  .kr-footer { gap: 1rem; font-size: .75rem; padding: 0 1rem; }
+}

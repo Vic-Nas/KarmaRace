@@ -1,4 +1,11 @@
 {% extends "base.html" %}
+{% load static %}
+
+{% block title %}Terms of Service — KarmaRace{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/prose.css' %}">
+{% endblock %}
 
 {% block content %}
 <div class="kr-prose">
@@ -41,14 +48,10 @@
   </ul>
 
   <h2>Limitation of Liability</h2>
-  <p>
-    The service is provided "as is" without warranties. To the maximum extent permitted by law,
-    we are not liable for indirect or consequential damages from service use.
-  </p>
+  <p>The service is provided "as is" without warranties. To the maximum extent permitted by law,
+  we are not liable for indirect or consequential damages from service use.</p>
 
   <h2>Changes</h2>
-  <p>
-    We may update these terms. Continued use after updates means you accept the revised terms.
-  </p>
+  <p>We may update these terms. Continued use after updates means you accept the revised terms.</p>
 </div>
 {% endblock %}

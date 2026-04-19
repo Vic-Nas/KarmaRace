@@ -1,26 +1,26 @@
 (function () {
-  const KEY = 'kr-theme';
-  const html = document.documentElement;
+  var KEY  = 'kr-theme';
+  var html = document.documentElement;
 
-  function apply(theme) {
-    html.setAttribute('data-theme', theme);
-  }
-
-  function saved() {
-    return localStorage.getItem(KEY) || 'light';
-  }
+  function apply(theme) { html.setAttribute('data-theme', theme); }
+  function saved()      { return localStorage.getItem(KEY) || 'light'; }
 
   apply(saved());
 
   document.addEventListener('DOMContentLoaded', function () {
-    const btn = document.getElementById('theme-toggle');
+    var btn = document.getElementById('theme-toggle');
     if (!btn) return;
-    btn.textContent = saved() === 'dark' ? '☀ Light' : '☾ Dark';
+
+    function render(theme) {
+      btn.textContent = theme === 'dark' ? '\u2600 Light' : '\u263E Dark';
+    }
+    render(saved());
+
     btn.addEventListener('click', function () {
-      const next = saved() === 'dark' ? 'light' : 'dark';
+      var next = saved() === 'dark' ? 'light' : 'dark';
       localStorage.setItem(KEY, next);
       apply(next);
-      btn.textContent = next === 'dark' ? '☀ Light' : '☾ Dark';
+      render(next);
     });
   });
 })();
