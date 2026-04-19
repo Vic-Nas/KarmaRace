@@ -47,7 +47,7 @@
           {% endif %}
         </div>
         {% if task.health_last_failure_reason %}
-        <div class="text-muted">Latest reason: {{ task.health_last_failure_reason }}</div>
+        <div class="text-muted">Latest reason: {{ task.webhook_owner_reason_summary }}</div>
         {% endif %}
       </div>
       {% endif %}

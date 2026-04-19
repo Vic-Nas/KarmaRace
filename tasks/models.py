@@ -46,6 +46,27 @@ class Task(models.Model):
 
         return ''
 
+    @property
+    def webhook_owner_reason_summary(self):
+        """Sanitized owner-facing webhook reason text for task pages."""
+        if self.type != self.Type.WEBHOOK:
+            return self.health_last_failure_reason
+
+        result = (self.health_last_result or '').strip().lower()
+        summaries = {
+            'request_error': 'Webhook endpoint is unreachable from the server.',
+            'invalid_json': 'Webhook endpoint must return JSON with "verified": true or false.',
+            'invalid_shape': 'Webhook response JSON is missing a boolean "verified" field.',
+            'not_verified': 'Webhook responded with verified=false.',
+            'not_verified_health': 'Webhook responded with verified=false.',
+            'verified': 'Last health check passed.',
+        }
+        if result in summaries:
+            return summaries[result]
+
+        # Keep owner task pages concise and non-technical.
+        return 'Webhook health check failed. See Notifications for details.'
+
     def __str__(self):
         return f'{self.owner.username} — {self.type}'
 

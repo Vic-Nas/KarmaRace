@@ -175,7 +175,7 @@ def task_health_check(request, task_slug):
     if ok:
         messages.success(request, 'Health check passed.')
     else:
-        messages.error(request, task.health_last_failure_reason or 'Health check failed.')
+        messages.error(task.webhook_owner_reason_summary or 'Health check failed.')
 
     if task.hidden and task.owner_unpublished:
         messages.warning(request, 'Task was auto-unpublished due to unhealthy webhook ratio.')
