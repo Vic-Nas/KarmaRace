@@ -117,8 +117,18 @@ Authorization: Bearer {task.webhook_secret}  # only if secret is set
   <div class="kr-help-section">
     <h2>Linked Accounts</h2>
     <p>
-      Connect GitHub and Product Hunt from Linked Accounts. OAuth tokens are used for verification requests.
+      Connect GitHub, Product Hunt, and Discord from Linked Accounts. OAuth tokens are used for verification requests.
       If checks fail due to missing token, disconnect and reconnect the provider.
+    </p>
+    <p>
+      Clicking Discord from the footer opens the server flow: if you are logged out you are sent to app login,
+      if your Discord link is valid you are sent directly to the guild, and if your link is stale (left server)
+      the old mapping is removed and relink is required.
+    </p>
+    <p>
+      On successful Discord link, KarmaRace joins your Discord account to the configured guild,
+      assigns the configured role, and syncs your guild nickname to your app username.
+      When you later change your app username, KarmaRace attempts to sync Discord nickname again.
     </p>
   </div>
 

@@ -41,5 +41,20 @@
       <a href="{% url 'connect_account' 'producthunt' %}" class="btn btn-primary btn-sm" style="margin-top:0.75rem">Link Product Hunt</a>
     {% endif %}
   </div>
+
+  <div class="card">
+    <h3>Discord</h3>
+    {% if discord %}
+      <p class="small text-muted" style="margin-top:0.4rem">Connected as <strong>{{ discord.platform_username|default:'(unknown)' }}</strong></p>
+      <a href="{% url 'discord_entry' %}" class="btn btn-primary btn-sm" style="margin-top:0.75rem">Open Server</a>
+      <form method="post" action="{% url 'unlink_account' 'discord' %}" style="margin-top:0.75rem">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-secondary btn-sm">Disconnect</button>
+      </form>
+    {% else %}
+      <p class="small text-muted" style="margin-top:0.4rem">Not connected.</p>
+      <a href="{% url 'discord_entry' %}" class="btn btn-primary btn-sm" style="margin-top:0.75rem">Link Discord</a>
+    {% endif %}
+  </div>
 </div>
 {% endblock %}

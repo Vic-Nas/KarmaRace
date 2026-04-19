@@ -10,9 +10,11 @@ class User(AbstractUser):
 class LinkedAccount(models.Model):
     GITHUB      = 'github'
     PRODUCTHUNT = 'producthunt'
+    DISCORD     = 'discord'
     PLATFORM_CHOICES = [
         (GITHUB,      'GitHub'),
         (PRODUCTHUNT, 'Product Hunt'),
+        (DISCORD,     'Discord'),
     ]
 
     user              = models.ForeignKey(User, on_delete=models.CASCADE, related_name='linked_accounts')

@@ -9,6 +9,7 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_POST
 
+from accounts import discord as discord_api
 from accounts.models import LinkedAccount, UserPreference
 from notifications.models import Notification, NotificationPreference
 from setup.platform_rules import KARMA_HIGH_THRESHOLD, KARMA_LOW_THRESHOLD
@@ -35,10 +36,12 @@ def linked_accounts(request):
 
 	github = LinkedAccount.objects.filter(user=request.user, platform=LinkedAccount.GITHUB).first()
 	producthunt = LinkedAccount.objects.filter(user=request.user, platform=LinkedAccount.PRODUCTHUNT).first()
+	discord = LinkedAccount.objects.filter(user=request.user, platform=LinkedAccount.DISCORD).first()
 
 	return render(request, 'accounts/linked_accounts.html', {
 		'github': github,
 		'producthunt': producthunt,
+		'discord': discord,
 	})
 
 
@@ -69,6 +72,16 @@ def connect_account(request, platform):
 		})
 		return redirect(f'https://api.producthunt.com/v2/oauth/authorize?{params}')
 
+	if platform == LinkedAccount.DISCORD:
+		if not discord_api.is_configured():
+			messages.error(request, 'Discord integration is not configured.')
+			return redirect('linked_accounts')
+
+		state = secrets.token_urlsafe(24)
+		request.session['discord_oauth_state'] = state
+		redirect_uri = request.build_absolute_uri('/app/accounts/discord/callback/')
+		return redirect(discord_api.authorize_url(redirect_uri=redirect_uri, state=state))
+
 	messages.error(request, 'Unknown platform.')
 	return redirect('linked_accounts')
 
@@ -81,6 +94,96 @@ def github_connect(request):
 @login_required
 def producthunt_connect(request):
 	return connect_account(request, LinkedAccount.PRODUCTHUNT)
+
+
+def _redirect_login_with_next(request):
+	next_url = request.get_full_path()
+	params = urlencode({'next': next_url})
+	return redirect(f"/accounts/login/?{params}")
+
+
+def _sync_discord_membership_for_link(request, linked: LinkedAccount):
+	"""
+	Returns True only when linked Discord account is still a guild member.
+	Returns False when membership is missing (and stale mapping is deleted).
+	Returns None when membership check fails due to API error.
+	"""
+	try:
+		if discord_api.is_member(linked.platform_id):
+			# Keep guild profile aligned with current app username.
+			discord_api.sync_nickname(linked.platform_id, request.user.username)
+			discord_api.ensure_role(linked.platform_id)
+			return True
+	except requests.RequestException:
+		messages.warning(request, 'Could not verify Discord membership right now. Please try again.')
+		return None
+
+	linked.delete()
+	messages.info(request, 'Discord link expired because account is no longer in the server. Please reconnect.')
+	return False
+
+
+def discord_entry(request):
+	if not request.user.is_authenticated:
+		return _redirect_login_with_next(request)
+
+	if not discord_api.is_configured():
+		messages.error(request, 'Discord integration is not configured.')
+		return redirect('linked_accounts')
+
+	linked = LinkedAccount.objects.filter(user=request.user, platform=LinkedAccount.DISCORD).first()
+	if linked:
+		membership_state = _sync_discord_membership_for_link(request, linked)
+		if membership_state is True:
+			return redirect(discord_api.guild_jump_url())
+		if membership_state is None:
+			return redirect('linked_accounts')
+
+	return connect_account(request, LinkedAccount.DISCORD)
+
+
+@login_required
+def discord_callback(request):
+	expected_state = request.session.pop('discord_oauth_state', None)
+	state = request.GET.get('state')
+	code = request.GET.get('code')
+
+	if not expected_state or state != expected_state:
+		messages.error(request, 'Discord OAuth state mismatch.')
+		return redirect('linked_accounts')
+
+	if not code:
+		messages.error(request, 'Discord OAuth did not return an authorization code.')
+		return redirect('linked_accounts')
+
+	redirect_uri = request.build_absolute_uri('/app/accounts/discord/callback/')
+	try:
+		access_token = discord_api.exchange_code_for_token(code=code, redirect_uri=redirect_uri)
+		identity = discord_api.fetch_identity(access_token)
+
+		discord_api.ensure_guild_membership(
+			discord_user_id=identity.user_id,
+			user_access_token=access_token,
+			nickname=request.user.username,
+		)
+		discord_api.ensure_role(identity.user_id)
+		discord_api.sync_nickname(identity.user_id, request.user.username)
+
+		LinkedAccount.objects.update_or_create(
+			user=request.user,
+			platform=LinkedAccount.DISCORD,
+			defaults={
+				'platform_id': identity.user_id,
+				'platform_username': identity.username,
+				'access_token': access_token,
+			},
+		)
+		messages.success(request, 'Discord account linked successfully.')
+		return redirect(discord_api.guild_jump_url())
+	except (requests.RequestException, ValueError) as exc:
+		messages.error(request, f'Discord linking failed: {exc}')
+
+	return redirect('linked_accounts')
 
 
 @login_required
@@ -151,7 +254,7 @@ def producthunt_callback(request):
 @login_required
 @require_POST
 def unlink_account(request, platform):
-	if platform not in {LinkedAccount.GITHUB, LinkedAccount.PRODUCTHUNT}:
+	if platform not in {LinkedAccount.GITHUB, LinkedAccount.PRODUCTHUNT, LinkedAccount.DISCORD}:
 		messages.error(request, 'Unknown platform.')
 		return redirect('linked_accounts')
 
