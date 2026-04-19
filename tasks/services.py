@@ -27,7 +27,12 @@ def verify_task(task, tester) -> bool:
 
 
 def verify_task_with_details(task, tester):
-    """Dispatch to verifier and return (ok, detail_message)."""
+    """Run health check on arrival, then dispatch to verifier."""
+    run_health_check(task)
+    task.refresh_from_db(fields=['hidden'])
+    if task.hidden:
+        return False, msg('TASK_TEMPORARILY_UNAVAILABLE')
+
     dispatch = {
         Task.Type.GITHUB_STAR: verify_github_with_details,
         Task.Type.GITHUB_FORK: verify_github_with_details,
@@ -591,7 +596,7 @@ def run_health_check(task) -> bool:
     task.save(update_fields=update_fields)
 
     if transitioned_to_hidden:
-        _schedule_health_failed_notification(task)
+        _notify_health_failed(task)
 
     return False
 
@@ -611,6 +616,25 @@ def _check_task_health_with_retry(task):
         if attempt < HEALTH_CHECK_ATTEMPTS:
             time.sleep(2 ** (attempt - 1))
     return False, reason
+
+
+def _notify_health_failed(task):
+    """Notify the task owner directly when a task is hidden by health failure."""
+    try:
+        from notifications.models import Notification
+        from notifications.services import notify
+        notify(
+            user=task.owner,
+            event=Notification.Event.TASK_HEALTH_FAILED,
+            payload={
+                'task_id': task.pk,
+                'task_type': task.type,
+                'target_id': task.target_id,
+                'owner_id': task.owner_id,
+            },
+        )
+    except Exception as exc:
+        logger.error('_notify_health_failed: failed for task %s: %s', task.pk, exc)
 
 
 def _check_task_health_with_reason(task):
@@ -661,37 +685,6 @@ def _check_task_health_with_reason(task):
 
     return False, 'Unknown task type for health check.'
 
-
-def _schedule_health_failed_notification(task):
-    """Queue a procrastinate job to notify the task owner of health failure."""
-    try:
-        from notifications.tasks import notify_task_health_failed
-        notify_task_health_failed.defer(task_id=task.pk)
-    except Exception as exc:
-        logger.error(
-            '_schedule_health_failed_notification: failed to queue job for task %s: %s',
-            task.pk, exc,
-        )
-        # Fallback so owner still gets in-app notification when queue is unavailable.
-        try:
-            from notifications.models import Notification
-            from notifications.services import notify
-
-            notify(
-                user=task.owner,
-                event=Notification.Event.TASK_HEALTH_FAILED,
-                payload={
-                    'task_id': task.pk,
-                    'task_type': task.type,
-                    'target_id': task.target_id,
-                    'owner_id': task.owner_id,
-                },
-            )
-        except Exception as fallback_exc:
-            logger.error(
-                '_schedule_health_failed_notification: fallback notify failed for task %s: %s',
-                task.pk, fallback_exc,
-            )
 
 
 # ---------------------------------------------------------------------------

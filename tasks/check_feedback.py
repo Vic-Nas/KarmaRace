@@ -1,5 +1,6 @@
 MESSAGES = {
     'UNKNOWN_TASK_TYPE': 'Unknown task type.',
+    'TASK_TEMPORARILY_UNAVAILABLE': 'This task is temporarily unavailable. Please try again later.',
     'TARGET_OWNER_REPO_REQUIRED': 'Target must be in owner/repo format.',
     'GITHUB_LINK_REQUIRED': 'Connect your GitHub account in Accounts before checking GitHub tasks.',
     'PH_LINK_REQUIRED': 'Connect your Product Hunt account in Accounts before checking Product Hunt tasks.',
