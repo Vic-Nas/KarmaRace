@@ -17,7 +17,7 @@
     <h2>How It Works</h2>
     <ol>
       <li>Create a task in My Tasks (new tasks start hidden).</li>
-      <li>Publish explicitly — publish runs configuration checks and can fail with a reason.</li>
+      <li>Publish explicitly — publish runs lightweight configuration checks and can fail with a reason.</li>
       <li>A tester opens the feed and gets one card at a time.</li>
       <li>Check queues async verification and shows loading until completion state updates.</li>
       <li>On CONFIRMED, tester earns karma and owner pays karma.</li>
@@ -52,12 +52,14 @@
   <div class="kr-help-section">
     <h2>Health Checks and Visibility</h2>
     <p>
-      Feed selection runs task health checks. Visibility uses a two-strike policy:
+      Health checks are owner-driven from My Tasks via the Health Check button.
+      Feed selection and tester check requests do not run pre-flight webhook health probes.
     </p>
     <ul>
-      <li>First consecutive health failure: task is marked suspect but remains visible.</li>
-      <li>Second consecutive health failure: task is hidden and owner receives a health-failed notification.</li>
-      <li>A later successful health check resets failure streak and can auto-unhide a task hidden by health checks.</li>
+      <li>Every webhook call outcome (check or manual health check) is counted as positive or negative health.</li>
+      <li>When negative ratio reaches configured threshold after minimum sample size, task is auto-unpublished and owner is notified.</li>
+      <li>Ratio is applied lazily on webhook calls; there is no background sweep loop.</li>
+      <li>Manual health checks are rate-limited per task.</li>
     </ul>
   </div>
 
@@ -88,7 +90,7 @@
 
   <div class="kr-help-section">
     <h2>Webhook Contract</h2>
-    <p>When a webhook task is checked (and during publish health checks), KarmaRace sends:</p>
+    <p>When a webhook task is checked (or owner runs manual health check), KarmaRace sends:</p>
     <pre><code>POST {task.target_id}
 Content-Type: application/json
 Authorization: Bearer {task.webhook_secret}  # only if secret is set
@@ -100,8 +102,8 @@ Authorization: Bearer {task.webhook_secret}  # only if secret is set
     <p>Expected response:</p>
     <pre><code>{ "verified": true }</code></pre>
     <p>
-      If verification fails, KarmaRace reports Sent/Expected/Got diagnostics to help debugging.
-      Webhook cards show a failure signal: tried_failed / (completed + tried_failed + not_tried + epsilon).
+      If verification fails, testers get a privacy-safe message while owner receives detailed diagnostics in Notifications.
+      My Tasks shows positive/negative webhook health counts, latest check time, latest result, and latest reason.
     </p>
   </div>
 
@@ -136,7 +138,7 @@ Authorization: Bearer {task.webhook_secret}  # only if secret is set
     <ul>
       <li>Webhook tasks are Pro-only.</li>
       <li>GitHub repo is private or missing.</li>
-      <li>Webhook endpoint is unreachable or does not return JSON with a boolean <code>verified</code> field.</li>
+      <li>Webhook URL is invalid (must be full http/https URL).</li>
     </ul>
   </div>
 

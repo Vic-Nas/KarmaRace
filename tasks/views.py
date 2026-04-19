@@ -8,6 +8,7 @@ from .forms import TaskForm
 from .models import Task
 from .services import on_task_unhidden, soft_delete_task
 from .services import get_task_configuration_failure
+from .services import run_health_check, can_run_manual_health_check
 
 
 @login_required
@@ -85,9 +86,58 @@ def task_publish(request, task_pk):
         if reason is None:
             task.owner_unpublished = False
             task.hidden = False
-            task.save(update_fields=['owner_unpublished', 'hidden'])
+            task.webhook_health_success_count = 0
+            task.webhook_health_failure_count = 0
+            task.health_last_result = ''
+            task.health_last_failure_reason = ''
+            task.health_last_checked_at = None
+            task.health_failure_streak = 0
+            task.save(update_fields=[
+                'owner_unpublished',
+                'hidden',
+                'webhook_health_success_count',
+                'webhook_health_failure_count',
+                'health_last_result',
+                'health_last_failure_reason',
+                'health_last_checked_at',
+                'health_failure_streak',
+            ])
             on_task_unhidden(task)
             messages.success(request, 'Task published.')
         else:
             messages.error(request, f'Cannot publish task: {reason}')
+    return redirect('my_tasks')
+
+
+@login_required
+@require_POST
+def task_health_check(request, task_pk):
+    task = get_object_or_404(Task, pk=task_pk, owner=request.user, is_deleted=False)
+
+    if task.type != Task.Type.WEBHOOK:
+        messages.info(request, 'Manual health checks are currently available only for webhook tasks.')
+        return redirect('my_tasks')
+
+    allowed, wait_seconds = can_run_manual_health_check(task)
+    if not allowed:
+        messages.warning(request, f'Health check is rate-limited. Try again in {wait_seconds}s.')
+        return redirect('my_tasks')
+
+    ok = run_health_check(task)
+    task.refresh_from_db(fields=[
+        'health_last_checked_at',
+        'health_last_result',
+        'health_last_failure_reason',
+        'hidden',
+        'owner_unpublished',
+    ])
+
+    if ok:
+        messages.success(request, 'Health check passed.')
+    else:
+        messages.error(request, task.health_last_failure_reason or 'Health check failed.')
+
+    if task.hidden and task.owner_unpublished:
+        messages.warning(request, 'Task was auto-unpublished due to unhealthy webhook ratio.')
+
     return redirect('my_tasks')

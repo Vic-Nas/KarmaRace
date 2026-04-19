@@ -8,12 +8,18 @@ from django.conf import settings
 
 from tasks.models import Task, TaskCompletion, ReciprocityObligation
 from tasks.check_feedback import msg
-from setup.platform_rules import WEBHOOK_OBLIGATIONS_ENABLED
+from setup.platform_rules import (
+    WEBHOOK_OBLIGATIONS_ENABLED,
+    WEBHOOK_FAILURE_RATE_EPSILON,
+    WEBHOOK_BAD_CHECK_RATIO_THRESHOLD,
+    WEBHOOK_BAD_CHECK_MIN_CALLS,
+    WEBHOOK_HEALTH_CHECK_RATE_LIMIT_SECONDS,
+)
 
 logger = logging.getLogger(__name__)
 
 HEALTH_HIDE_THRESHOLD = 2
-HEALTH_CHECK_ATTEMPTS = 3  # retries within a single run before counting as failure
+HEALTH_CHECK_ATTEMPTS = 1  # manual checks favor low server load over retry loops
 
 
 # ---------------------------------------------------------------------------
@@ -27,11 +33,7 @@ def verify_task(task, tester) -> bool:
 
 
 def verify_task_with_details(task, tester):
-    """Run health check on arrival, then dispatch to verifier."""
-    run_health_check(task)
-    task.refresh_from_db(fields=['hidden'])
-    if task.hidden:
-        return False, msg('TASK_TEMPORARILY_UNAVAILABLE')
+    """Dispatch to verifier without pre-flight health probing."""
 
     dispatch = {
         Task.Type.GITHUB_STAR: verify_github_with_details,
@@ -148,11 +150,24 @@ def verify_webhook_with_details(task, tester):
         body = response.json()
         verified = body.get('verified', False)
         if verified:
+            _record_webhook_health_outcome(
+                task=task,
+                is_success=True,
+                result='verified',
+                reason='Webhook response contained verified=true.',
+            )
             notify_owner('verified', {
                 'http_status': response.status_code,
                 'response_json': body,
             })
             return True, msg('WEBHOOK_VERIFIED')
+
+        _record_webhook_health_outcome(
+            task=task,
+            is_success=False,
+            result='not_verified',
+            reason='Webhook response contained verified=false.',
+        )
         notify_owner('not_verified', {
             'http_status': response.status_code,
             'response_json': body,
@@ -160,11 +175,23 @@ def verify_webhook_with_details(task, tester):
         return False, msg('WEBHOOK_NOT_VERIFIED')
     except requests.RequestException as exc:
         logger.error('verify_webhook: request failed for task %s: %s', task.pk, exc)
+        _record_webhook_health_outcome(
+            task=task,
+            is_success=False,
+            result='request_error',
+            reason=f'Webhook request error: {exc}',
+        )
         notify_owner('request_error', {
             'error': str(exc),
         })
         return False, msg('WEBHOOK_REQUEST_FAILED')
     except ValueError:
+        _record_webhook_health_outcome(
+            task=task,
+            is_success=False,
+            result='invalid_json',
+            reason='Webhook response was non-JSON.',
+        )
         notify_owner('invalid_json', {'response': 'non-json response'})
         return False, msg('WEBHOOK_BAD_JSON')
 
@@ -236,10 +263,9 @@ def get_task_configuration_failure(task):
         pro_gate = _check_webhook_owner_plan_detailed(task)
         if pro_gate is not None:
             return pro_gate
-        detail = _check_webhook_endpoint_contract_detailed(task)
+        detail = _check_webhook_target_format(task)
         if detail is not None:
-            logger.warning('get_task_configuration_failure: webhook check failed for task %s: %s', task.pk, detail)
-            return _webhook_user_facing_reason(detail)
+            return detail
         return None
 
     logger.warning('get_task_configuration_failure: unknown task type %s', task.type)
@@ -317,6 +343,12 @@ def _check_webhook_endpoint_contract_detailed(task):
         try:
             decoded = response.json()
         except ValueError:
+            _record_webhook_health_outcome(
+                task=task,
+                is_success=False,
+                result='invalid_json',
+                reason='Webhook response was non-JSON.',
+            )
             _notify_webhook_attempt(
                 task=task,
                 status='invalid_json',
@@ -336,6 +368,12 @@ def _check_webhook_endpoint_contract_detailed(task):
 
         verified = decoded.get('verified', None)
         if isinstance(verified, bool):
+            _record_webhook_health_outcome(
+                task=task,
+                is_success=bool(verified),
+                result='verified' if verified else 'not_verified',
+                reason='Manual webhook health check response parsed successfully.',
+            )
             _notify_webhook_attempt(
                 task=task,
                 status='verified' if verified else 'not_verified',
@@ -348,6 +386,12 @@ def _check_webhook_endpoint_contract_detailed(task):
             )
             return None
 
+        _record_webhook_health_outcome(
+            task=task,
+            is_success=False,
+            result='invalid_shape',
+            reason='Webhook response JSON missing boolean verified field.',
+        )
         _notify_webhook_attempt(
             task=task,
             status='invalid_shape',
@@ -365,6 +409,12 @@ def _check_webhook_endpoint_contract_detailed(task):
             f'Got: status={response.status_code} json={decoded}.'
         )
     except requests.RequestException as exc:
+        _record_webhook_health_outcome(
+            task=task,
+            is_success=False,
+            result='request_error',
+            reason=f'Webhook request error: {exc}',
+        )
         _notify_webhook_attempt(
             task=task,
             status='request_error',
@@ -388,6 +438,17 @@ def _webhook_user_facing_reason(detail):
     if 'request error=' in detail:
         return 'Webhook endpoint is unreachable from the server.'
     return 'Webhook endpoint must return JSON with "verified": true or false.'
+
+
+def _check_webhook_target_format(task):
+    from urllib.parse import urlparse
+
+    parsed = urlparse((task.target_id or '').strip())
+    if not parsed.scheme or not parsed.netloc:
+        return 'Webhook URL is invalid. Use a full http/https URL.'
+    if parsed.scheme not in ('http', 'https'):
+        return 'Webhook URL is invalid. Use http or https.'
+    return None
 
 
 def _check_webhook_owner_plan_detailed(task):
@@ -425,31 +486,32 @@ def run_health_check(task) -> bool:
     Two-strike policy on consecutive failed runs:
     - First run failure: marks suspect, does not hide.
     - Second run failure: hides task and notifies owner.
-    - A healthy run resets streak and auto-unhides — unless owner manually unpublished.
+    - A healthy run resets streak and clears failure reason.
 
     Returns True if healthy, False if failed.
     """
     healthy, reason = _check_task_health_with_retry(task)
 
+    # Webhook health state is tracked by cumulative call outcomes + ratio logic.
+    # Do not apply legacy streak-based hide/unhide rules for webhook tasks.
+    if task.type == Task.Type.WEBHOOK:
+        if not healthy and reason and not task.health_last_failure_reason:
+            task.health_last_failure_reason = reason
+            task.save(update_fields=['health_last_failure_reason'])
+        return healthy
+
     update_fields = ['health_last_checked_at']
     task.health_last_checked_at = timezone.now()
 
     if healthy:
-        was_health_hidden = task.hidden and task.health_failure_streak >= HEALTH_HIDE_THRESHOLD
         if task.health_failure_streak != 0:
             task.health_failure_streak = 0
             update_fields.append('health_failure_streak')
         if task.health_last_failure_reason:
             task.health_last_failure_reason = ''
             update_fields.append('health_last_failure_reason')
-        if was_health_hidden and not task.owner_unpublished:
-            task.hidden = False
-            update_fields.append('hidden')
 
         task.save(update_fields=update_fields)
-
-        if was_health_hidden and not task.owner_unpublished:
-            on_task_unhidden(task)
 
         return True
 
@@ -501,6 +563,10 @@ def _notify_health_failed(task):
                 'task_type': task.type,
                 'target_id': task.target_id,
                 'owner_id': task.owner_id,
+                'webhook_health_success_count': task.webhook_health_success_count,
+                'webhook_health_failure_count': task.webhook_health_failure_count,
+                'health_last_result': task.health_last_result,
+                'health_last_failure_reason': task.health_last_failure_reason,
             },
         )
     except Exception as exc:
@@ -525,6 +591,9 @@ def _check_task_health_with_reason(task):
         elif task.type == Task.Type.WEBHOOK:
             if _check_webhook_owner_plan_detailed(task) is not None:
                 return False, 'Webhook tasks are Pro-only.'
+            format_reason = _check_webhook_target_format(task)
+            if format_reason is not None:
+                return False, format_reason
             webhook_reason = _check_webhook_endpoint_contract_detailed(task)
             if webhook_reason is None:
                 return True, ''
@@ -578,8 +647,8 @@ def get_user_github_repo_choices(user):
     Return (choices, error_text) for public repositories where the user has push access.
     choices is a list of (full_name, label) tuples.
     """
-    username, user_token = _get_github_identity(user)
-    if not username or not user_token:
+    _username, user_token = _get_github_identity(user)
+    if not user_token:
         return [], 'Cannot load GitHub repositories. Link your GitHub account in Accounts.'
 
     repos = []
@@ -591,7 +660,8 @@ def get_user_github_repo_choices(user):
                 'https://api.github.com/user/repos',
                 headers=_github_headers(token_override=user_token),
                 params={
-                    'affiliation': 'owner,collaborator',
+                    'affiliation': 'owner,collaborator,organization_member',
+                    'type': 'all',
                     'sort': 'updated',
                     'direction': 'desc',
                     'per_page': 100,
@@ -687,3 +757,55 @@ def _notify_webhook_attempt(task, status, phase, sent_payload, detail, tester=No
         )
     except Exception as exc:
         logger.warning('webhook notification emit failed for task %s: %s', task.pk, exc)
+
+
+def can_run_manual_health_check(task):
+    """Rate-limit owner-triggered health checks per task."""
+    if task.health_last_checked_at is None:
+        return True, 0
+
+    delta = timezone.now() - task.health_last_checked_at
+    seconds = int(delta.total_seconds())
+    wait = int(WEBHOOK_HEALTH_CHECK_RATE_LIMIT_SECONDS) - seconds
+    if wait > 0:
+        return False, wait
+    return True, 0
+
+
+def _record_webhook_health_outcome(task, is_success, result, reason):
+    """Track webhook call outcomes and auto-unpublish if bad ratio threshold is reached."""
+    if task.type != Task.Type.WEBHOOK:
+        return
+
+    update_fields = ['health_last_checked_at', 'health_last_result', 'health_last_failure_reason']
+    task.health_last_checked_at = timezone.now()
+    task.health_last_result = (result or '')[:64]
+    task.health_last_failure_reason = reason or ''
+
+    if is_success:
+        task.webhook_health_success_count += 1
+        update_fields.append('webhook_health_success_count')
+    else:
+        task.webhook_health_failure_count += 1
+        update_fields.append('webhook_health_failure_count')
+
+    total = task.webhook_health_success_count + task.webhook_health_failure_count
+    bad_ratio = (
+        float(task.webhook_health_failure_count)
+        / float(total + WEBHOOK_FAILURE_RATE_EPSILON)
+    ) if total > 0 else 0.0
+
+    should_auto_unpublish = (
+        total >= int(WEBHOOK_BAD_CHECK_MIN_CALLS)
+        and bad_ratio >= float(WEBHOOK_BAD_CHECK_RATIO_THRESHOLD)
+    )
+    transitioned = should_auto_unpublish and not task.hidden
+    if should_auto_unpublish:
+        task.hidden = True
+        task.owner_unpublished = True
+        update_fields.extend(['hidden', 'owner_unpublished'])
+
+    task.save(update_fields=list(dict.fromkeys(update_fields)))
+
+    if transitioned:
+        _notify_health_failed(task)

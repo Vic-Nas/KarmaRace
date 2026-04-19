@@ -429,20 +429,10 @@ def check(request, task_id):
         return redirect('account_login')
 
     from feed.tasks import process_task_check
-    from tasks.services import run_health_check
 
     task = get_object_or_404(Task, pk=task_id, is_deleted=False, hidden=False)
     if task.owner_id == request.user.id:
         return respond(TaskCompletion.State.FAILED, 'You cannot check your own task.')
-
-    # Always validate task health at check-time so testers see explicit runtime
-    # failures even when feed selection is kept stable/pinned.
-    if not run_health_check(task):
-        task.refresh_from_db(fields=['hidden', 'health_last_failure_reason'])
-        return respond(
-            TaskCompletion.State.FAILED,
-            task.health_last_failure_reason or msg('CHECK_FAILED_GENERIC'),
-        )
 
     precheck_error = _precheck_linked_account(request.user, task)
     if precheck_error:
