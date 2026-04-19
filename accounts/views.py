@@ -6,6 +6,7 @@ from allauth.socialaccount.models import SocialAccount, SocialToken
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.urls import reverse
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_POST
 
@@ -69,8 +70,8 @@ def github_connect(request):
 
 def _redirect_login_with_next(request):
 	next_url = request.get_full_path()
-	params = urlencode({'next': next_url})
-	return redirect(f"/accounts/login/?{params}")
+	params = urlencode({'process': 'login', 'next': next_url})
+	return redirect(f"{reverse('google_login')}?{params}")
 
 
 def _sync_discord_membership_for_link(request, linked: LinkedAccount):
