@@ -1,5 +1,6 @@
 # notifications/views.py
 import json
+
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.shortcuts import render, get_object_or_404
@@ -16,6 +17,11 @@ def _notif_summary(notif):
         return f"Task #{p.get('task_id', '?')} confirmed."
     if event == Notification.Event.TASK_HEALTH_FAILED:
         return f"Task #{p.get('task_id', '?')} failed health check."
+    if event == Notification.Event.WEBHOOK_CHECK:
+        return (
+            f"Webhook {p.get('phase', 'check')} "
+            f"for Task #{p.get('task_id', '?')} => {p.get('status', 'unknown')}"
+        )
     if event == Notification.Event.KARMA_LOW:
         return "Your karma balance is low."
     if event == Notification.Event.KARMA_RESTORED:
@@ -42,6 +48,22 @@ def _serialize(notif):
         'read_at': notif.read_at.isoformat() if notif.read_at else None,
         'created_at': notif.created_at.isoformat(),
     }
+
+
+def _pretty_payload(payload):
+    if not payload:
+        return '{}'
+    try:
+        return json.dumps(payload, indent=2, sort_keys=True)
+    except (TypeError, ValueError):
+        return str(payload)
+
+
+def _safe_int(value):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
 
 @login_required
@@ -88,12 +110,49 @@ def mark_all_read(request):
 
 @login_required
 def inbox(request):
-    notifications = Notification.objects.filter(user=request.user).order_by('-created_at')[:50]
+    qs = Notification.objects.filter(user=request.user)
+
+    selected_event = (request.GET.get('event') or '').strip()
+    selected_task_id = _safe_int(request.GET.get('task_id'))
+    query = (request.GET.get('q') or '').strip().lower()
+
+    if selected_event:
+        qs = qs.filter(event=selected_event)
+    if selected_task_id:
+        qs = qs.filter(payload__task_id=selected_task_id)
+
+    notifications = list(qs.order_by('-created_at')[:200])
+
+    if query:
+        notifications = [
+            n for n in notifications
+            if (
+                query in _notif_summary(n).lower()
+                or query in (n.event or '').lower()
+                or query in _pretty_payload(n.payload).lower()
+            )
+        ]
+
     Notification.objects.filter(user=request.user, read_at__isnull=True).update(read_at=timezone.now())
+
+    all_notifications = Notification.objects.filter(user=request.user).order_by('-created_at')[:300]
+    task_ids = sorted(
+        {
+            payload.get('task_id')
+            for payload in [n.payload or {} for n in all_notifications]
+            if isinstance(payload.get('task_id'), int)
+        }
+    )
 
     return render(request, 'notifications/inbox.html', {
         'notifications': notifications,
         'summaries': {n.pk: _notif_summary(n) for n in notifications},
+        'payload_pretty': {n.pk: _pretty_payload(n.payload) for n in notifications},
+        'events': Notification.Event.choices,
+        'selected_event': selected_event,
+        'selected_task_id': selected_task_id,
+        'task_ids': task_ids,
+        'search_query': request.GET.get('q', ''),
     })
 
 

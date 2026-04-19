@@ -1,12 +1,7 @@
 {% extends "base.html" %}
-{% load static notif_tags %}
+{% load notif_tags %}
 
 {% block title %}Preferences — KarmaRace{% endblock %}
-
-{% block extra_head %}
-<link rel="stylesheet" href="{% static 'css/cards.css' %}">
-<link rel="stylesheet" href="{% static 'css/notifications.css' %}">
-{% endblock %}
 
 {% block content %}
 <div class="page-header">
@@ -41,7 +36,7 @@
       Configure email and webhook delivery per event type. Webhook URL and secret are shared across all events where webhook is enabled.
     </p>
 
-    <div class="pref-webhook-global" style="margin-bottom:1rem;padding:1rem;background:var(--surface);border:1px solid var(--border);border-radius:5px">
+    <div class="pref-webhook-global" style="margin-bottom:1rem;padding:1rem;background:#f8f9fa;border:1px solid #dee2e6;border-radius:5px">
       <div class="form-group" style="margin-bottom:0.75rem">
         <label for="webhook-url">Webhook URL</label>
         <input type="url" name="webhook_url" id="webhook-url" placeholder="https://your-server.com/hook" value="{{ webhook_url }}">

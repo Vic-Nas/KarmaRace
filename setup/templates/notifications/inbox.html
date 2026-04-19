@@ -1,19 +1,15 @@
 {% extends "base.html" %}
-{% load static notif_tags %}
+{% load notif_tags %}
 
 {% block title %}Notifications — KarmaRace{% endblock %}
 
-{% block extra_head %}
-<link rel="stylesheet" href="{% static 'css/notifications.css' %}">
-{% endblock %}
-
 {% block content %}
-<div class="page-header">
-  <h1>Notifications</h1>
-  <div style="display:flex;gap:0.5rem;align-items:center">
-    <a href="{% url 'preferences' %}" class="btn btn-ghost btn-sm">Preferences</a>
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h3 mb-0">Notifications</h1>
+  <div class="d-flex gap-2 align-items-center">
+    <a href="{% url 'preferences' %}" class="btn btn-outline-secondary btn-sm">Preferences</a>
     {% if notifications %}
-    <form method="post" action="{% url 'notifications_mark_all_read' %}">
+    <form method="post" action="{% url 'notifications_mark_all_read' %}" class="m-0">
       {% csrf_token %}
       <button type="submit" class="btn btn-secondary btn-sm">Mark all read</button>
     </form>
@@ -21,31 +17,60 @@
   </div>
 </div>
 
-<hr>
+<form method="get" class="row g-2 mb-3">
+  <div class="col-md-4">
+    <input
+      type="text"
+      class="form-control"
+      name="q"
+      value="{{ search_query }}"
+      placeholder="Search summary, event, or payload"
+    >
+  </div>
+  <div class="col-md-3">
+    <select class="form-select" name="event">
+      <option value="">All events</option>
+      {% for value, label in events %}
+      <option value="{{ value }}" {% if selected_event == value %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-md-3">
+    <select class="form-select" name="task_id">
+      <option value="">All tasks</option>
+      {% for task_id in task_ids %}
+      <option value="{{ task_id }}" {% if selected_task_id == task_id %}selected{% endif %}>Task #{{ task_id }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-md-2 d-grid">
+    <button class="btn btn-primary" type="submit">Apply</button>
+  </div>
+</form>
 
 {% if notifications %}
-<div class="notif-list">
+<div class="list-group">
   {% for notif in notifications %}
-  <div class="notif-item {% if not notif.read_at %}unread{% endif %}">
-    <div class="notif-item__icon">
-      {% if notif.event == 'TASK_CONFIRMED' %}✔
-      {% elif notif.event == 'TASK_HEALTH_FAILED' %}⚠
-      {% elif notif.event == 'KARMA_LOW' %}↓
-      {% elif notif.event == 'KARMA_RESTORED' %}↑
-      {% elif notif.event == 'APPRECIATION' %}♥
-      {% else %}●{% endif %}
+  <details class="list-group-item list-group-item-action {% if not notif.read_at %}list-group-item-warning{% endif %}">
+    <summary class="d-flex justify-content-between align-items-start" style="cursor:pointer;">
+      <div>
+        <div class="small text-muted">{{ notif.get_event_display }}</div>
+        <div>{{ summaries|get_item:notif.pk }}</div>
+      </div>
+      <div class="small text-muted ms-3 text-nowrap">{{ notif.created_at|timesince }} ago</div>
+    </summary>
+    <div class="mt-2">
+      <div class="small text-muted mb-1">Payload</div>
+      <pre class="bg-light border rounded p-2 mb-2"><code>{{ payload_pretty|get_item:notif.pk }}</code></pre>
+      {% if notif.event == 'WEBHOOK_CHECK' and notif.payload.task_id %}
+      <a class="btn btn-sm btn-outline-primary" href="{% url 'feed' %}?task_id={{ notif.payload.task_id }}">Open Task</a>
+      {% endif %}
     </div>
-    <div class="notif-item__body">
-      <div class="notif-item__event">{{ notif.get_event_display }}</div>
-      <div class="notif-item__msg">{{ summaries|get_item:notif.pk }}</div>
-      <div class="notif-item__time">{{ notif.created_at|timesince }} ago</div>
-    </div>
-  </div>
+  </details>
   {% endfor %}
 </div>
 {% else %}
-<div class="notif-empty">
-  <div style="font-size:2rem;margin-bottom:0.5rem">🔔</div>
+<div class="alert alert-light border">
   No notifications yet. Complete tasks to earn karma and receive updates.
 </div>
 {% endif %}

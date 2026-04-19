@@ -3,10 +3,6 @@
 
 {% block title %}{% if is_create %}New Task{% else %}Edit Task{% endif %} — KarmaRace{% endblock %}
 
-{% block extra_head %}
-<link rel="stylesheet" href="{% static 'css/cards.css' %}">
-{% endblock %}
-
 {% block content %}
 <div class="page-header">
   <h1>{% if is_create %}New Task{% else %}Edit Task{% endif %}</h1>
@@ -20,10 +16,25 @@
       <label for="id_type">Type</label>
       {{ form.type }}
     </div>
-    <div class="form-group">
+    <div class="form-group" id="target-input-row">
       <label for="id_target_id">Target</label>
       {{ form.target_id }}
-      <div class="form-text">GitHub: <code>owner/repo</code> &nbsp;&middot;&nbsp; Webhook: full URL</div>
+      <div class="form-text">Webhook: full URL</div>
+    </div>
+    <div class="form-group" id="github-target-row" style="display:none">
+      <label for="id_github_target_select">GitHub Repository</label>
+      <select id="id_github_target_select" class="form-select">
+        <option value="">Select repository</option>
+        {% for value, label in form.github_repo_choices %}
+        <option value="{{ value }}" {% if value == form.github_repo_selected %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <div class="form-text">Only public repos where your linked GitHub account has push access are available.</div>
+      {% if form.github_repo_load_error %}
+      <div class="alert alert-warning" style="margin-top:0.5rem">
+        {{ form.github_repo_load_error }}
+      </div>
+      {% endif %}
     </div>
     <div class="form-group" id="webhook-secret-row" style="display:none">
       <label for="id_webhook_secret">Webhook Secret <span class="text-muted" style="text-transform:none;font-weight:400">(optional)</span></label>

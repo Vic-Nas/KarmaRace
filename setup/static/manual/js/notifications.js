@@ -21,6 +21,7 @@
       TASK_HEALTH_FAILED: '⚠ Task health failed',
       KARMA_LOW:          '↓ Karma low',
       KARMA_RESTORED:     '↑ Karma restored',
+      WEBHOOK_CHECK:      '↗ Webhook check',
       PROJECT_STATE:      '● Project update',
       APPRECIATION:       '♥ Appreciation',
       FLAG_UP_RECEIVED:   '⚑ Flag received',
@@ -31,7 +32,7 @@
   function eventIcon(ev) {
     return {
       TASK_CONFIRMED: '✔', TASK_HEALTH_FAILED: '⚠', KARMA_LOW: '↓',
-      KARMA_RESTORED: '↑', PROJECT_STATE: '◉', APPRECIATION: '♥',
+      KARMA_RESTORED: '↑', WEBHOOK_CHECK: '↗', PROJECT_STATE: '◉', APPRECIATION: '♥',
       FLAG_UP_RECEIVED: '⚑', FLAG_UP_SENT: '⚐',
     }[ev] || '●';
   }

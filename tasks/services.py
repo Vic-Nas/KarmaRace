@@ -125,11 +125,22 @@ def verify_webhook_with_details(task, tester):
         headers['Authorization'] = f'Bearer {task.webhook_secret}'
 
     task_slug = _task_slug(task)
+    sent_payload = {'task_slug': task_slug, 'platform_username': platform_username}
+
+    def notify_owner(status, detail):
+        _notify_webhook_attempt(
+            task=task,
+            status=status,
+            phase='check',
+            sent_payload=sent_payload,
+            detail=detail,
+            tester=tester,
+        )
 
     try:
         response = requests.post(
             task.target_id,
-            json={'task_slug': task_slug, 'platform_username': platform_username},
+            json=sent_payload,
             headers=headers,
             timeout=10,
         )
@@ -137,26 +148,25 @@ def verify_webhook_with_details(task, tester):
         body = response.json()
         verified = body.get('verified', False)
         if verified:
+            notify_owner('verified', {
+                'http_status': response.status_code,
+                'response_json': body,
+            })
             return True, msg('WEBHOOK_VERIFIED')
-        got_preview = str(body)
-        if len(got_preview) > 300:
-            got_preview = got_preview[:300] + '...'
-        return False, msg(
-            'WEBHOOK_NOT_VERIFIED',
-            sent=f'{{"task_slug": "{task_slug}", "platform_username": "{platform_username}"}}',
-            expected='{"verified": true}',
-            got=got_preview,
-        )
+        notify_owner('not_verified', {
+            'http_status': response.status_code,
+            'response_json': body,
+        })
+        return False, msg('WEBHOOK_NOT_VERIFIED')
     except requests.RequestException as exc:
         logger.error('verify_webhook: request failed for task %s: %s', task.pk, exc)
-        return False, msg(
-            'WEBHOOK_REQUEST_FAILED',
-            sent=f'{{"task_slug": "{task_slug}", "platform_username": "{platform_username}"}}',
-            expected='{"verified": true}',
-            error=exc,
-        )
+        notify_owner('request_error', {
+            'error': str(exc),
+        })
+        return False, msg('WEBHOOK_REQUEST_FAILED')
     except ValueError:
-        return False, msg('WEBHOOK_BAD_JSON', expected='{"verified": true}')
+        notify_owner('invalid_json', {'response': 'non-json response'})
+        return False, msg('WEBHOOK_BAD_JSON')
 
 
 # ---------------------------------------------------------------------------
@@ -307,6 +317,16 @@ def _check_webhook_endpoint_contract_detailed(task):
         try:
             decoded = response.json()
         except ValueError:
+            _notify_webhook_attempt(
+                task=task,
+                status='invalid_json',
+                phase='health-check',
+                sent_payload=payload,
+                detail={
+                    'http_status': response.status_code,
+                    'response_body': body[:500],
+                },
+            )
             return (
                 'Webhook endpoint contract check failed. '
                 f'Sent: POST {task.target_id} body={payload}; '
@@ -316,8 +336,28 @@ def _check_webhook_endpoint_contract_detailed(task):
 
         verified = decoded.get('verified', None)
         if isinstance(verified, bool):
+            _notify_webhook_attempt(
+                task=task,
+                status='verified' if verified else 'not_verified',
+                phase='health-check',
+                sent_payload=payload,
+                detail={
+                    'http_status': response.status_code,
+                    'response_json': decoded,
+                },
+            )
             return None
 
+        _notify_webhook_attempt(
+            task=task,
+            status='invalid_shape',
+            phase='health-check',
+            sent_payload=payload,
+            detail={
+                'http_status': response.status_code,
+                'response_json': decoded,
+            },
+        )
         return (
             'Webhook endpoint contract check failed. '
             f'Sent: POST {task.target_id} body={payload}; '
@@ -325,6 +365,13 @@ def _check_webhook_endpoint_contract_detailed(task):
             f'Got: status={response.status_code} json={decoded}.'
         )
     except requests.RequestException as exc:
+        _notify_webhook_attempt(
+            task=task,
+            status='request_error',
+            phase='health-check',
+            sent_payload=payload,
+            detail={'error': str(exc)},
+        )
         return (
             'Webhook endpoint contract check failed. '
             f'Sent: POST {task.target_id} body={payload}; '
@@ -526,6 +573,62 @@ def _get_github_identity(tester):
     return username, access_token
 
 
+def get_user_github_repo_choices(user):
+    """
+    Return (choices, error_text) for public repositories where the user has push access.
+    choices is a list of (full_name, label) tuples.
+    """
+    username, user_token = _get_github_identity(user)
+    if not username or not user_token:
+        return [], 'Cannot load GitHub repositories. Link your GitHub account in Accounts.'
+
+    repos = []
+    seen = set()
+    page = 1
+    try:
+        while page <= 5:
+            response = requests.get(
+                'https://api.github.com/user/repos',
+                headers=_github_headers(token_override=user_token),
+                params={
+                    'affiliation': 'owner,collaborator',
+                    'sort': 'updated',
+                    'direction': 'desc',
+                    'per_page': 100,
+                    'page': page,
+                },
+                timeout=10,
+            )
+            if response.status_code in (401, 403):
+                return [], 'Cannot load GitHub repositories. Reconnect your GitHub account in Accounts.'
+            response.raise_for_status()
+
+            data = response.json()
+            if not data:
+                break
+
+            for repo in data:
+                full_name = (repo.get('full_name') or '').strip()
+                if not full_name or full_name in seen:
+                    continue
+                if repo.get('private'):
+                    continue
+                if not (repo.get('permissions') or {}).get('push'):
+                    continue
+
+                seen.add(full_name)
+                repos.append((full_name, full_name))
+
+            if len(data) < 100:
+                break
+            page += 1
+    except requests.RequestException as exc:
+        logger.warning('get_user_github_repo_choices: failed for user %s: %s', user.pk, exc)
+        return [], 'Could not load GitHub repositories right now. Try again shortly.'
+
+    return repos, ''
+
+
 def _task_slug(task):
     """Deterministic slug for webhook verification payloads."""
     platform_map = {
@@ -556,3 +659,31 @@ def _github_headers(token_override=None) -> dict:
     if token:
         headers['Authorization'] = f'Bearer {token}'
     return headers
+
+
+def _notify_webhook_attempt(task, status, phase, sent_payload, detail, tester=None):
+    """Best-effort owner notification for every webhook contact attempt."""
+    try:
+        from notifications.models import Notification
+        from notifications.services import notify
+
+        payload = {
+            'task_id': task.pk,
+            'task_type': task.type,
+            'target_id': task.target_id,
+            'phase': phase,
+            'status': status,
+            'sent_payload': sent_payload,
+            'detail': detail,
+        }
+        if tester is not None:
+            payload['tester_id'] = tester.pk
+            payload['tester_username'] = getattr(tester, 'username', '')
+
+        notify(
+            user=task.owner,
+            event=Notification.Event.WEBHOOK_CHECK,
+            payload=payload,
+        )
+    except Exception as exc:
+        logger.warning('webhook notification emit failed for task %s: %s', task.pk, exc)

@@ -18,7 +18,7 @@ def my_tasks(request):
 
 @login_required
 def task_create(request):
-    form = TaskForm(request.POST or None)
+    form = TaskForm(request.POST or None, user=request.user)
 
     if request.method == 'POST' and form.is_valid():
         task = form.save(commit=False)
@@ -41,7 +41,7 @@ def task_create(request):
 @login_required
 def task_edit(request, task_pk):
     task = get_object_or_404(Task, pk=task_pk, owner=request.user, is_deleted=False)
-    form = TaskForm(request.POST or None, instance=task)
+    form = TaskForm(request.POST or None, instance=task, user=request.user)
 
     if request.method == 'POST' and form.is_valid():
         task = form.save(commit=False)

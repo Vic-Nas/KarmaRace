@@ -7,6 +7,7 @@ class Notification(models.Model):
     class Event(models.TextChoices):
         TASK_CONFIRMED     = 'TASK_CONFIRMED'
         TASK_HEALTH_FAILED = 'TASK_HEALTH_FAILED'
+        WEBHOOK_CHECK      = 'WEBHOOK_CHECK'
         KARMA_LOW          = 'KARMA_LOW'
         KARMA_RESTORED     = 'KARMA_RESTORED'
         PROJECT_STATE      = 'PROJECT_STATE'
