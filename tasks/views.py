@@ -1,6 +1,7 @@
 # tasks/views.py
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
@@ -18,8 +19,41 @@ def my_tasks(request):
 
 
 @login_required
+def slug_available(request):
+    slug = (request.GET.get('slug') or '').strip()
+    task_id = request.GET.get('task_id')
+
+    if not slug:
+        return JsonResponse({'available': False, 'reason': 'Slug is required.'})
+
+    slug_field = Task._meta.get_field('slug').formfield()
+    try:
+        slug = slug_field.clean(slug)
+    except Exception:
+        return JsonResponse({'available': False, 'reason': 'Invalid slug format.'})
+
+    qs = Task.objects.filter(owner=request.user, slug=slug)
+    if task_id:
+        try:
+            qs = qs.exclude(pk=int(task_id))
+        except (TypeError, ValueError):
+            pass
+
+    available = not qs.exists()
+    return JsonResponse({
+        'available': available,
+        'reason': '' if available else 'Slug already used by one of your tasks.',
+    })
+
+
+@login_required
 def task_create(request):
-    form = TaskForm(request.POST or None, user=request.user)
+    force_repo_reload = request.method == 'GET' and request.GET.get('reload_repos') == '1'
+    form = TaskForm(
+        request.POST or None,
+        user=request.user,
+        force_repo_reload=force_repo_reload,
+    )
 
     if request.method == 'POST' and form.is_valid():
         task = form.save(commit=False)
@@ -40,9 +74,15 @@ def task_create(request):
 
 
 @login_required
-def task_edit(request, task_pk):
-    task = get_object_or_404(Task, pk=task_pk, owner=request.user, is_deleted=False)
-    form = TaskForm(request.POST or None, instance=task, user=request.user)
+def task_edit(request, task_slug):
+    task = get_object_or_404(Task, slug=task_slug, owner=request.user, is_deleted=False)
+    force_repo_reload = request.method == 'GET' and request.GET.get('reload_repos') == '1'
+    form = TaskForm(
+        request.POST or None,
+        instance=task,
+        user=request.user,
+        force_repo_reload=force_repo_reload,
+    )
 
     if request.method == 'POST' and form.is_valid():
         task = form.save(commit=False)
@@ -60,16 +100,16 @@ def task_edit(request, task_pk):
 
 @login_required
 @require_POST
-def task_delete(request, task_pk):
-    task = get_object_or_404(Task, pk=task_pk, owner=request.user, is_deleted=False)
+def task_delete(request, task_slug):
+    task = get_object_or_404(Task, slug=task_slug, owner=request.user, is_deleted=False)
     soft_delete_task(task)
     return redirect('my_tasks')
 
 
 @login_required
 @require_POST
-def task_unpublish(request, task_pk):
-    task = get_object_or_404(Task, pk=task_pk, owner=request.user, is_deleted=False)
+def task_unpublish(request, task_slug):
+    task = get_object_or_404(Task, slug=task_slug, owner=request.user, is_deleted=False)
     if not task.owner_unpublished:
         task.owner_unpublished = True
         task.hidden = True
@@ -79,8 +119,8 @@ def task_unpublish(request, task_pk):
 
 @login_required
 @require_POST
-def task_publish(request, task_pk):
-    task = get_object_or_404(Task, pk=task_pk, owner=request.user, is_deleted=False)
+def task_publish(request, task_slug):
+    task = get_object_or_404(Task, slug=task_slug, owner=request.user, is_deleted=False)
     if task.owner_unpublished or task.hidden:
         reason = get_task_configuration_failure(task)
         if reason is None:
@@ -111,8 +151,8 @@ def task_publish(request, task_pk):
 
 @login_required
 @require_POST
-def task_health_check(request, task_pk):
-    task = get_object_or_404(Task, pk=task_pk, owner=request.user, is_deleted=False)
+def task_health_check(request, task_slug):
+    task = get_object_or_404(Task, slug=task_slug, owner=request.user, is_deleted=False)
 
     if task.type != Task.Type.WEBHOOK:
         messages.info(request, 'Manual health checks are currently available only for webhook tasks.')

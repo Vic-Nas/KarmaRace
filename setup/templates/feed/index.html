@@ -122,8 +122,8 @@
 
     {% if request.user.is_authenticated and request.user.id == task.owner_id %}
     <div style="margin-top:0.75rem;display:flex;gap:0.5rem">
-      <a href="{% url 'task_edit' task.id %}" class="btn btn-secondary btn-sm">Edit</a>
-      <form method="post" action="{% url 'task_delete' task.id %}" onsubmit="return confirm('Delete this task?')">
+      <a href="{% url 'task_edit' task.slug %}" class="btn btn-secondary btn-sm">Edit</a>
+      <form method="post" action="{% url 'task_delete' task.slug %}" onsubmit="return confirm('Delete this task?')">
         {% csrf_token %}
         <button type="submit" class="btn btn-danger btn-sm">Delete</button>
       </form>

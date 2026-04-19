@@ -3,6 +3,7 @@ import logging
 import requests
 from django.utils import timezone
 from django.db import transaction
+from django.core.cache import cache
 
 from django.conf import settings
 
@@ -20,6 +21,7 @@ logger = logging.getLogger(__name__)
 
 HEALTH_HIDE_THRESHOLD = 2
 HEALTH_CHECK_ATTEMPTS = 1  # manual checks favor low server load over retry loops
+GITHUB_REPO_CHOICES_CACHE_SECONDS = 900
 
 
 # ---------------------------------------------------------------------------
@@ -126,8 +128,7 @@ def verify_webhook_with_details(task, tester):
     if task.webhook_secret:
         headers['Authorization'] = f'Bearer {task.webhook_secret}'
 
-    task_slug = _task_slug(task)
-    sent_payload = {'task_slug': task_slug, 'platform_username': platform_username}
+    sent_payload = {'task_slug': task.slug, 'platform_username': platform_username}
 
     def notify_owner(status, detail):
         _notify_webhook_attempt(
@@ -321,10 +322,9 @@ def _check_webhook_endpoint_contract_detailed(task):
             'Expected: full http/https URL; '
             'Got: missing scheme or host.'
         )
-    probe_slug = _task_slug(task)
     expected = '{"verified": true|false}'
     payload = {
-        'task_slug': probe_slug,
+        'task_slug': task.slug,
         'platform_username': 'probe-user',
     }
     headers = {'Content-Type': 'application/json'}
@@ -647,20 +647,82 @@ def get_user_github_repo_choices(user):
     Return (choices, error_text) for public repositories where the user has push access.
     choices is a list of (full_name, label) tuples.
     """
-    _username, user_token = _get_github_identity(user)
+    return get_user_github_repo_choices_cached(user, force_reload=False)
+
+
+def get_user_github_repo_choices_cached(user, force_reload=False):
+    """Cached wrapper for GitHub repository choices to keep task form loading lazy."""
+    username, user_token = _get_github_identity(user)
     if not user_token:
         return [], 'Cannot load GitHub repositories. Link your GitHub account in Accounts.'
 
+    cache_key = f'github_repo_choices_v4:{user.pk}'
+    if not force_reload:
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return cached, ''
+
     repos = []
     seen = set()
-    page = 1
-    try:
+    observed_scopes = ''
+
+    def add_if_eligible(repo):
+        full_name = (repo.get('full_name') or '').strip()
+        if not full_name or full_name in seen:
+            return
+        if repo.get('private'):
+            return
+        if not (repo.get('permissions') or {}).get('push'):
+            return
+
+        seen.add(full_name)
+        repos.append((full_name, full_name))
+
+    def collect_user_repos(extra_params):
+        nonlocal observed_scopes
+        page = 1
         while page <= 5:
+            params = {
+                'sort': 'updated',
+                'direction': 'desc',
+                'per_page': 100,
+                'page': page,
+            }
+            params.update(extra_params or {})
             response = requests.get(
                 'https://api.github.com/user/repos',
                 headers=_github_headers(token_override=user_token),
+                params=params,
+                timeout=10,
+            )
+            observed_scopes = observed_scopes or (response.headers.get('X-OAuth-Scopes') or '')
+            if response.status_code in (401, 403):
+                return response, 'auth'
+            if response.status_code == 422:
+                return response, 'unprocessable'
+            response.raise_for_status()
+
+            data = response.json()
+            if not data:
+                break
+
+            for repo in data:
+                add_if_eligible(repo)
+
+            if len(data) < 100:
+                break
+            page += 1
+
+        return None, 'ok'
+
+    def collect_org_repos(org_login):
+        nonlocal observed_scopes
+        page = 1
+        while page <= 5:
+            response = requests.get(
+                f'https://api.github.com/orgs/{org_login}/repos',
+                headers=_github_headers(token_override=user_token),
                 params={
-                    'affiliation': 'owner,collaborator,organization_member',
                     'type': 'all',
                     'sort': 'updated',
                     'direction': 'desc',
@@ -669,8 +731,13 @@ def get_user_github_repo_choices(user):
                 },
                 timeout=10,
             )
-            if response.status_code in (401, 403):
-                return [], 'Cannot load GitHub repositories. Reconnect your GitHub account in Accounts.'
+            observed_scopes = observed_scopes or (response.headers.get('X-OAuth-Scopes') or '')
+
+            # Some orgs/policies can reject listing even when direct repo lookup works.
+            if response.status_code in (401, 403, 404):
+                return
+            if response.status_code == 422:
+                return
             response.raise_for_status()
 
             data = response.json()
@@ -678,49 +745,173 @@ def get_user_github_repo_choices(user):
                 break
 
             for repo in data:
-                full_name = (repo.get('full_name') or '').strip()
-                if not full_name or full_name in seen:
-                    continue
-                if repo.get('private'):
-                    continue
-                if not (repo.get('permissions') or {}).get('push'):
-                    continue
-
-                seen.add(full_name)
-                repos.append((full_name, full_name))
+                add_if_eligible(repo)
 
             if len(data) < 100:
                 break
             page += 1
+
+    def collect_orgs_from(url, extract_login):
+        page = 1
+        found = set()
+        while page <= 5:
+            response = requests.get(
+                url,
+                headers=_github_headers(token_override=user_token),
+                params={'per_page': 100, 'page': page},
+                timeout=10,
+            )
+            if response.status_code in (401, 403, 404):
+                return found
+            if response.status_code == 422:
+                return found
+            response.raise_for_status()
+
+            data = response.json()
+            if not isinstance(data, list) or not data:
+                break
+
+            for item in data:
+                login = (extract_login(item) or '').strip()
+                if login:
+                    found.add(login)
+
+            if len(data) < 100:
+                break
+            page += 1
+        return found
+
+    def collect_recent_push_event_repos(max_candidates=40):
+        """Best-effort enrichment from recent public push events for this user."""
+        if not username:
+            return []
+
+        found = []
+        seen_candidates = set()
+        page = 1
+        while page <= 5 and len(found) < max_candidates:
+            response = requests.get(
+                f'https://api.github.com/users/{username}/events/public',
+                headers=_github_headers(token_override=user_token),
+                params={'per_page': 100, 'page': page},
+                timeout=10,
+            )
+            if response.status_code in (401, 403, 404, 422):
+                return found
+            response.raise_for_status()
+
+            events = response.json()
+            if not isinstance(events, list) or not events:
+                break
+
+            for event in events:
+                if event.get('type') != 'PushEvent':
+                    continue
+                repo_name = ((event.get('repo') or {}).get('name') or '').strip()
+                if not repo_name or repo_name in seen_candidates:
+                    continue
+                seen_candidates.add(repo_name)
+                found.append(repo_name)
+                if len(found) >= max_candidates:
+                    break
+
+            if len(events) < 100:
+                break
+            page += 1
+        return found
+
+    def collect_repo_details(repo_full_name):
+        response = requests.get(
+            f'https://api.github.com/repos/{repo_full_name}',
+            headers=_github_headers(token_override=user_token),
+            timeout=10,
+        )
+        if response.status_code in (401, 403, 404, 422):
+            return
+        response.raise_for_status()
+        add_if_eligible(response.json())
+
+    try:
+        # Merge multiple query shapes because GitHub behavior differs across
+        # org policies/token scopes; this maximizes collaborator visibility.
+        response, mode = collect_user_repos({'type': 'all'})
+        if mode == 'auth':
+            return [], 'Cannot load GitHub repositories. Reconnect your GitHub account in Accounts.'
+        if mode == 'unprocessable':
+            logger.warning(
+                'get_user_github_repo_choices: type=all query returned 422 for user %s: %s',
+                user.pk,
+                getattr(response, 'text', '')[:300],
+            )
+
+        response, mode = collect_user_repos({'type': 'member'})
+        if mode == 'auth':
+            return [], 'Cannot load GitHub repositories. Reconnect your GitHub account in Accounts.'
+        if mode == 'unprocessable':
+            logger.warning(
+                'get_user_github_repo_choices: type=member query returned 422 for user %s: %s',
+                user.pk,
+                getattr(response, 'text', '')[:300],
+            )
+
+        response, mode = collect_user_repos({'affiliation': 'owner,collaborator,organization_member'})
+        if mode == 'auth':
+            return [], 'Cannot load GitHub repositories. Reconnect your GitHub account in Accounts.'
+        if mode == 'unprocessable':
+            logger.warning(
+                'get_user_github_repo_choices: affiliation query returned 422 for user %s: %s',
+                user.pk,
+                getattr(response, 'text', '')[:300],
+            )
+
+        org_logins = set()
+        org_logins.update(collect_orgs_from(
+            'https://api.github.com/user/orgs',
+            lambda item: item.get('login'),
+        ))
+        org_logins.update(collect_orgs_from(
+            'https://api.github.com/user/memberships/orgs',
+            lambda item: (item.get('organization') or {}).get('login'),
+        ))
+        if username:
+            org_logins.update(collect_orgs_from(
+                f'https://api.github.com/users/{username}/orgs',
+                lambda item: item.get('login'),
+            ))
+
+        for org_login in sorted(org_logins):
+            collect_org_repos(org_login)
+
+        # Enrich from recent push activity: helps surface push-access repos that
+        # may be omitted from standard listing endpoints under limited scopes.
+        try:
+            for repo_full_name in collect_recent_push_event_repos():
+                collect_repo_details(repo_full_name)
+        except requests.RequestException as exc:
+            logger.warning(
+                'get_user_github_repo_choices: recent push enrichment failed for user %s: %s',
+                user.pk,
+                exc,
+            )
+
+        scopes = {s.strip() for s in (observed_scopes or '').split(',') if s.strip()}
+        if 'read:org' not in scopes and 'repo' not in scopes:
+            logger.warning(
+                'get_user_github_repo_choices: token may have limited org visibility for user %s (scopes=%s)',
+                user.pk,
+                observed_scopes,
+            )
     except requests.RequestException as exc:
         logger.warning('get_user_github_repo_choices: failed for user %s: %s', user.pk, exc)
-        return [], 'Could not load GitHub repositories right now. Try again shortly.'
+        return [], 'Could not load GitHub repositories right now. Click Reload repos to retry.'
 
+    repos.sort(key=lambda item: item[0].lower())
+
+    if not repos:
+        return [], 'No eligible public push-access repositories were discovered for this GitHub token.'
+
+    cache.set(cache_key, repos, GITHUB_REPO_CHOICES_CACHE_SECONDS)
     return repos, ''
-
-
-def _task_slug(task):
-    """Deterministic slug for webhook verification payloads."""
-    platform_map = {
-        Task.Type.GITHUB_STAR: 'github-star',
-        Task.Type.GITHUB_FORK: 'github-fork',
-        Task.Type.WEBHOOK: 'webhook',
-    }
-    platform = platform_map.get(task.type, 'task')
-    target_component = _slug_component(task.target_id)
-    owner_component = _slug_component(getattr(task.owner, 'username', '') or 'owner')
-    return f'{platform}-{owner_component}-{target_component}'
-
-
-def _slug_component(raw):
-    value = (raw or '').strip().lower()
-    if not value:
-        return 'target'
-
-    import re
-    value = re.sub(r'[^a-z0-9]+', '-', value)
-    value = value.strip('-')
-    return value or 'target'
 
 
 def _github_headers(token_override=None) -> dict:

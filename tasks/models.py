@@ -1,5 +1,6 @@
 # tasks/models.py
 from django.db import models
+
 from accounts.models import User
 
 
@@ -12,6 +13,7 @@ class Task(models.Model):
 
     owner          = models.ForeignKey(User, on_delete=models.CASCADE, related_name='owned_tasks')
     type           = models.CharField(max_length=20, choices=Type.choices)
+    slug           = models.SlugField(max_length=180, blank=True, db_index=True)
     description    = models.TextField()
     target_id      = models.CharField(max_length=500)
     webhook_secret = models.CharField(max_length=255, blank=True, default='')
