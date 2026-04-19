@@ -69,7 +69,7 @@
       If no matching obligation card is available, feed falls back to normal cards.
       Cards shown in this mode are tagged as Obligation.
     </p>
-    <p>On successful checks for GitHub/Product Hunt task types:</p>
+    <p>On successful checks for GitHub task types:</p>
     <ul>
       <li>If a matching open obligation exists, it is settled and removed.</li>
       <li>Otherwise, a reverse obligation is created.</li>
@@ -82,7 +82,6 @@
     <ul>
       <li><strong>GitHub Star:</strong> target format <code>owner/repo</code>, verified against tester linked GitHub account.</li>
       <li><strong>GitHub Fork:</strong> target format <code>owner/repo</code>, verified against tester linked GitHub account.</li>
-      <li><strong>Product Hunt Engagement:</strong> target format slug only, requires both upvote and comment from tester linked Product Hunt account.</li>
       <li><strong>Webhook:</strong> target format full URL, publish is Pro-only, verified by endpoint JSON response.</li>
     </ul>
   </div>
@@ -117,7 +116,7 @@ Authorization: Bearer {task.webhook_secret}  # only if secret is set
   <div class="kr-help-section">
     <h2>Linked Accounts</h2>
     <p>
-      Connect GitHub, Product Hunt, and Discord from Linked Accounts. OAuth tokens are used for verification requests.
+      Connect GitHub and Discord from Linked Accounts. OAuth tokens are used for verification requests.
       If checks fail due to missing token, disconnect and reconnect the provider.
     </p>
     <p>
@@ -137,7 +136,6 @@ Authorization: Bearer {task.webhook_secret}  # only if secret is set
     <ul>
       <li>Webhook tasks are Pro-only.</li>
       <li>GitHub repo is private or missing.</li>
-      <li>Product Hunt slug is invalid or post not found.</li>
       <li>Webhook endpoint is unreachable or does not return JSON with a boolean <code>verified</code> field.</li>
     </ul>
   </div>
@@ -147,7 +145,6 @@ Authorization: Bearer {task.webhook_secret}  # only if secret is set
     <p>Checks now return precise result text. Typical failure messages include:</p>
     <ul>
       <li>GitHub star/fork not detected yet for your linked account.</li>
-      <li>Product Hunt upvote missing, comment missing, or both missing.</li>
       <li>Webhook returned unexpected JSON or unreachable endpoint errors.</li>
       <li>Verification timed out.</li>
       <li>Task was archived/unpublished before verification completed.</li>

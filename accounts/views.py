@@ -35,12 +35,10 @@ def linked_accounts(request):
 		)
 
 	github = LinkedAccount.objects.filter(user=request.user, platform=LinkedAccount.GITHUB).first()
-	producthunt = LinkedAccount.objects.filter(user=request.user, platform=LinkedAccount.PRODUCTHUNT).first()
 	discord = LinkedAccount.objects.filter(user=request.user, platform=LinkedAccount.DISCORD).first()
 
 	return render(request, 'accounts/linked_accounts.html', {
 		'github': github,
-		'producthunt': producthunt,
 		'discord': discord,
 	})
 
@@ -49,28 +47,6 @@ def linked_accounts(request):
 def connect_account(request, platform):
 	if platform == LinkedAccount.GITHUB:
 		return redirect('/accounts/github/login/?process=connect&next=/app/accounts/linked-accounts/')
-
-	if platform == LinkedAccount.PRODUCTHUNT:
-		if not settings.PH_CLIENT_ID or not settings.PH_CLIENT_SECRET:
-			messages.error(
-				request,
-				'Product Hunt OAuth is not configured. Set PH_CLIENT_ID/PH_CLIENT_SECRET '
-				'or PH_API_KEY/PH_API_SECRET in .env.',
-			)
-			return redirect('linked_accounts')
-
-		state = secrets.token_urlsafe(24)
-		request.session['ph_oauth_state'] = state
-		redirect_uri = request.build_absolute_uri('/app/accounts/producthunt/callback/')
-
-		params = urlencode({
-			'client_id': settings.PH_CLIENT_ID,
-			'redirect_uri': redirect_uri,
-			'response_type': 'code',
-			'scope': 'public',
-			'state': state,
-		})
-		return redirect(f'https://api.producthunt.com/v2/oauth/authorize?{params}')
 
 	if platform == LinkedAccount.DISCORD:
 		if not discord_api.is_configured():
@@ -89,11 +65,6 @@ def connect_account(request, platform):
 @login_required
 def github_connect(request):
 	return connect_account(request, LinkedAccount.GITHUB)
-
-
-@login_required
-def producthunt_connect(request):
-	return connect_account(request, LinkedAccount.PRODUCTHUNT)
 
 
 def _redirect_login_with_next(request):
@@ -187,74 +158,9 @@ def discord_callback(request):
 
 
 @login_required
-def producthunt_callback(request):
-	expected_state = request.session.pop('ph_oauth_state', None)
-	state = request.GET.get('state')
-	code = request.GET.get('code')
-
-	if not expected_state or state != expected_state:
-		messages.error(request, 'Product Hunt OAuth state mismatch.')
-		return redirect('linked_accounts')
-
-	if not code:
-		messages.error(request, 'Product Hunt OAuth did not return an authorization code.')
-		return redirect('linked_accounts')
-
-	redirect_uri = request.build_absolute_uri('/app/accounts/producthunt/callback/')
-	try:
-		token_resp = requests.post(
-			'https://api.producthunt.com/v2/oauth/token',
-			data={
-				'grant_type': 'authorization_code',
-				'client_id': settings.PH_CLIENT_ID,
-				'client_secret': settings.PH_CLIENT_SECRET,
-				'redirect_uri': redirect_uri,
-				'code': code,
-			},
-			timeout=15,
-		)
-		token_resp.raise_for_status()
-		token_data = token_resp.json()
-		access_token = token_data.get('access_token', '')
-		if not access_token:
-			messages.error(request, 'Product Hunt OAuth token response was missing access_token.')
-			return redirect('linked_accounts')
-
-		profile_resp = requests.post(
-			'https://api.producthunt.com/v2/api/graphql',
-			json={'query': 'query { viewer { id username } }'},
-			headers={
-				'Authorization': f'Bearer {access_token}',
-				'Content-Type': 'application/json',
-			},
-			timeout=15,
-		)
-		profile_resp.raise_for_status()
-		viewer = profile_resp.json().get('data', {}).get('viewer') or {}
-
-		platform_id = str(viewer.get('id') or f'producthunt-{request.user.pk}')
-		username = (viewer.get('username') or '').strip()
-
-		LinkedAccount.objects.update_or_create(
-			user=request.user,
-			platform=LinkedAccount.PRODUCTHUNT,
-			defaults={
-				'platform_id': platform_id,
-				'platform_username': username,
-				'access_token': access_token,
-			},
-		)
-		messages.success(request, 'Product Hunt account linked successfully.')
-	except requests.RequestException as exc:
-		messages.error(request, f'Product Hunt OAuth failed: {exc}')
-
-	return redirect('linked_accounts')
-
-
-@login_required
 @require_POST
 def unlink_account(request, platform):
-	if platform not in {LinkedAccount.GITHUB, LinkedAccount.PRODUCTHUNT, LinkedAccount.DISCORD}:
+	if platform not in {LinkedAccount.GITHUB, LinkedAccount.DISCORD}:
 		messages.error(request, 'Unknown platform.')
 		return redirect('linked_accounts')
 

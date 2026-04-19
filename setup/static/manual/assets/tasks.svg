@@ -11,9 +11,8 @@
   <text x="16" y="28" class="label">GitHub star / fork</text>
   <text x="16" y="50" class="sub">Free tier</text>
   <rect x="222" y="0" width="196" height="82" rx="8" class="card"/>
-  <text x="238" y="28" class="label">Product Hunt</text>
-  <text x="238" y="46" class="label">comment &amp; upvote</text>
-  <text x="238" y="66" class="sub">Free tier</text>
+  <text x="238" y="28" class="label">GitHub fork</text>
+  <text x="238" y="50" class="sub">Free tier</text>
   <rect x="444" y="0" width="196" height="82" rx="8" class="pro-card"/>
   <rect x="460" y="12" width="28" height="17" rx="4" class="badge"/>
   <text x="464" y="24.5" class="badge-text">Pro</text>

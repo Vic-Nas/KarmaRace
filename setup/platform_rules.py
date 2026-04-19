@@ -3,7 +3,6 @@
 KARMA_REWARDS_BY_TASK_TYPE = {
     'GITHUB_STAR': 5,
     'GITHUB_FORK': 5,
-    'PH_ENGAGEMENT': 5,
     'WEBHOOK': 10,
 }
 

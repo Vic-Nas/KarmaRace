@@ -15,7 +15,7 @@ class TaskForm(forms.ModelForm):
             }),
             'target_id': forms.TextInput(attrs={
                 'class': 'form-control',
-                'placeholder': 'owner/repo  — or PH slug  — or https://your-webhook.com/verify',
+                'placeholder': 'owner/repo  — or https://your-webhook.com/verify',
             }),
             'webhook_secret': forms.TextInput(attrs={
                 'class': 'form-control',
@@ -27,7 +27,7 @@ class TaskForm(forms.ModelForm):
             'webhook_secret': 'Webhook secret (optional)',
         }
         help_texts = {
-            'target_id': 'GitHub: <code>owner/repo</code> &nbsp;·&nbsp; Product Hunt: post slug &nbsp;·&nbsp; Webhook: full URL',
+            'target_id': 'GitHub: <code>owner/repo</code> &nbsp;·&nbsp; Webhook: full URL',
             'type': '',
         }
 
@@ -56,8 +56,6 @@ class TaskForm(forms.ModelForm):
             return f'Star GitHub repo {target_id}'
         if task_type == Task.Type.GITHUB_FORK:
             return f'Fork GitHub repo {target_id}'
-        if task_type == Task.Type.PH_ENGAGEMENT:
-            return f'Upvote and comment on Product Hunt post {target_id}'
         return ''
 
     def clean_description(self):

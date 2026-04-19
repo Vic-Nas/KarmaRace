@@ -208,12 +208,6 @@ RESEND_API_KEY        = os.environ.get('RESEND_API_KEY')
 RESEND_FROM_EMAIL     = os.environ.get('RESEND_FROM_EMAIL', f'noreply@{DOMAIN}')
 RESEND_WEBHOOK_SECRET = os.environ.get('RESEND_WEBHOOK_SECRET', '')
 
-# PH
-PH_DEV_TOKEN = env('PH_DEV_TOKEN')
-# Product Hunt may expose OAuth credentials as PH_API_KEY/PH_API_SECRET.
-PH_CLIENT_ID = env('PH_CLIENT_ID', default=env('PH_API_KEY', default=''))
-PH_CLIENT_SECRET = env('PH_CLIENT_SECRET', default=env('PH_API_SECRET', default=''))
-
 # GitHub (server credential for GitHub API calls)
 GITHUB_TOKEN = os.environ.get('GITHUB_TOKEN', '')
 

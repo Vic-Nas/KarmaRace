@@ -36,7 +36,6 @@ def verify_task_with_details(task, tester):
     dispatch = {
         Task.Type.GITHUB_STAR: verify_github_with_details,
         Task.Type.GITHUB_FORK: verify_github_with_details,
-        Task.Type.PH_ENGAGEMENT:  verify_ph_with_details,
         Task.Type.WEBHOOK:     verify_webhook_with_details,
     }
     verifier = dispatch.get(task.type)
@@ -105,105 +104,6 @@ def verify_github_with_details(task, tester):
     except requests.RequestException as exc:
         logger.error('verify_github: request failed for task %s: %s', task.pk, exc)
         return False, msg('GITHUB_REQUEST_FAILED', error=exc)
-
-
-def verify_ph_with_details(task, tester):
-    """
-    Check Product Hunt upvote and comment presence via PH GraphQL API.
-    Uses tester's stored access_token for user-scoped queries.
-    task.target_id must be a PH post slug.
-
-    Both an upvote (isVoted) and a comment by the tester are required.
-    Paginates through all comments using GraphQL cursor-based pagination.
-    """
-    try:
-        linked = tester.linked_accounts.get(platform='producthunt')
-    except tester.linked_accounts.model.DoesNotExist:
-        logger.info('verify_ph: tester %s has no linked Product Hunt account', tester.pk)
-        return False, msg('PH_LINK_REQUIRED')
-
-    access_token = linked.access_token
-    ph_user_id = (linked.platform_id or '').strip()
-    ph_username = (linked.platform_username or '').strip().lower()
-
-    ok, post_vars, id_mode_reason = _resolve_ph_post_query_vars(task.target_id)
-    if not ok:
-        return False, id_mode_reason
-
-    headers = {
-        'Authorization': f'Bearer {access_token}',
-        'Content-Type':  'application/json',
-    }
-
-    # First check isVoted — single cheap query, no pagination needed.
-    voted_query = (
-        'query(' + _ph_query_signature(post_vars) + ') '
-        '{ post(' + _ph_query_arg(post_vars) + ') { isVoted } }'
-    )
-    is_voted = False
-    try:
-        response = requests.post(
-            'https://api.producthunt.com/v2/api/graphql',
-            json={'query': voted_query, 'variables': post_vars},
-            headers=headers,
-            timeout=10,
-        )
-        response.raise_for_status()
-        data = response.json()
-        post = data.get('data', {}).get('post')
-        if not post:
-            logger.warning('verify_ph: post target %s not found', task.target_id)
-            return False, msg('PH_POST_NOT_FOUND')
-        is_voted = bool(post.get('isVoted'))
-    except requests.RequestException as exc:
-        logger.error('verify_ph: vote check failed for task %s: %s', task.pk, exc)
-        return False, msg('PH_VOTE_CHECK_FAILED', error=exc)
-
-    # Check comments with cursor-based pagination.
-    comments_query = (
-        'query(' + _ph_query_signature(post_vars, include_cursor=True) + ') '
-        '{ post(' + _ph_query_arg(post_vars) + ') '
-        '{ comments(first: 100, after: $cursor) '
-        '{ edges { node { user { id username } } } pageInfo { hasNextPage endCursor } } } }'
-    )
-    cursor = None
-    has_comment = False
-    try:
-        while True:
-            response = requests.post(
-                'https://api.producthunt.com/v2/api/graphql',
-                json={
-                    'query': comments_query,
-                    'variables': {**post_vars, 'cursor': cursor},
-                },
-                headers=headers,
-                timeout=10,
-            )
-            response.raise_for_status()
-            data     = response.json()
-            comments = data.get('data', {}).get('post', {}).get('comments', {})
-            edges    = comments.get('edges', [])
-
-            if any(_matches_ph_user(edge, ph_user_id, ph_username) for edge in edges):
-                has_comment = True
-                break
-
-            page_info = comments.get('pageInfo', {})
-            if not page_info.get('hasNextPage'):
-                break
-            cursor = page_info.get('endCursor')
-
-    except requests.RequestException as exc:
-        logger.error('verify_ph: comment check failed for task %s: %s', task.pk, exc)
-        return False, msg('PH_COMMENT_CHECK_FAILED', error=exc)
-
-    if is_voted and has_comment:
-        return True, msg('PH_ENGAGEMENT_VERIFIED')
-    if not is_voted and not has_comment:
-        return False, msg('PH_BOTH_REQUIRED')
-    if not is_voted:
-        return False, msg('PH_UPVOTE_REQUIRED')
-    return False, msg('PH_COMMENT_REQUIRED')
 
 
 def verify_webhook_with_details(task, tester):
@@ -322,8 +222,6 @@ def get_task_configuration_failure(task):
     """Return None when valid, otherwise a human-readable reason."""
     if task.type in (Task.Type.GITHUB_STAR, Task.Type.GITHUB_FORK):
         return _check_github_repo_public_detailed(task)
-    elif task.type == Task.Type.PH_ENGAGEMENT:
-        return _check_ph_post_exists_detailed(task)
     elif task.type == Task.Type.WEBHOOK:
         pro_gate = _check_webhook_owner_plan_detailed(task)
         if pro_gate is not None:
@@ -374,81 +272,6 @@ def _check_github_repo_public_detailed(task):
     except requests.RequestException as exc:
         logger.error('on_task_created: GitHub check failed for task %s: %s', task.pk, exc)
         return f'GitHub repo check failed: {exc}'
-
-
-def _check_ph_post_exists_detailed(task):
-    ok, post_vars, reason = _resolve_ph_post_query_vars(task.target_id)
-    if not ok:
-        return reason
-
-    query = f'query({ _ph_query_signature(post_vars) }) {{ post({ _ph_query_arg(post_vars) }) {{ id }} }}'
-    try:
-        response = requests.post(
-            'https://api.producthunt.com/v2/api/graphql',
-            json={'query': query, 'variables': post_vars},
-            headers={
-                'Authorization': f'Bearer {settings.PH_DEV_TOKEN}',
-                'Content-Type':  'application/json',
-            },
-            timeout=10,
-        )
-        response.raise_for_status()
-        if not response.json().get('data', {}).get('post'):
-            logger.warning(
-                'on_task_created: PH post %s not found (task %s)',
-                task.target_id, task.pk,
-            )
-            return 'Product Hunt post not found. Use post slug.'
-        return None
-    except requests.RequestException as exc:
-        logger.error('on_task_created: PH check failed for task %s: %s', task.pk, exc)
-        return f'Product Hunt post check failed: {exc}'
-
-
-def _resolve_ph_post_query_vars(target):
-    """Return (ok, vars, reason). vars is {'postSlug': ...}."""
-    raw = (target or '').strip()
-    if not raw:
-        return False, None, 'Product Hunt target is required.'
-
-    if raw.startswith('http://') or raw.startswith('https://'):
-        return False, None, 'Use Product Hunt post slug only (no URL).'
-
-    if raw.isdigit():
-        return False, None, 'Use Product Hunt post slug only (no numeric ID).'
-
-    candidate = raw.strip().lower()
-    if not candidate:
-        return False, None, 'Product Hunt slug is required.'
-
-    # Keep slug validation intentionally simple for now.
-    if any(ch.isspace() for ch in candidate):
-        return False, None, 'Product Hunt slug must not contain spaces.'
-
-    return True, {'postSlug': candidate}, None
-
-
-def _ph_query_signature(post_vars, include_cursor=False):
-    base = '$postSlug: String!'
-    if include_cursor:
-        return f'{base}, $cursor: String'
-    return base
-
-
-def _ph_query_arg(post_vars):
-    return 'slug: $postSlug'
-
-
-def _matches_ph_user(edge, ph_user_id, ph_username):
-    user = edge.get('node', {}).get('user', {})
-    edge_id = (user.get('id') or '').strip()
-    edge_username = (user.get('username') or '').strip().lower()
-
-    if ph_user_id and edge_id and edge_id == ph_user_id:
-        return True
-    if ph_username and edge_username and edge_username == ph_username:
-        return True
-    return False
 
 
 def _check_webhook_endpoint_contract_detailed(task):
@@ -652,25 +475,6 @@ def _check_task_health_with_reason(task):
                 return False, 'GitHub repo is private.'
             return True, ''
 
-        elif task.type == Task.Type.PH_ENGAGEMENT:
-            ok, post_vars, reason = _resolve_ph_post_query_vars(task.target_id)
-            if not ok:
-                return False, reason or msg('PH_POST_NOT_FOUND')
-            query = 'query($postSlug: String!) { post(slug: $postSlug) { id } }'
-            response = requests.post(
-                'https://api.producthunt.com/v2/api/graphql',
-                json={'query': query, 'variables': post_vars},
-                headers={
-                    'Authorization': f'Bearer {settings.PH_DEV_TOKEN}',
-                    'Content-Type':  'application/json',
-                },
-                timeout=10,
-            )
-            response.raise_for_status()
-            if not bool(response.json().get('data', {}).get('post')):
-                return False, msg('PH_POST_NOT_FOUND')
-            return True, ''
-
         elif task.type == Task.Type.WEBHOOK:
             if _check_webhook_owner_plan_detailed(task) is not None:
                 return False, 'Webhook tasks are Pro-only.'
@@ -727,7 +531,6 @@ def _task_slug(task):
     platform_map = {
         Task.Type.GITHUB_STAR: 'github-star',
         Task.Type.GITHUB_FORK: 'github-fork',
-        Task.Type.PH_ENGAGEMENT: 'ph',
         Task.Type.WEBHOOK: 'webhook',
     }
     platform = platform_map.get(task.type, 'task')

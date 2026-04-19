@@ -13,8 +13,7 @@
   <text x="20" y="34" class="title">Free</text>
   <text x="20" y="54" class="price">Always free</text>
   <text x="20" y="86"  class="check">✓</text><text x="36" y="86"  class="feat">GitHub star &amp; fork tasks</text>
-  <text x="20" y="112" class="check">✓</text><text x="36" y="112" class="feat">Product Hunt tasks</text>
-  <text x="20" y="138" class="check">✓</text><text x="36" y="138" class="feat">Karma feed visibility</text>
+  <text x="20" y="112" class="check">✓</text><text x="36" y="112" class="feat">Karma feed visibility</text>
   <rect x="252" y="0" width="248" height="212" rx="10" class="pro-card"/>
   <rect x="272" y="14" width="28" height="17" rx="4" class="badge"/>
   <text x="276" y="26.5" class="badge-text">Pro</text>

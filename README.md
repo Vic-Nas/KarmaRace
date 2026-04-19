@@ -10,7 +10,7 @@
 
 ## How it works
 
-**1. Publish a task** &nbsp;—&nbsp; Star a GitHub repo, upvote on Product Hunt, or verify via webhook. Takes under a minute to set up.
+**1. Publish a task** &nbsp;—&nbsp; Star/fork a GitHub repo, or verify via webhook. Takes under a minute to set up.
 
 **2. Other founders complete your tasks** &nbsp;—&nbsp; Every action is server-side verified. No fake clicks, no gaming the system.
 

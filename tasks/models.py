@@ -8,7 +8,6 @@ class Task(models.Model):
     class Type(models.TextChoices):
         GITHUB_STAR = 'GITHUB_STAR'
         GITHUB_FORK = 'GITHUB_FORK'
-        PH_ENGAGEMENT = 'PH_ENGAGEMENT'
         WEBHOOK     = 'WEBHOOK'
 
     owner          = models.ForeignKey(User, on_delete=models.CASCADE, related_name='owned_tasks')
@@ -36,9 +35,6 @@ class Task(models.Model):
 
         if self.type in (self.Type.GITHUB_STAR, self.Type.GITHUB_FORK):
             return f'https://github.com/{target}'
-
-        if self.type == self.Type.PH_ENGAGEMENT:
-            return f'https://www.producthunt.com/products/{target}'
 
         if self.type == self.Type.WEBHOOK:
             return target

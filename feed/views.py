@@ -30,14 +30,12 @@ PREF_FEED_TASK_TYPES = 'feed_filter_task_types'
 ALL_TASK_TYPES = [
     Task.Type.GITHUB_STAR,
     Task.Type.GITHUB_FORK,
-    Task.Type.PH_ENGAGEMENT,
     Task.Type.WEBHOOK,
 ]
 
 TASK_TYPE_LABELS = {
     Task.Type.GITHUB_STAR: 'GitHub Star',
     Task.Type.GITHUB_FORK: 'GitHub Fork',
-    Task.Type.PH_ENGAGEMENT: 'Product Hunt',
     Task.Type.WEBHOOK: 'Webhook',
 }
 
@@ -377,10 +375,6 @@ def _precheck_linked_account(user, task):
     if task.type in (Task.Type.GITHUB_STAR, Task.Type.GITHUB_FORK):
         if not user.linked_accounts.filter(platform='github').exists():
             return msg('GITHUB_LINK_REQUIRED')
-
-    if task.type == Task.Type.PH_ENGAGEMENT:
-        if not user.linked_accounts.filter(platform='producthunt').exists():
-            return msg('PH_LINK_REQUIRED')
 
     return None
 

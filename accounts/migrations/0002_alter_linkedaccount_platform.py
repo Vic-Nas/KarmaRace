@@ -13,6 +13,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='linkedaccount',
             name='platform',
-            field=models.CharField(choices=[('github', 'GitHub'), ('producthunt', 'Product Hunt'), ('discord', 'Discord')], max_length=50),
+            field=models.CharField(choices=[('github', 'GitHub'), ('discord', 'Discord')], max_length=50),
         ),
     ]
