@@ -7,15 +7,12 @@
     .badge { fill: #0f2d1e; }
     .badge-text { font: 600 10px ui-sans-serif,system-ui,sans-serif; fill: #1D9E75; }
   </style>
-  <rect x="0" y="0" width="196" height="82" rx="8" class="card"/>
-  <text x="16" y="28" class="label">GitHub star / fork</text>
-  <text x="16" y="50" class="sub">Free tier</text>
-  <rect x="222" y="0" width="196" height="82" rx="8" class="card"/>
-  <text x="238" y="28" class="label">GitHub fork</text>
-  <text x="238" y="50" class="sub">Free tier</text>
-  <rect x="444" y="0" width="196" height="82" rx="8" class="pro-card"/>
-  <rect x="460" y="12" width="28" height="17" rx="4" class="badge"/>
-  <text x="464" y="24.5" class="badge-text">Pro</text>
-  <text x="460" y="50" class="label">Webhook</text>
-  <text x="460" y="68" class="label">verification</text>
+  <rect x="111" y="0" width="196" height="82" rx="8" class="card"/>
+  <text x="127" y="28" class="label">GitHub star / fork</text>
+  <text x="127" y="50" class="sub">Free tier</text>
+  <rect x="333" y="0" width="196" height="82" rx="8" class="pro-card"/>
+  <rect x="349" y="12" width="28" height="17" rx="4" class="badge"/>
+  <text x="353" y="24.5" class="badge-text">Pro</text>
+  <text x="349" y="50" class="label">Webhook</text>
+  <text x="349" y="68" class="label">verification</text>
 </svg>
