@@ -8,28 +8,25 @@
   margin: 0 auto;
   padding: 1.75rem 1.25rem;
   width: 100%;
-  /* Align to bottom of content area, above fixed footer */
-  min-height: calc(100vh - var(--footer-h) - 52px); /* 52px = nav approx */
+  min-height: calc(100vh - var(--footer-h) - 52px);
 }
-.kr-main      { grid-area: main; min-width: 0; }
+.kr-main       { grid-area: main; min-width: 0; }
 .kr-ads--left  { grid-area: left; }
 .kr-ads--right { grid-area: right; }
 
-/* Sticky ad columns — fixed relative to viewport scroll */
 .kr-ads--left,
 .kr-ads--right {
   display: flex;
   flex-direction: column;
   gap: .75rem;
-  /* Stick while scrolling */
   position: sticky;
-  top: 68px; /* height of nav */
+  top: 68px;
   align-self: start;
   max-height: calc(100vh - 68px - var(--footer-h) - 2rem);
   overflow: hidden;
 }
 
-/* Pro: hide sidebars */
+/* Pro: no sidebars */
 body.is-pro .kr-ads--left,
 body.is-pro .kr-ads--right { display: none; }
 body.is-pro .kr-page {
@@ -41,9 +38,7 @@ body.is-pro .kr-page {
 /* ── Fixed Footer ── */
 .kr-footer {
   position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
+  bottom: 0; left: 0; right: 0;
   height: var(--footer-h);
   z-index: 300;
   background: var(--footer-bg);
@@ -71,22 +66,17 @@ body.is-pro .kr-page {
   padding-bottom: .85rem;
   border-bottom: 1px solid var(--border);
 }
-.page-header h1 { font-size: 1.55rem; color: var(--text); }
-
+.page-header h1 { font-size: 1.55rem; }
 #kr-messages { margin-bottom: 1rem; }
 
-/* ── Responsive ── */
 @media (max-width: 960px) {
   .kr-page {
     grid-template-columns: 1fr;
-    grid-template-areas:
-      "main"
-      "left"
-      "right";
+    grid-template-areas: "main" "left" "right";
   }
   .kr-ads--left,
   .kr-ads--right {
-    position: static; /* no sticky on mobile */
+    position: static;
     flex-direction: row;
     flex-wrap: nowrap;
     justify-content: center;
@@ -99,12 +89,8 @@ body.is-pro .kr-page {
   .kr-ads--left::-webkit-scrollbar,
   .kr-ads--right::-webkit-scrollbar { display: none; }
   .kr-ads--left .ad-box,
-  .kr-ads--right .ad-box {
-    flex: 0 0 160px;
-    min-height: 90px;
-  }
+  .kr-ads--right .ad-box { flex: 0 0 160px; min-height: 90px; }
 }
-
 @media (max-width: 600px) {
   .kr-page { padding: 1rem .75rem; gap: .75rem; }
   .kr-footer { gap: 1rem; font-size: .75rem; padding: 0 1rem; }

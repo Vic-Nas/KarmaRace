@@ -30,6 +30,9 @@
   --accent-hover:  #b85e20;
   --accent-light:  #fdf3ec;
 
+  --karma:         #e07828;
+  --karma-light:   #fef0e3;
+
   --primary:       #3d8c2e;
   --primary-hover: #2e6d22;
   --primary-light: #edf6e8;
@@ -61,6 +64,9 @@
   --accent:        #e8883a;
   --accent-hover:  #f0a060;
   --accent-light:  #261800;
+
+  --karma:         #f09040;
+  --karma-light:   #2a1800;
 
   --primary:       #5cb84a;
   --primary-hover: #78cc64;

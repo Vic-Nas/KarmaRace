@@ -40,7 +40,18 @@
 .lb-row__rank--silver { color: #9ba3af; }
 .lb-row__rank--bronze { color: #a0634a; }
 .lb-row__username { font-weight: 600; font-size: .95rem; }
-.lb-row__karma    { font-size: .88rem; color: var(--primary); font-weight: 600; }
+
+/* ── Karma — orange ── */
+.lb-row__karma {
+  font-size: .88rem;
+  color: var(--karma);
+  font-weight: 700;
+  background: var(--karma-light);
+  padding: .1rem .5rem;
+  border-radius: 99px;
+  border: 1px solid color-mix(in srgb, var(--karma) 20%, transparent);
+  white-space: nowrap;
+}
 
 .lb-empty {
   padding: 2rem; text-align: center; color: var(--text-muted);

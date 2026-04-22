@@ -2,9 +2,7 @@
 .profile-header {
   display: flex; align-items: center; gap: 1.25rem;
   padding: 1.5rem 0 1.25rem;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 1.5rem;
-  flex-wrap: wrap;
+  border-bottom: 1px solid var(--border); margin-bottom: 1.5rem; flex-wrap: wrap;
 }
 .profile-header__avatar {
   width: 64px; height: 64px; border-radius: 50%;
@@ -15,30 +13,16 @@
 .profile-header__username { font-size: 1.45rem; margin-bottom: .15rem; }
 .profile-header__name { color: var(--text-muted); font-size: .95rem; margin: 0; }
 
-.profile-stats {
-  display: flex; gap: 1.5rem; flex-wrap: wrap; margin-bottom: 1.5rem;
-}
+.profile-stats { display: flex; gap: 1.5rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
 .profile-stat {
   background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--radius); padding: 1rem 1.4rem;
   display: flex; flex-direction: column; align-items: center; min-width: 100px;
 }
 .profile-stat__value { font-size: 1.6rem; font-weight: 700; color: var(--primary); }
-.profile-stat__label {
-  font-size: .78rem; color: var(--text-muted);
-  text-transform: uppercase; letter-spacing: .05em; margin-top: .2rem;
-}
+.profile-stat__label { font-size: .78rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; margin-top: .2rem; }
 
-.profile-link {
-  display: inline-flex; align-items: center; gap: .4rem;
-  padding: .75rem 1rem; color: var(--text); font-size: .9rem;
-}
+.profile-link { display: inline-flex; align-items: center; gap: .4rem; padding: .75rem 1rem; color: var(--text); font-size: .9rem; }
 .profile-link:hover { color: var(--primary); text-decoration: none; }
 
-.edit-profile-grid {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: .75rem;
-}
-
-.profile-edit-cta {
-  padding: 1rem;
-}
+.edit-profile-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: .75rem; }

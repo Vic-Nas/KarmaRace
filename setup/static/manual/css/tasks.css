@@ -1,24 +1,13 @@
-/* tasks.css — My Tasks list and Edit/Create form */
-
+/* tasks.css — My Tasks list */
 .mytask-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  overflow: hidden;
+  display: flex; flex-direction: column;
+  border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden;
 }
-
 .mytask-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: .75rem 1.1rem;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  transition: background var(--transition);
-  min-width: 0;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 1rem; padding: .75rem 1.1rem;
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  transition: background var(--transition); min-width: 0;
 }
 .mytask-item:last-child { border-bottom: none; }
 .mytask-item:hover { background: var(--surface-alt); }
@@ -26,67 +15,34 @@
 .mytask-item.drag-over { border-top: 2px solid var(--primary); }
 
 .mytask__handle {
-  cursor: grab;
-  color: var(--text-muted);
-  padding: 0 .35rem;
-  flex-shrink: 0;
+  cursor: grab; color: var(--text-muted);
+  padding: 0 .35rem; flex-shrink: 0;
   -webkit-user-select: none;
-  user-select: none;
-  font-size: 1rem;
+  user-select: none; font-size: 1rem;
 }
 .mytask__handle:active { cursor: grabbing; }
 
 .mytask__left {
-  flex: 1 1 0;
-  min-width: 0;
-  display: flex;
-  align-items: baseline;
-  gap: .75rem;
-  overflow: hidden;
+  flex: 1 1 0; min-width: 0;
+  display: flex; align-items: baseline;
+  gap: .75rem; overflow: hidden;
 }
-.mytask__title {
-  font-size: .9rem;
-  font-weight: 600;
-  color: var(--text);
-  white-space: nowrap;
-  flex-shrink: 0;
-}
+.mytask__title { font-size: .9rem; font-weight: 600; color: var(--text); white-space: nowrap; flex-shrink: 0; }
 .mytask__title a { color: var(--accent); }
 .mytask__priority-badge { margin-left: .35rem; }
 .mytask__target {
-  font-size: .8rem;
-  color: var(--text-muted);
-  font-family: var(--font-mono);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  flex-shrink: 1;
-  min-width: 0;
+  font-size: .8rem; color: var(--text-muted); font-family: var(--font-mono);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 1; min-width: 0;
 }
 .mytask__desc {
-  font-size: .78rem;
-  color: var(--text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  flex-shrink: 2;
-  min-width: 0;
+  font-size: .78rem; color: var(--text-muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 2; min-width: 0;
 }
+.mytask__right { display: flex; align-items: center; gap: .6rem; flex-shrink: 0; }
+.mytask__health { font-size: .75rem; font-family: var(--font-mono); display: flex; gap: .3rem; }
+.mytask__actions { display: flex; align-items: center; gap: .35rem; }
 
-.mytask__right {
-  display: flex;
-  align-items: center;
-  gap: .6rem;
-  flex-shrink: 0;
-}
-.mytask__health {
-  font-size: .75rem;
-  font-family: var(--font-mono);
-  display: flex;
-  gap: .3rem;
-}
-.mytask__actions {
-  display: flex;
-  align-items: center;
-  gap: .35rem;
+@media (max-width: 640px) {
+  .mytask-item { flex-direction: column; align-items: flex-start; gap: .6rem; }
+  .mytask__right { width: 100%; justify-content: space-between; }
 }

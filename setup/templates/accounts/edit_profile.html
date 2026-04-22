@@ -6,6 +6,7 @@
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'css/profile.css' %}">
 <link rel="stylesheet" href="{% static 'css/toggles.css' %}">
+<link rel="stylesheet" href="{% static 'css/prefs.css' %}">
 {% endblock %}
 
 {% block content %}
@@ -41,11 +42,11 @@
   <h3>Visibility</h3>
   <p class="small text-muted mt-1 mb-2">Choose what appears on your public profile.</p>
 
-  <div class="pref-table">
+  <div class="pref-table pref-table--2col">
     <div class="pref-table__head"><span>Field</span><span>Public</span></div>
 
     {% for field_name, label, checked in visibility_fields %}
-    <div class="pref-table__row pref-table__row--2col">
+    <div class="pref-table__row">
       <span class="pref-table__label">{{ label }}</span>
       <label class="toggle">
         <input type="checkbox" name="{{ field_name }}" value="1" {% if checked %}checked{% endif %}>

@@ -2,9 +2,8 @@
   var table = document.getElementById('lb-table');
   var searchInput = document.getElementById('lb-search-input');
 
-  // Only run SSE when no active search filter is applied.
   function isSearchActive() {
-    return (searchInput && searchInput.value.trim().length > 0);
+    return searchInput && searchInput.value.trim().length > 0;
   }
 
   function rankClass(rank) {
@@ -29,7 +28,7 @@
 
     var karma = document.createElement('span');
     karma.className = 'lb-row__karma';
-    karma.textContent = '\u262F ' + row.karma;
+    karma.textContent = '\u2605 ' + row.karma; /* ★ star as karma symbol */
 
     a.appendChild(rank);
     a.appendChild(username);
@@ -47,22 +46,15 @@
       table.appendChild(empty);
       return;
     }
-    rows.forEach(function (row) {
-      table.appendChild(buildRow(row));
-    });
+    rows.forEach(function (row) { table.appendChild(buildRow(row)); });
   }
 
   function startSSE() {
-    if (isSearchActive()) return;
-    if (!window.EventSource) return;
-
+    if (isSearchActive() || !window.EventSource) return;
     var es = new EventSource('/leaderboard/stream/');
     es.onmessage = function (e) {
       if (isSearchActive()) return;
-      try {
-        var rows = JSON.parse(e.data);
-        renderRows(rows);
-      } catch (_) {}
+      try { renderRows(JSON.parse(e.data)); } catch (_) {}
     };
     es.onerror = function () {
       es.close();
