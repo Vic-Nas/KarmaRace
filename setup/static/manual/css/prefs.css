@@ -16,6 +16,9 @@
 .pref-table__row:last-child { border-bottom: none; }
 .pref-table__row:hover { background: var(--surface-alt); }
 .pref-table__row--locked { opacity: .5; }
+.pref-table__row--4col { grid-template-columns: 1fr 80px 80px 80px; }
+.pref-table__head:has(+ .pref-table__row--4col),
+.pref-table__head.head-4col { grid-template-columns: 1fr 80px 80px 80px; }
 .pref-table__label { font-size: .87rem; color: var(--text); }
 .pref-webhook-global {
   padding: 1rem; background: var(--surface-alt);
@@ -24,5 +27,4 @@
 .prefs-threshold-grid {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: .75rem;
 }
-/* Prefs save indicator */
 #prefs-saved { display: none; color: var(--success); font-size: .85rem; font-weight: 700; margin-left: .5rem; }

@@ -16,7 +16,10 @@
 
 **3. Karma drives your visibility** &nbsp;—&nbsp; High-karma contributors get prioritized in the feed. No ad budget needed.
 
-**4. Reciprocity is enforced** &nbsp;—&nbsp; If you owe actions to other users, your feed locks to only tasks that satisfy those obligations until they are cleared.
+**4. Reciprocity is enforced** &nbsp;—&nbsp; If you owe actions to other users and
+they created tasks of the right type, 
+your feed locks to only tasks that satisfy those obligations 
+until they are cleared.
 
 ---
 

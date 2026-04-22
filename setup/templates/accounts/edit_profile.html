@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Edit Profile — KarmaRace{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/profile.css' %}">
+<link rel="stylesheet" href="{% static 'css/toggles.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Edit Profile</h1>
+  <a href="{% url 'public_profile' username=request.user.username %}" class="btn btn-outline-secondary btn-sm">View profile</a>
+</div>
+
+<form method="post" class="card">
+  {% csrf_token %}
+
+  <h3>Info</h3>
+  <p class="small text-muted mt-1 mb-2">This info can be shown or hidden on your public profile.</p>
+
+  <div class="edit-profile-grid">
+    <div class="form-group">
+      <label for="ep-first">First name</label>
+      <input type="text" id="ep-first" name="first_name" maxlength="100" value="{{ profile.first_name }}">
+    </div>
+    <div class="form-group">
+      <label for="ep-last">Last name</label>
+      <input type="text" id="ep-last" name="last_name" maxlength="100" value="{{ profile.last_name }}">
+    </div>
+  </div>
+
+  <div class="form-group">
+    <label for="ep-email">Contact email <span class="text-muted small">(not your login email)</span></label>
+    <input type="email" id="ep-email" name="contact_email" maxlength="254" value="{{ profile.contact_email }}"
+           placeholder="shown publicly if enabled">
+  </div>
+
+  <hr>
+  <h3>Visibility</h3>
+  <p class="small text-muted mt-1 mb-2">Choose what appears on your public profile.</p>
+
+  <div class="pref-table">
+    <div class="pref-table__head"><span>Field</span><span>Public</span></div>
+
+    {% for field_name, label, checked in visibility_fields %}
+    <div class="pref-table__row pref-table__row--2col">
+      <span class="pref-table__label">{{ label }}</span>
+      <label class="toggle">
+        <input type="checkbox" name="{{ field_name }}" value="1" {% if checked %}checked{% endif %}>
+        <span class="toggle__track"><span class="toggle__thumb"></span></span>
+      </label>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="mt-2">
+    <button type="submit" class="btn btn-primary btn-sm">Save</button>
+  </div>
+</form>
+{% endblock %}

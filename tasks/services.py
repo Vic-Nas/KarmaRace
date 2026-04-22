@@ -10,17 +10,17 @@ from django.conf import settings
 from tasks.models import Task, TaskCompletion, ReciprocityObligation
 from tasks.check_feedback import msg
 from setup.platform_rules import (
-    WEBHOOK_OBLIGATIONS_ENABLED,
     WEBHOOK_FAILURE_RATE_EPSILON,
     WEBHOOK_BAD_CHECK_RATIO_THRESHOLD,
     WEBHOOK_BAD_CHECK_MIN_CALLS,
     WEBHOOK_HEALTH_CHECK_RATE_LIMIT_SECONDS,
+    karma_reward_for_task,
 )
 
 logger = logging.getLogger(__name__)
 
 HEALTH_HIDE_THRESHOLD = 2
-HEALTH_CHECK_ATTEMPTS = 1  # manual checks favor low server load over retry loops
+HEALTH_CHECK_ATTEMPTS = 1
 GITHUB_REPO_CHOICES_CACHE_SECONDS = 900
 
 
@@ -29,14 +29,11 @@ GITHUB_REPO_CHOICES_CACHE_SECONDS = 900
 # ---------------------------------------------------------------------------
 
 def verify_task(task, tester) -> bool:
-    """Dispatch to the correct verifier based on task type."""
     ok, _ = verify_task_with_details(task, tester)
     return ok
 
 
 def verify_task_with_details(task, tester):
-    """Dispatch to verifier without pre-flight health probing."""
-
     dispatch = {
         Task.Type.GITHUB_STAR: verify_github_with_details,
         Task.Type.GITHUB_FORK: verify_github_with_details,
@@ -54,26 +51,19 @@ def verify_task_with_details(task, tester):
 # ---------------------------------------------------------------------------
 
 def verify_github_with_details(task, tester):
-    """
-    Check star or fork via GitHub API using server credentials.
-    task.target_id must be the repo full name, e.g. "owner/repo".
-    tester must have a linked GitHub account with platform_username set.
-    """
     username, user_token = _get_github_identity(tester)
     if not username:
-        logger.info('verify_github: tester %s has no linked GitHub account', tester.pk)
         return False, msg('GITHUB_LINK_REQUIRED')
 
-    repo     = task.target_id
-
+    repo = task.target_id
     if not _is_valid_github_repo_target(repo):
         return False, msg('TARGET_OWNER_REPO_REQUIRED')
 
     try:
-        if task.type == Task.Type.GITHUB_STAR:
-            if not user_token:
-                return False, msg('GITHUB_TOKEN_RECONNECT')
+        if not user_token:
+            return False, msg('GITHUB_TOKEN_RECONNECT')
 
+        if task.type == Task.Type.GITHUB_STAR:
             response = requests.get(
                 f'https://api.github.com/user/starred/{repo}',
                 headers=_github_headers(token_override=user_token),
@@ -88,10 +78,6 @@ def verify_github_with_details(task, tester):
             return False, msg('GITHUB_STATUS_STAR', status=response.status_code)
 
         else:
-            if not user_token:
-                return False, msg('GITHUB_TOKEN_RECONNECT')
-
-            # One-path check: ask the authenticated linked user for the specific repo.
             response = requests.get(
                 f'https://api.github.com/repos/{username}/{repo.split("/", 1)[1]}',
                 headers=_github_headers(token_override=user_token),
@@ -111,12 +97,6 @@ def verify_github_with_details(task, tester):
 
 
 def verify_webhook_with_details(task, tester):
-    """
-    POST {"task_slug": ..., "platform_username": ...} to owner endpoint.
-    Sends Authorization: Bearer <webhook_secret> header if set.
-    Expects {"verified": true/false} in response.
-    task.target_id is the webhook endpoint URL.
-    """
     platform_username = (
         tester.linked_accounts
         .filter(platform='github')
@@ -124,75 +104,37 @@ def verify_webhook_with_details(task, tester):
         .first()
     ) or ''
 
-    headers = {}
-    if task.webhook_secret:
-        headers['Authorization'] = f'Bearer {task.webhook_secret}'
-
+    headers = {'Authorization': f'Bearer {task.webhook_secret}'} if task.webhook_secret else {}
     sent_payload = {'task_slug': task.slug, 'platform_username': platform_username}
 
     def notify_owner(status, detail):
         _notify_webhook_attempt(
-            task=task,
-            status=status,
-            phase='check',
-            sent_payload=sent_payload,
-            detail=detail,
-            tester=tester,
+            task=task, status=status, phase='check',
+            sent_payload=sent_payload, detail=detail, tester=tester,
         )
 
     try:
-        response = requests.post(
-            task.target_id,
-            json=sent_payload,
-            headers=headers,
-            timeout=10,
-        )
+        response = requests.post(task.target_id, json=sent_payload, headers=headers, timeout=10)
         response.raise_for_status()
         body = response.json()
         verified = body.get('verified', False)
+
         if verified:
-            _record_webhook_health_outcome(
-                task=task,
-                is_success=True,
-                result='verified',
-                reason='Webhook response contained verified=true.',
-            )
-            notify_owner('verified', {
-                'http_status': response.status_code,
-                'response_json': body,
-            })
+            _record_webhook_health_outcome(task, True, 'verified', 'Webhook response contained verified=true.')
+            notify_owner('verified', {'http_status': response.status_code, 'response_json': body})
             return True, msg('WEBHOOK_VERIFIED')
 
-        _record_webhook_health_outcome(
-            task=task,
-            is_success=False,
-            result='not_verified',
-            reason='Webhook response contained verified=false.',
-        )
-        notify_owner('not_verified', {
-            'http_status': response.status_code,
-            'response_json': body,
-        })
+        _record_webhook_health_outcome(task, False, 'not_verified', 'Webhook response contained verified=false.')
+        notify_owner('not_verified', {'http_status': response.status_code, 'response_json': body})
         return False, msg('WEBHOOK_NOT_VERIFIED')
+
     except requests.RequestException as exc:
         logger.error('verify_webhook: request failed for task %s: %s', task.pk, exc)
-        _record_webhook_health_outcome(
-            task=task,
-            is_success=False,
-            result='request_error',
-            reason=f'Webhook request error: {exc}',
-        )
-        notify_owner('request_error', {
-            'error': str(exc),
-        })
+        _record_webhook_health_outcome(task, False, 'request_error', f'Webhook request error: {exc}')
+        notify_owner('request_error', {'error': str(exc)})
         return False, msg('WEBHOOK_REQUEST_FAILED')
     except ValueError:
-        _record_webhook_health_outcome(
-            task=task,
-            is_success=False,
-            result='invalid_json',
-            reason='Webhook response was non-JSON.',
-        )
+        _record_webhook_health_outcome(task, False, 'invalid_json', 'Webhook response was non-JSON.')
         notify_owner('invalid_json', {'response': 'non-json response'})
         return False, msg('WEBHOOK_BAD_JSON')
 
@@ -202,31 +144,21 @@ def verify_webhook_with_details(task, tester):
 # ---------------------------------------------------------------------------
 
 def soft_delete_task(task):
-    """
-    Soft-delete a task:
-    - Sets is_deleted=True.
-    - Auto-fails all PENDING completions for this task.
-    """
     task.is_deleted = True
     task.save(update_fields=['is_deleted'])
-
     TaskCompletion.objects.filter(
         task=task,
         state=TaskCompletion.State.PENDING,
-    ).update(
-        state=TaskCompletion.State.FAILED,
-        result_detail=msg('ARCHIVED_DURING_CHECK'),
-    )
+    ).update(state=TaskCompletion.State.FAILED, result_detail=msg('ARCHIVED_DURING_CHECK'))
 
 
 @transaction.atomic
 def settle_or_create_obligation(actor, counterparty, task_type, completed_task):
-    """Settle existing debt first; otherwise create reverse obligation."""
+    """Settle existing debt first; otherwise create reverse obligation.
+    Obligations apply to all task types including WEBHOOK.
+    """
     if actor.pk == counterparty.pk:
         return None
-
-    if task_type == Task.Type.WEBHOOK and not WEBHOOK_OBLIGATIONS_ENABLED:
-        return 'ignored_webhook'
 
     debt = ReciprocityObligation.objects.select_for_update().filter(
         debtor=actor,
@@ -253,22 +185,29 @@ def settle_or_create_obligation(actor, counterparty, task_type, completed_task):
 
 
 # ---------------------------------------------------------------------------
+# Reward computation — called at task creation time
+# ---------------------------------------------------------------------------
+
+def assign_task_karma_reward(task):
+    """Compute and persist karma_reward based on owner's current balance."""
+    from karma.services import get_balance
+    owner_karma = get_balance(task.owner)
+    task.karma_reward = karma_reward_for_task(owner_karma, task.type)
+    task.save(update_fields=['karma_reward'])
+
+
+# ---------------------------------------------------------------------------
 # Configuration check (runs at publish time)
 # ---------------------------------------------------------------------------
 
 def get_task_configuration_failure(task):
-    """Return None when valid, otherwise a human-readable reason."""
     if task.type in (Task.Type.GITHUB_STAR, Task.Type.GITHUB_FORK):
         return _check_github_repo_public_detailed(task)
     elif task.type == Task.Type.WEBHOOK:
-        pro_gate = _check_webhook_owner_plan_detailed(task)
-        if pro_gate is not None:
+        pro_gate = None if getattr(task.owner, 'is_pro', False) else 'Webhook tasks are Pro-only.'
+        if pro_gate:
             return pro_gate
-        detail = _check_webhook_target_format(task)
-        if detail is not None:
-            return detail
-        return None
-
+        return _check_webhook_target_format(task)
     logger.warning('get_task_configuration_failure: unknown task type %s', task.type)
     return 'Unknown task type.'
 
@@ -283,7 +222,6 @@ def _is_valid_github_repo_target(target):
 def _check_github_repo_public_detailed(task):
     if not _is_valid_github_repo_target(task.target_id):
         return 'GitHub target must be owner/repo format.'
-
     try:
         response = requests.get(
             f'https://api.github.com/repos/{task.target_id}',
@@ -292,141 +230,69 @@ def _check_github_repo_public_detailed(task):
         )
         if response.status_code == 200:
             if response.json().get('private', True):
-                logger.warning(
-                    'on_task_created: GitHub repo %s is private (task %s)',
-                    task.target_id, task.pk,
-                )
                 return 'GitHub repo is private. Feed tasks require a public repo.'
             return None
         elif response.status_code == 404:
             return 'GitHub repo not found. Check owner/repo spelling.'
-        else:
-            logger.warning(
-                'on_task_created: GitHub repo %s not found (task %s, status %s)',
-                task.target_id, task.pk, response.status_code,
-            )
-            return f'GitHub API returned status {response.status_code} while checking repo.'
+        return f'GitHub API returned status {response.status_code} while checking repo.'
     except requests.RequestException as exc:
         logger.error('on_task_created: GitHub check failed for task %s: %s', task.pk, exc)
         return f'GitHub repo check failed: {exc}'
 
 
 def _check_webhook_endpoint_contract_detailed(task):
-    """POST probe payload and require JSON with boolean 'verified'."""
     from urllib.parse import urlparse
     parsed = urlparse(task.target_id)
     if not parsed.scheme or not parsed.netloc:
         return (
-            'Webhook target is invalid. '
-            f'Sent: {task.target_id}; '
-            'Expected: full http/https URL; '
-            'Got: missing scheme or host.'
+            f'Webhook target is invalid. Sent: {task.target_id}; '
+            'Expected: full http/https URL; Got: missing scheme or host.'
         )
     expected = '{"verified": true|false}'
-    payload = {
-        'task_slug': task.slug,
-        'platform_username': 'probe-user',
-    }
+    payload = {'task_slug': task.slug, 'platform_username': 'probe-user'}
     headers = {'Content-Type': 'application/json'}
     if task.webhook_secret:
         headers['Authorization'] = f'Bearer {task.webhook_secret}'
 
     try:
-        response = requests.post(
-            task.target_id,
-            json=payload,
-            headers=headers,
-            timeout=10,
-        )
+        response = requests.post(task.target_id, json=payload, headers=headers, timeout=10)
         body = response.text
-
         try:
             decoded = response.json()
         except ValueError:
-            _record_webhook_health_outcome(
-                task=task,
-                is_success=False,
-                result='invalid_json',
-                reason='Webhook response was non-JSON.',
-            )
-            _notify_webhook_attempt(
-                task=task,
-                status='invalid_json',
-                phase='health-check',
-                sent_payload=payload,
-                detail={
-                    'http_status': response.status_code,
-                    'response_body': body[:500],
-                },
-            )
+            _record_webhook_health_outcome(task, False, 'invalid_json', 'Webhook response was non-JSON.')
+            _notify_webhook_attempt(task, 'invalid_json', 'health-check', payload,
+                                    {'http_status': response.status_code, 'response_body': body[:500]})
             return (
-                'Webhook endpoint contract check failed. '
-                f'Sent: POST {task.target_id} body={payload}; '
-                f'Expected: {expected}; '
-                f'Got: status={response.status_code} non-JSON body={body[:300]}.'
+                f'Webhook endpoint contract check failed. Sent: POST {task.target_id} body={payload}; '
+                f'Expected: {expected}; Got: status={response.status_code} non-JSON body={body[:300]}.'
             )
 
         verified = decoded.get('verified', None)
         if isinstance(verified, bool):
             _record_webhook_health_outcome(
-                task=task,
-                is_success=bool(verified),
-                result='verified' if verified else 'not_verified',
-                reason='Manual webhook health check response parsed successfully.',
+                task, bool(verified),
+                'verified' if verified else 'not_verified',
+                'Manual webhook health check response parsed successfully.',
             )
-            _notify_webhook_attempt(
-                task=task,
-                status='verified' if verified else 'not_verified',
-                phase='health-check',
-                sent_payload=payload,
-                detail={
-                    'http_status': response.status_code,
-                    'response_json': decoded,
-                },
-            )
+            _notify_webhook_attempt(task, 'verified' if verified else 'not_verified', 'health-check',
+                                    payload, {'http_status': response.status_code, 'response_json': decoded})
             return None
 
-        _record_webhook_health_outcome(
-            task=task,
-            is_success=False,
-            result='invalid_shape',
-            reason='Webhook response JSON missing boolean verified field.',
-        )
-        _notify_webhook_attempt(
-            task=task,
-            status='invalid_shape',
-            phase='health-check',
-            sent_payload=payload,
-            detail={
-                'http_status': response.status_code,
-                'response_json': decoded,
-            },
-        )
+        _record_webhook_health_outcome(task, False, 'invalid_shape',
+                                       'Webhook response JSON missing boolean verified field.')
+        _notify_webhook_attempt(task, 'invalid_shape', 'health-check', payload,
+                                {'http_status': response.status_code, 'response_json': decoded})
         return (
-            'Webhook endpoint contract check failed. '
-            f'Sent: POST {task.target_id} body={payload}; '
-            f'Expected: {expected}; '
-            f'Got: status={response.status_code} json={decoded}.'
+            f'Webhook endpoint contract check failed. Sent: POST {task.target_id} body={payload}; '
+            f'Expected: {expected}; Got: status={response.status_code} json={decoded}.'
         )
     except requests.RequestException as exc:
-        _record_webhook_health_outcome(
-            task=task,
-            is_success=False,
-            result='request_error',
-            reason=f'Webhook request error: {exc}',
-        )
-        _notify_webhook_attempt(
-            task=task,
-            status='request_error',
-            phase='health-check',
-            sent_payload=payload,
-            detail={'error': str(exc)},
-        )
+        _record_webhook_health_outcome(task, False, 'request_error', f'Webhook request error: {exc}')
+        _notify_webhook_attempt(task, 'request_error', 'health-check', payload, {'error': str(exc)})
         return (
-            'Webhook endpoint contract check failed. '
-            f'Sent: POST {task.target_id} body={payload}; '
-            f'Expected: {expected}; '
-            f'Got: request error={exc}.'
+            f'Webhook endpoint contract check failed. Sent: POST {task.target_id} body={payload}; '
+            f'Expected: {expected}; Got: request error={exc}.'
         )
 
 
@@ -442,7 +308,6 @@ def _webhook_user_facing_reason(detail):
 
 def _check_webhook_target_format(task):
     from urllib.parse import urlparse
-
     parsed = urlparse((task.target_id or '').strip())
     if not parsed.scheme or not parsed.netloc:
         return 'Webhook URL is invalid. Use a full http/https URL.'
@@ -451,26 +316,14 @@ def _check_webhook_target_format(task):
     return None
 
 
-def _check_webhook_owner_plan_detailed(task):
-    if not getattr(task.owner, 'is_pro', False):
-        return 'Webhook tasks are Pro-only.'
-    return None
-
-
 # ---------------------------------------------------------------------------
 # Unhide hook
 # ---------------------------------------------------------------------------
 
 def on_task_unhidden(task):
-    """
-    Called when a task's hidden flag is set back to False.
-    Unarchives this task for users who have not already confirmed it.
-    """
     completed_user_ids = TaskCompletion.objects.filter(
-        task=task,
-        state=TaskCompletion.State.CONFIRMED,
+        task=task, state=TaskCompletion.State.CONFIRMED,
     ).values_list('tester_id', flat=True)
-
     users_to_unarchive = task.archived_by.exclude(id__in=completed_user_ids)
     if users_to_unarchive:
         task.archived_by.remove(*users_to_unarchive)
@@ -481,19 +334,8 @@ def on_task_unhidden(task):
 # ---------------------------------------------------------------------------
 
 def run_health_check(task) -> bool:
-    """
-    Retries the health check up to HEALTH_CHECK_ATTEMPTS times before counting a failure.
-    Two-strike policy on consecutive failed runs:
-    - First run failure: marks suspect, does not hide.
-    - Second run failure: hides task and notifies owner.
-    - A healthy run resets streak and clears failure reason.
-
-    Returns True if healthy, False if failed.
-    """
     healthy, reason = _check_task_health_with_retry(task)
 
-    # Webhook health state is tracked by cumulative call outcomes + ratio logic.
-    # Do not apply legacy streak-based hide/unhide rules for webhook tasks.
     if task.type == Task.Type.WEBHOOK:
         if not healthy and reason and not task.health_last_failure_reason:
             task.health_last_failure_reason = reason
@@ -510,9 +352,7 @@ def run_health_check(task) -> bool:
         if task.health_last_failure_reason:
             task.health_last_failure_reason = ''
             update_fields.append('health_last_failure_reason')
-
         task.save(update_fields=update_fields)
-
         return True
 
     task.health_failure_streak += 1
@@ -534,11 +374,6 @@ def run_health_check(task) -> bool:
 
 
 def _check_task_health_with_retry(task):
-    """
-    Attempts the health check up to HEALTH_CHECK_ATTEMPTS times.
-    Returns (True, '') on first success; (False, last_reason) if all attempts fail.
-    Exponential backoff between attempts (1s, 2s, …).
-    """
     import time
     reason = 'Health check failed.'
     for attempt in range(1, HEALTH_CHECK_ATTEMPTS + 1):
@@ -551,7 +386,6 @@ def _check_task_health_with_retry(task):
 
 
 def _notify_health_failed(task):
-    """Notify the task owner directly when a task is hidden by health failure."""
     try:
         from notifications.models import Notification
         from notifications.services import notify
@@ -559,9 +393,7 @@ def _notify_health_failed(task):
             user=task.owner,
             event=Notification.Event.TASK_HEALTH_FAILED,
             payload={
-                'task_id': task.pk,
-                'task_type': task.type,
-                'target_id': task.target_id,
+                'task_id': task.pk, 'task_type': task.type, 'target_id': task.target_id,
                 'owner_id': task.owner_id,
                 'webhook_health_success_count': task.webhook_health_success_count,
                 'webhook_health_failure_count': task.webhook_health_failure_count,
@@ -574,7 +406,6 @@ def _notify_health_failed(task):
 
 
 def _check_task_health_with_reason(task):
-    """Returns True if the external resource is still reachable / valid."""
     try:
         if task.type in (Task.Type.GITHUB_STAR, Task.Type.GITHUB_FORK):
             response = requests.get(
@@ -589,10 +420,10 @@ def _check_task_health_with_reason(task):
             return True, ''
 
         elif task.type == Task.Type.WEBHOOK:
-            if _check_webhook_owner_plan_detailed(task) is not None:
+            if not getattr(task.owner, 'is_pro', False):
                 return False, 'Webhook tasks are Pro-only.'
             format_reason = _check_webhook_target_format(task)
-            if format_reason is not None:
+            if format_reason:
                 return False, format_reason
             webhook_reason = _check_webhook_endpoint_contract_detailed(task)
             if webhook_reason is None:
@@ -606,13 +437,11 @@ def _check_task_health_with_reason(task):
     return False, 'Unknown task type for health check.'
 
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
 def _get_github_identity(tester):
-    """Return (username, access_token) from LinkedAccount and allauth fallback."""
     username = ''
     access_token = ''
 
@@ -621,37 +450,28 @@ def _get_github_identity(tester):
         username = (linked.platform_username or '').strip()
         access_token = (linked.access_token or '').strip()
 
-    # Fallback to allauth social identity if LinkedAccount fields are stale/missing.
     try:
         from allauth.socialaccount.models import SocialAccount, SocialToken
-
         social = SocialAccount.objects.filter(user=tester, provider='github').first()
         if social:
             if not username:
                 username = (
-                    social.extra_data.get('login')
-                    or social.extra_data.get('username')
-                    or ''
+                    social.extra_data.get('login') or social.extra_data.get('username') or ''
                 ).strip()
             if not access_token:
                 token = SocialToken.objects.filter(account=social).order_by('-pk').first()
                 access_token = (token.token if token else '') or ''
     except Exception as exc:
-        logger.warning('verify_github: allauth fallback lookup failed for tester %s: %s', tester.pk, exc)
+        logger.warning('verify_github: allauth fallback failed for tester %s: %s', tester.pk, exc)
 
     return username, access_token
 
 
 def get_user_github_repo_choices(user):
-    """
-    Return (choices, error_text) for public repositories where the user has push access.
-    choices is a list of (full_name, label) tuples.
-    """
     return get_user_github_repo_choices_cached(user, force_reload=False)
 
 
 def get_user_github_repo_choices_cached(user, force_reload=False):
-    """Cached wrapper for GitHub repository choices to keep task form loading lazy."""
     username, user_token = _get_github_identity(user)
     if not user_token:
         return [], 'Cannot load GitHub repositories. Link your GitHub account in Accounts.'
@@ -674,7 +494,6 @@ def get_user_github_repo_choices_cached(user, force_reload=False):
             return
         if not (repo.get('permissions') or {}).get('push'):
             return
-
         seen.add(full_name)
         repos.append((full_name, full_name))
 
@@ -682,18 +501,12 @@ def get_user_github_repo_choices_cached(user, force_reload=False):
         nonlocal observed_scopes
         page = 1
         while page <= 5:
-            params = {
-                'sort': 'updated',
-                'direction': 'desc',
-                'per_page': 100,
-                'page': page,
-            }
+            params = {'sort': 'updated', 'direction': 'desc', 'per_page': 100, 'page': page}
             params.update(extra_params or {})
             response = requests.get(
                 'https://api.github.com/user/repos',
                 headers=_github_headers(token_override=user_token),
-                params=params,
-                timeout=10,
+                params=params, timeout=10,
             )
             observed_scopes = observed_scopes or (response.headers.get('X-OAuth-Scopes') or '')
             if response.status_code in (401, 403):
@@ -701,52 +514,33 @@ def get_user_github_repo_choices_cached(user, force_reload=False):
             if response.status_code == 422:
                 return response, 'unprocessable'
             response.raise_for_status()
-
             data = response.json()
             if not data:
                 break
-
             for repo in data:
                 add_if_eligible(repo)
-
             if len(data) < 100:
                 break
             page += 1
-
         return None, 'ok'
 
     def collect_org_repos(org_login):
-        nonlocal observed_scopes
         page = 1
         while page <= 5:
             response = requests.get(
                 f'https://api.github.com/orgs/{org_login}/repos',
                 headers=_github_headers(token_override=user_token),
-                params={
-                    'type': 'all',
-                    'sort': 'updated',
-                    'direction': 'desc',
-                    'per_page': 100,
-                    'page': page,
-                },
+                params={'type': 'all', 'sort': 'updated', 'direction': 'desc', 'per_page': 100, 'page': page},
                 timeout=10,
             )
-            observed_scopes = observed_scopes or (response.headers.get('X-OAuth-Scopes') or '')
-
-            # Some orgs/policies can reject listing even when direct repo lookup works.
-            if response.status_code in (401, 403, 404):
-                return
-            if response.status_code == 422:
+            if response.status_code in (401, 403, 404, 422):
                 return
             response.raise_for_status()
-
             data = response.json()
             if not data:
                 break
-
             for repo in data:
                 add_if_eligible(repo)
-
             if len(data) < 100:
                 break
             page += 1
@@ -756,36 +550,27 @@ def get_user_github_repo_choices_cached(user, force_reload=False):
         found = set()
         while page <= 5:
             response = requests.get(
-                url,
-                headers=_github_headers(token_override=user_token),
-                params={'per_page': 100, 'page': page},
-                timeout=10,
+                url, headers=_github_headers(token_override=user_token),
+                params={'per_page': 100, 'page': page}, timeout=10,
             )
-            if response.status_code in (401, 403, 404):
-                return found
-            if response.status_code == 422:
+            if response.status_code in (401, 403, 404, 422):
                 return found
             response.raise_for_status()
-
             data = response.json()
             if not isinstance(data, list) or not data:
                 break
-
             for item in data:
                 login = (extract_login(item) or '').strip()
                 if login:
                     found.add(login)
-
             if len(data) < 100:
                 break
             page += 1
         return found
 
     def collect_recent_push_event_repos(max_candidates=40):
-        """Best-effort enrichment from recent public push events for this user."""
         if not username:
             return []
-
         found = []
         seen_candidates = set()
         page = 1
@@ -793,17 +578,14 @@ def get_user_github_repo_choices_cached(user, force_reload=False):
             response = requests.get(
                 f'https://api.github.com/users/{username}/events/public',
                 headers=_github_headers(token_override=user_token),
-                params={'per_page': 100, 'page': page},
-                timeout=10,
+                params={'per_page': 100, 'page': page}, timeout=10,
             )
             if response.status_code in (401, 403, 404, 422):
                 return found
             response.raise_for_status()
-
             events = response.json()
             if not isinstance(events, list) or not events:
                 break
-
             for event in events:
                 if event.get('type') != 'PushEvent':
                     continue
@@ -814,7 +596,6 @@ def get_user_github_repo_choices_cached(user, force_reload=False):
                 found.append(repo_name)
                 if len(found) >= max_candidates:
                     break
-
             if len(events) < 100:
                 break
             page += 1
@@ -823,8 +604,7 @@ def get_user_github_repo_choices_cached(user, force_reload=False):
     def collect_repo_details(repo_full_name):
         response = requests.get(
             f'https://api.github.com/repos/{repo_full_name}',
-            headers=_github_headers(token_override=user_token),
-            timeout=10,
+            headers=_github_headers(token_override=user_token), timeout=10,
         )
         if response.status_code in (401, 403, 404, 422):
             return
@@ -832,81 +612,42 @@ def get_user_github_repo_choices_cached(user, force_reload=False):
         add_if_eligible(response.json())
 
     try:
-        # Merge multiple query shapes because GitHub behavior differs across
-        # org policies/token scopes; this maximizes collaborator visibility.
-        response, mode = collect_user_repos({'type': 'all'})
-        if mode == 'auth':
-            return [], 'Cannot load GitHub repositories. Reconnect your GitHub account in Accounts.'
-        if mode == 'unprocessable':
-            logger.warning(
-                'get_user_github_repo_choices: type=all query returned 422 for user %s: %s',
-                user.pk,
-                getattr(response, 'text', '')[:300],
-            )
-
-        response, mode = collect_user_repos({'type': 'member'})
-        if mode == 'auth':
-            return [], 'Cannot load GitHub repositories. Reconnect your GitHub account in Accounts.'
-        if mode == 'unprocessable':
-            logger.warning(
-                'get_user_github_repo_choices: type=member query returned 422 for user %s: %s',
-                user.pk,
-                getattr(response, 'text', '')[:300],
-            )
-
-        response, mode = collect_user_repos({'affiliation': 'owner,collaborator,organization_member'})
-        if mode == 'auth':
-            return [], 'Cannot load GitHub repositories. Reconnect your GitHub account in Accounts.'
-        if mode == 'unprocessable':
-            logger.warning(
-                'get_user_github_repo_choices: affiliation query returned 422 for user %s: %s',
-                user.pk,
-                getattr(response, 'text', '')[:300],
-            )
+        for params in ({'type': 'all'}, {'type': 'member'}, {'affiliation': 'owner,collaborator,organization_member'}):
+            resp, mode = collect_user_repos(params)
+            if mode == 'auth':
+                return [], 'Cannot load GitHub repositories. Reconnect your GitHub account in Accounts.'
+            if mode == 'unprocessable':
+                logger.warning('get_user_github_repo_choices: query returned 422 for user %s', user.pk)
 
         org_logins = set()
-        org_logins.update(collect_orgs_from(
-            'https://api.github.com/user/orgs',
-            lambda item: item.get('login'),
-        ))
+        org_logins.update(collect_orgs_from('https://api.github.com/user/orgs', lambda i: i.get('login')))
         org_logins.update(collect_orgs_from(
             'https://api.github.com/user/memberships/orgs',
-            lambda item: (item.get('organization') or {}).get('login'),
+            lambda i: (i.get('organization') or {}).get('login'),
         ))
         if username:
             org_logins.update(collect_orgs_from(
-                f'https://api.github.com/users/{username}/orgs',
-                lambda item: item.get('login'),
+                f'https://api.github.com/users/{username}/orgs', lambda i: i.get('login'),
             ))
 
         for org_login in sorted(org_logins):
             collect_org_repos(org_login)
 
-        # Enrich from recent push activity: helps surface push-access repos that
-        # may be omitted from standard listing endpoints under limited scopes.
         try:
             for repo_full_name in collect_recent_push_event_repos():
                 collect_repo_details(repo_full_name)
         except requests.RequestException as exc:
-            logger.warning(
-                'get_user_github_repo_choices: recent push enrichment failed for user %s: %s',
-                user.pk,
-                exc,
-            )
+            logger.warning('get_user_github_repo_choices: push enrichment failed for user %s: %s', user.pk, exc)
 
         scopes = {s.strip() for s in (observed_scopes or '').split(',') if s.strip()}
         if 'read:org' not in scopes and 'repo' not in scopes:
-            logger.warning(
-                'get_user_github_repo_choices: token may have limited org visibility for user %s (scopes=%s)',
-                user.pk,
-                observed_scopes,
-            )
+            logger.warning('get_user_github_repo_choices: limited org visibility for user %s (scopes=%s)',
+                           user.pk, observed_scopes)
     except requests.RequestException as exc:
         logger.warning('get_user_github_repo_choices: failed for user %s: %s', user.pk, exc)
         return [], 'Could not load GitHub repositories right now. Click Reload repos to retry.'
 
     repos.sort(key=lambda item: item[0].lower())
-
     if not repos:
         return [], 'No eligible public push-access repositories were discovered for this GitHub token.'
 
@@ -923,38 +664,24 @@ def _github_headers(token_override=None) -> dict:
 
 
 def _notify_webhook_attempt(task, status, phase, sent_payload, detail, tester=None):
-    """Best-effort owner notification for every webhook contact attempt."""
     try:
         from notifications.models import Notification
         from notifications.services import notify
-
         payload = {
-            'task_id': task.pk,
-            'task_type': task.type,
-            'target_id': task.target_id,
-            'phase': phase,
-            'status': status,
-            'sent_payload': sent_payload,
-            'detail': detail,
+            'task_id': task.pk, 'task_type': task.type, 'target_id': task.target_id,
+            'phase': phase, 'status': status, 'sent_payload': sent_payload, 'detail': detail,
         }
         if tester is not None:
             payload['tester_id'] = tester.pk
             payload['tester_username'] = getattr(tester, 'username', '')
-
-        notify(
-            user=task.owner,
-            event=Notification.Event.WEBHOOK_CHECK,
-            payload=payload,
-        )
+        notify(user=task.owner, event=Notification.Event.WEBHOOK_CHECK, payload=payload)
     except Exception as exc:
         logger.warning('webhook notification emit failed for task %s: %s', task.pk, exc)
 
 
 def can_run_manual_health_check(task):
-    """Rate-limit owner-triggered health checks per task."""
     if task.health_last_checked_at is None:
         return True, 0
-
     delta = timezone.now() - task.health_last_checked_at
     seconds = int(delta.total_seconds())
     wait = int(WEBHOOK_HEALTH_CHECK_RATE_LIMIT_SECONDS) - seconds
@@ -964,7 +691,6 @@ def can_run_manual_health_check(task):
 
 
 def _record_webhook_health_outcome(task, is_success, result, reason):
-    """Track webhook call outcomes and auto-unpublish if bad ratio threshold is reached."""
     if task.type != Task.Type.WEBHOOK:
         return
 
@@ -982,8 +708,7 @@ def _record_webhook_health_outcome(task, is_success, result, reason):
 
     total = task.webhook_health_success_count + task.webhook_health_failure_count
     bad_ratio = (
-        float(task.webhook_health_failure_count)
-        / float(total + WEBHOOK_FAILURE_RATE_EPSILON)
+        float(task.webhook_health_failure_count) / float(total + WEBHOOK_FAILURE_RATE_EPSILON)
     ) if total > 0 else 0.0
 
     should_auto_unpublish = (

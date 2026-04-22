@@ -17,11 +17,12 @@ class Task(models.Model):
     description    = models.TextField()
     target_id      = models.CharField(max_length=500)
     webhook_secret = models.CharField(max_length=255, blank=True, default='')
+    karma_reward   = models.PositiveSmallIntegerField(default=0)
     succeed_count  = models.PositiveIntegerField(default=0)
     tried_count    = models.PositiveIntegerField(default=0)
     is_deleted          = models.BooleanField(default=False)
-    hidden              = models.BooleanField(default=False)   # system-controlled (health, creation)
-    owner_unpublished   = models.BooleanField(default=False)   # owner-controlled; blocks auto-publish
+    hidden              = models.BooleanField(default=False)
+    owner_unpublished   = models.BooleanField(default=False)
     health_failure_streak = models.PositiveSmallIntegerField(default=0)
     health_last_failure_reason = models.TextField(blank=True, default='')
     health_last_checked_at = models.DateTimeField(null=True, blank=True)
@@ -37,13 +38,10 @@ class Task(models.Model):
         target = (self.target_id or '').strip()
         if not target:
             return ''
-
         if self.type in (self.Type.GITHUB_STAR, self.Type.GITHUB_FORK):
             return f'https://github.com/{target}'
-
         if self.type == self.Type.WEBHOOK:
             return target
-
         return ''
 
     @property
@@ -63,8 +61,6 @@ class Task(models.Model):
         }
         if result in summaries:
             return summaries[result]
-
-        # Keep owner task pages concise and non-technical.
         return 'Webhook health check failed. See Notifications for details.'
 
     def __str__(self):

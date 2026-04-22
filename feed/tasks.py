@@ -5,7 +5,6 @@ from django.db import transaction
 
 from karma.models import KarmaTransaction
 from karma.services import credit_karma, debit_karma
-from setup.platform_rules import KARMA_REWARDS_BY_TASK_TYPE
 from tasks.check_feedback import msg
 from tasks.models import Task, TaskCompletion
 from tasks.services import verify_task_with_details, settle_or_create_obligation
@@ -41,7 +40,7 @@ def process_task_check(task_id: int, tester_id: int):
                 completion.result_detail = msg('CHECK_CONFIRMED')
                 completion.save(update_fields=['state', 'result_detail'])
 
-                reward = int(KARMA_REWARDS_BY_TASK_TYPE.get(task.type, 0) or 0)
+                reward = task.karma_reward
                 if reward > 0:
                     credit_karma(
                         user=completion.tester,
@@ -69,11 +68,6 @@ def process_task_check(task_id: int, tester_id: int):
             completion.state = TaskCompletion.State.FAILED
             completion.result_detail = detail or msg('CHECK_FAILED_GENERIC')
             completion.save(update_fields=['state', 'result_detail'])
-            logger.info(
-                'process_task_check: task %s failed for tester %s: %s',
-                task.pk,
-                tester_id,
-                detail,
-            )
+            logger.info('process_task_check: task %s failed for tester %s: %s', task.pk, tester_id, detail)
 
         task.save(update_fields=['tried_count', 'succeed_count'])

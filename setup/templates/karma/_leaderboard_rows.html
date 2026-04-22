@@ -1,0 +1,11 @@
+{% if rows %}
+{% for row in rows %}
+<a href="/u/{{ row.username }}/" class="lb-row">
+  <span class="lb-row__rank {% if row.rank == 1 %}lb-row__rank--gold{% elif row.rank == 2 %}lb-row__rank--silver{% elif row.rank == 3 %}lb-row__rank--bronze{% endif %}">#{{ row.rank }}</span>
+  <span class="lb-row__username">{{ row.username }}</span>
+  <span class="lb-row__karma">&#9775; {{ row.karma }}</span>
+</a>
+{% endfor %}
+{% else %}
+<div class="lb-empty">No results{% if search %} for &ldquo;{{ search }}&rdquo;{% endif %}.</div>
+{% endif %}

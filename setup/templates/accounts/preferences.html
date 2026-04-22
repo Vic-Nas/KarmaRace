@@ -16,9 +16,7 @@
 
 <div class="card mb-3">
   <h3>Karma Thresholds</h3>
-  <p class="small text-muted mt-1 mb-2">
-    Control your personal low/high karma notification bands.
-  </p>
+  <p class="small text-muted mt-1 mb-2">Control your personal low/high karma notification bands.</p>
 
   <form method="post" id="prefs-form">
     {% csrf_token %}
@@ -37,13 +35,15 @@
     </div>
 
     <hr>
-
     <h3>Delivery Preferences</h3>
 
     {% if user.is_pro %}
     <p class="small text-muted mt-1 mb-2">
-      Configure email and webhook delivery per event type.
+      Configure email, webhook, and Discord delivery per event.
       Webhook URL and secret are shared across all webhook-enabled events.
+      {% if not has_discord %}
+        <a href="{% url 'discord_entry' %}">Link Discord</a> to enable Discord notifications.
+      {% endif %}
     </p>
 
     <div class="pref-webhook-global">
@@ -64,11 +64,11 @@
 
     <div class="pref-table mt-2">
       <div class="pref-table__head">
-        <span>Event</span><span>Email</span><span>Webhook</span>
+        <span>Event</span><span>Email</span><span>Webhook</span><span>Discord</span>
       </div>
       {% for event_key, event_label in all_events %}
       {% with pref=prefs|get_item:event_key %}
-      <div class="pref-table__row">
+      <div class="pref-table__row pref-table__row--4col">
         <span class="pref-table__label">{{ event_label }}</span>
         <label class="toggle">
           <input type="checkbox" name="email_{{ event_key }}" value="1"
@@ -77,7 +77,14 @@
         </label>
         <label class="toggle">
           <input type="checkbox" name="webhook_{{ event_key }}" value="1"
-                 {% if pref and pref.webhook_enabled %}checked{% endif %}>
+                 {% if pref and pref.webhook_url %}checked{% endif %}>
+          <span class="toggle__track"><span class="toggle__thumb"></span></span>
+        </label>
+        <label class="toggle {% if not has_discord %}toggle--locked{% endif %}"
+               {% if not has_discord %}title="Link Discord to enable"{% endif %}>
+          <input type="checkbox" name="discord_{{ event_key }}" value="1"
+                 {% if not has_discord %}disabled{% endif %}
+                 {% if pref and pref.discord_enabled %}checked{% endif %}>
           <span class="toggle__track"><span class="toggle__thumb"></span></span>
         </label>
       </div>
@@ -87,23 +94,21 @@
 
     {% else %}
     <p class="small text-muted mt-1 mb-2">
-      <a href="{% url 'billing_plan' %}">Upgrade to Pro</a> to enable email and webhook delivery.
+      <a href="{% url 'billing_plan' %}">Upgrade to Pro</a> to enable email, webhook, and Discord delivery.
     </p>
     <div class="pref-table">
       <div class="pref-table__head">
-        <span>Event</span><span>Email</span><span>Webhook</span>
+        <span>Event</span><span>Email</span><span>Webhook</span><span>Discord</span>
       </div>
       {% for event_key, event_label in all_events %}
-      <div class="pref-table__row pref-table__row--locked">
+      <div class="pref-table__row pref-table__row--4col pref-table__row--locked">
         <span class="pref-table__label">{{ event_label }}</span>
+        {% for _ in "123" %}
         <label class="toggle toggle--locked" title="Pro feature">
           <input type="checkbox" disabled>
           <span class="toggle__track"><span class="toggle__thumb"></span></span>
         </label>
-        <label class="toggle toggle--locked" title="Pro feature">
-          <input type="checkbox" disabled>
-          <span class="toggle__track"><span class="toggle__thumb"></span></span>
-        </label>
+        {% endfor %}
       </div>
       {% endfor %}
     </div>

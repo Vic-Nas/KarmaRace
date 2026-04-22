@@ -10,4 +10,5 @@ urlpatterns = [
 	path('linked-accounts/connect/<str:platform>/', views.connect_account, name='connect_account'),
 	path('linked-accounts/github/connect/', views.github_connect, name='github_connect'),
 	path('linked-accounts/<str:platform>/unlink/', views.unlink_account, name='unlink_account'),
+	path('profile/edit/', views.edit_profile, name='edit_profile'),
 ]

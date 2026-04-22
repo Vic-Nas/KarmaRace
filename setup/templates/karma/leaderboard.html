@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Leaderboard — KarmaRace{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/leaderboard.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Leaderboard</h1>
+  <span class="lb-live-dot" title="Live"></span>
+</div>
+
+<form method="get" class="lb-search">
+  <input type="text" name="q" value="{{ search }}" placeholder="Search username…" id="lb-search-input">
+  <button type="submit" class="btn btn-primary btn-sm">Search</button>
+  {% if search %}<a href="{% url 'leaderboard' %}" class="btn btn-outline-secondary btn-sm">Clear</a>{% endif %}
+</form>
+
+<div class="lb-table" id="lb-table">
+  {% include "karma/_leaderboard_rows.html" %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/leaderboard.js' %}"></script>
+{% endblock %}

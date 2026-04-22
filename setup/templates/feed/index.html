@@ -90,7 +90,7 @@
     </p>
     {% endif %}
 
-    <p class="small text-muted mt-1">by {{ task.owner.username }}</p>
+    <p class="small text-muted mt-1">by <a href="/u/{{ task.owner.username }}/">{{ task.owner.username }}</a></p>
 
     <div class="alert alert-info" id="check-loading-banner"{% if not checking_task_id %} style="display:none"{% endif %}>
       {% if checking_task_id %}Verification in progress &mdash; this card will refresh automatically&hellip;{% endif %}
@@ -129,6 +129,7 @@
 
 {% block extra_js %}
 <script src="{% static 'js/feed-check.js' %}"></script>
+<script src="{% static 'js/feed-check-poll.js' %}"></script>
 {% if checking_task_id %}
 <script>FeedCheck.start("{% url 'feed_check_status' checking_task_id %}");</script>
 {% endif %}

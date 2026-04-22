@@ -18,25 +18,19 @@ def _notif_summary(notif):
     if event == Notification.Event.TASK_HEALTH_FAILED:
         return f"Task #{p.get('task_id', '?')} failed health check."
     if event == Notification.Event.WEBHOOK_CHECK:
-        return (
-            f"Webhook {p.get('phase', 'check')} "
-            f"for Task #{p.get('task_id', '?')} => {p.get('status', 'unknown')}"
-        )
+        return f"Webhook {p.get('phase', 'check')} for Task #{p.get('task_id', '?')} => {p.get('status', 'unknown')}"
     if event == Notification.Event.KARMA_LOW:
-        return "Your karma balance is low."
+        return 'Your karma balance is low.'
     if event == Notification.Event.KARMA_RESTORED:
-        return "Your karma balance is restored."
+        return 'Your karma balance is restored.'
     if event == Notification.Event.APPRECIATION:
         return p.get('message', 'You received appreciation.')
     return str(p)[:80]
 
 
 def _karma_delta(notif):
-    p = notif.payload or {}
-    delta = p.get('delta')
-    if isinstance(delta, (int, float)):
-        return int(delta)
-    return 0
+    delta = (notif.payload or {}).get('delta')
+    return int(delta) if isinstance(delta, (int, float)) else 0
 
 
 def _serialize(notif):
@@ -68,16 +62,10 @@ def _safe_int(value):
 
 @login_required
 def unread_poll(request):
-    since_id = request.GET.get('since', 0)
-    try:
-        since_id = int(since_id)
-    except (TypeError, ValueError):
-        since_id = 0
-
+    since_id = _safe_int(request.GET.get('since', 0)) or 0
     qs = Notification.objects.filter(user=request.user, read_at__isnull=True)
     if since_id:
         qs = qs.filter(pk__gt=since_id)
-
     notifications = list(qs.order_by('pk')[:20])
     return JsonResponse({
         'unread_count': Notification.objects.filter(user=request.user, read_at__isnull=True).count(),
@@ -135,14 +123,11 @@ def inbox(request):
 
     Notification.objects.filter(user=request.user, read_at__isnull=True).update(read_at=timezone.now())
 
-    all_notifications = Notification.objects.filter(user=request.user).order_by('-created_at')[:300]
-    task_ids = sorted(
-        {
-            payload.get('task_id')
-            for payload in [n.payload or {} for n in all_notifications]
-            if isinstance(payload.get('task_id'), int)
-        }
-    )
+    all_recent = Notification.objects.filter(user=request.user).order_by('-created_at')[:300]
+    task_ids = sorted({
+        p.get('task_id') for p in [n.payload or {} for n in all_recent]
+        if isinstance(p.get('task_id'), int)
+    })
 
     return render(request, 'notifications/inbox.html', {
         'notifications': notifications,
@@ -159,32 +144,28 @@ def inbox(request):
 @login_required
 @require_POST
 def save_preferences(request):
-    """Save notification preferences for Pro users. Email + webhook per event,
-    shared webhook URL and secret across all events."""
+    """Save notification delivery preferences for Pro users."""
     if not request.user.is_pro:
         return JsonResponse({'ok': False, 'error': 'Pro required'}, status=403)
 
-    webhook_url = request.POST.get('webhook_url', '').strip()
-    webhook_secret = request.POST.get('webhook_secret', '').strip()
+    webhook_url    = (request.POST.get('webhook_url', '') or '').strip()
+    webhook_secret = (request.POST.get('webhook_secret', '') or '').strip()
 
     for event, _ in Notification.Event.choices:
-        email_enabled = request.POST.get(f'email_{event}') == '1'
+        email_enabled   = request.POST.get(f'email_{event}') == '1'
         webhook_enabled = request.POST.get(f'webhook_{event}') == '1'
+        discord_enabled = request.POST.get(f'discord_{event}') == '1'
+
         defaults = {
-            'email_enabled': email_enabled,
-            'webhook_url': webhook_url if webhook_enabled else '',
+            'email_enabled':   email_enabled,
+            'webhook_url':     webhook_url if webhook_enabled else '',
+            'discord_enabled': discord_enabled,
         }
-        # Store secret if model supports it
         if hasattr(NotificationPreference, 'webhook_secret'):
             defaults['webhook_secret'] = webhook_secret if webhook_enabled else ''
-        # Store webhook_enabled flag if model has it
-        if hasattr(NotificationPreference, 'webhook_enabled'):
-            defaults['webhook_enabled'] = webhook_enabled
 
         NotificationPreference.objects.update_or_create(
-            user=request.user,
-            event=event,
-            defaults=defaults,
+            user=request.user, event=event, defaults=defaults,
         )
 
     return JsonResponse({'ok': True})

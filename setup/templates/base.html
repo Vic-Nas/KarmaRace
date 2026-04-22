@@ -34,6 +34,7 @@
   <div class="kr-nav__links">
     {% if user.is_authenticated %}
       <a href="{% url 'my_tasks' %}" class="btn btn-outline-secondary btn-sm">My Tasks</a>
+      <a href="{% url 'leaderboard' %}" class="btn btn-outline-secondary btn-sm">Leaderboard</a>
       <a href="{% url 'linked_accounts' %}" class="btn btn-outline-secondary btn-sm">Accounts</a>
       <a href="{% url 'preferences' %}" class="btn btn-outline-secondary btn-sm">Preferences</a>
       {% if user.is_staff %}
@@ -53,7 +54,7 @@
         <span class="kr-bell__dot" id="notif-dot"></span>
         <span class="kr-bell__count" id="notif-count"></span>
       </button>
-      <span class="kr-nav__username">{{ user.username }}</span>
+      <a href="/u/{{ user.username }}/" class="kr-nav__username">{{ user.username }}</a>
       <a href="{% url 'account_logout' %}" class="btn btn-ghost btn-sm">Log out</a>
     {% else %}
       <a href="{% url 'google_login' %}" class="btn btn-primary btn-sm">Sign in with Google</a>
@@ -131,6 +132,7 @@ window.KR_ADS = {
 {% if user.is_authenticated %}
 <script src="{% static 'js/karma.js' %}"></script>
 <script src="{% static 'js/notifications.js' %}"></script>
+<script src="{% static 'js/notifications-poll.js' %}"></script>
 {% endif %}
 <script src="{% static 'js/ads.js' %}"></script>
 {% block extra_js %}{% endblock %}
