@@ -1,6 +1,5 @@
 /* tasks.css — My Tasks list and Edit/Create form */
 
-/* Task list */
 .mytask-list {
   display: flex;
   flex-direction: column;
@@ -19,12 +18,24 @@
   background: var(--surface);
   border-bottom: 1px solid var(--border);
   transition: background var(--transition);
-  min-width: 0; /* prevent row from growing */
+  min-width: 0;
 }
 .mytask-item:last-child { border-bottom: none; }
 .mytask-item:hover { background: var(--surface-alt); }
+.mytask-item.dragging { opacity: .4; }
+.mytask-item.drag-over { border-top: 2px solid var(--primary); }
 
-/* Left side: never wraps, never expands the row height */
+.mytask__handle {
+  cursor: grab;
+  color: var(--text-muted);
+  padding: 0 .35rem;
+  flex-shrink: 0;
+  -webkit-user-select: none;
+  user-select: none;
+  font-size: 1rem;
+}
+.mytask__handle:active { cursor: grabbing; }
+
 .mytask__left {
   flex: 1 1 0;
   min-width: 0;
@@ -41,6 +52,7 @@
   flex-shrink: 0;
 }
 .mytask__title a { color: var(--accent); }
+.mytask__priority-badge { margin-left: .35rem; }
 .mytask__target {
   font-size: .8rem;
   color: var(--text-muted);
@@ -57,11 +69,10 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  flex-shrink: 2; /* truncates first when space is tight */
+  flex-shrink: 2;
   min-width: 0;
 }
 
-/* Right side: badge + actions, never shrinks or wraps */
 .mytask__right {
   display: flex;
   align-items: center;
@@ -78,38 +89,4 @@
   display: flex;
   align-items: center;
   gap: .35rem;
-}
-.mytask__actions form { margin: 0; }
-
-/* Task edit/create form */
-.task-form-card { max-width: 560px; margin: 0 auto; }
-
-/* Slug indicator */
-.slug-ok  { font-size: .78rem; color: var(--success); margin-top: .25rem; }
-.slug-bad { font-size: .78rem; color: var(--danger);  margin-top: .25rem; }
-
-/* Empty state */
-.empty-state {
-  padding: 3.5rem 0;
-  text-align: center;
-  color: var(--text-muted);
-}
-.empty-state p { font-size: 1rem; }
-
-/* GitHub repo locked row */
-.github-target-info {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: .3rem;
-}
-
-/* Responsive */
-@media (max-width: 640px) {
-  .mytask-item {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: .6rem;
-  }
-  .mytask__right { width: 100%; justify-content: space-between; }
 }

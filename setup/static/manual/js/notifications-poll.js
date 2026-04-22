@@ -7,7 +7,7 @@
       .then(function (data) {
         if (!data || !dropList) return;
         dropList.innerHTML = '';
-        var items = data.notifications || [];
+        var items = (data.notifications || []).slice(0, 3);
         items.forEach(function (n) {
           dropList.appendChild(window._KRNotifUI.buildDropItem(n));
         });

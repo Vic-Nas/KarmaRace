@@ -5,6 +5,7 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'css/tasks.css' %}">
+<link rel="stylesheet" href="{% static 'css/tasks-drag.css' %}">
 {% endblock %}
 
 {% block content %}
@@ -14,9 +15,12 @@
 </div>
 
 {% if tasks %}
-  <div class="mytask-list">
+<p class="small text-muted mb-2">Drag ☰ to reorder. Top task shows first in the feed.</p>
+<div class="mytask-list" id="mytask-list">
   {% for task in tasks %}
-  <div class="mytask-item">
+  <div class="mytask-item" data-id="{{ task.pk }}">
+
+    <span class="mytask__handle" title="Drag to reorder">☰</span>
 
     <div class="mytask__left">
       <div class="mytask__title">
@@ -24,6 +28,9 @@
           <a href="{{ task.target_url }}" target="_blank" rel="noopener noreferrer">{{ task.get_type_display }}</a>
         {% else %}
           {{ task.get_type_display }}
+        {% endif %}
+        {% if task.priority > 0 %}
+          <span class="badge badge-info mytask__priority-badge">Prioritised</span>
         {% endif %}
       </div>
       <div class="mytask__target">{{ task.target_id }}</div>
@@ -55,7 +62,8 @@
             <button type="submit" class="btn btn-secondary btn-sm">Unpublish</button>
           </form>
         {% endif %}
-        <form method="post" action="{% url 'task_delete' task.slug %}" onsubmit="return confirm('Delete this task?')">
+        <form method="post" action="{% url 'task_delete' task.slug %}"
+              onsubmit="return confirm('Delete this task?')">
           {% csrf_token %}
           <button type="submit" class="btn btn-danger btn-sm">Delete</button>
         </form>
@@ -64,11 +72,15 @@
 
   </div>
   {% endfor %}
-  </div>
+</div>
 {% else %}
-  <div class="empty-state">
-    <p>No tasks yet. Create one and start earning karma from testers.</p>
-    <a href="{% url 'task_create' %}" class="btn btn-primary mt-2">Create first task</a>
-  </div>
+<div class="empty-state">
+  <p>No tasks yet. Create one and start earning karma from testers.</p>
+  <a href="{% url 'task_create' %}" class="btn btn-primary mt-2">Create first task</a>
+</div>
 {% endif %}
+{% endblock %}
+
+{% block extra_js %}
+{% if tasks %}<script src="{% static 'js/task-reorder.js' %}"></script>{% endif %}
 {% endblock %}

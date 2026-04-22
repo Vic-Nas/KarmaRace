@@ -1,7 +1,9 @@
-/* profile.css — Public profile and edit profile pages */
+/* profile.css — Public profile page */
 .profile-header {
   display: flex; align-items: center; gap: 1.25rem;
-  padding: 1.5rem 0 1.25rem; border-bottom: 1px solid var(--border); margin-bottom: 1.5rem;
+  padding: 1.5rem 0 1.25rem;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 1.5rem;
   flex-wrap: wrap;
 }
 .profile-header__avatar {
@@ -22,8 +24,10 @@
   display: flex; flex-direction: column; align-items: center; min-width: 100px;
 }
 .profile-stat__value { font-size: 1.6rem; font-weight: 700; color: var(--primary); }
-.profile-stat__label { font-size: .78rem; color: var(--text-muted); text-transform: uppercase;
-  letter-spacing: .05em; margin-top: .2rem; }
+.profile-stat__label {
+  font-size: .78rem; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: .05em; margin-top: .2rem;
+}
 
 .profile-link {
   display: inline-flex; align-items: center; gap: .4rem;
@@ -31,8 +35,10 @@
 }
 .profile-link:hover { color: var(--primary); text-decoration: none; }
 
-/* Edit profile */
 .edit-profile-grid {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: .75rem;
 }
-.pref-table__row--2col { grid-template-columns: 1fr 80px; }
+
+.profile-edit-cta {
+  padding: 1rem;
+}

@@ -16,7 +16,7 @@
       <div class="btn-group">
         <input type="radio" name="completion" id="c_not"  value="not_completed" {% if completion == 'not_completed' %}checked{% endif %}>
         <label for="c_not">Not done</label>
-        <input type="radio" name="completion" id="c_done" value="completed"     {% if completion == 'completed' %}checked{% endif %}>
+        <input type="radio" name="completion" id="c_done" value="completed" {% if completion == 'completed' %}checked{% endif %}>
         <label for="c_done">Done</label>
       </div>
     </div>
@@ -25,7 +25,7 @@
       <div class="btn-group">
         <input type="radio" name="archive" id="a_not"  value="not_archived" {% if archive == 'not_archived' %}checked{% endif %}>
         <label for="a_not">Active</label>
-        <input type="radio" name="archive" id="a_arch" value="archived"     {% if archive == 'archived' %}checked{% endif %}>
+        <input type="radio" name="archive" id="a_arch" value="archived" {% if archive == 'archived' %}checked{% endif %}>
         <label for="a_arch">Archived</label>
       </div>
     </div>
@@ -58,9 +58,9 @@
 {% if feed_empty %}
   <div class="feed-empty">
     {% if obligation_mode %}
-      <p>No eligible tasks available to clear your obligations right now. Check back soon.</p>
+      <p>No eligible tasks to clear your obligations right now. Check back soon.</p>
     {% else %}
-      <p>No tasks to test right now. Come back later or <a href="{% url 'task_create' %}">post your own</a>.</p>
+      <p>No tasks to test right now. <a href="{% url 'task_create' %}">Post your own</a>.</p>
     {% endif %}
   </div>
 {% else %}
@@ -72,7 +72,9 @@
         {{ task.get_type_display }}
       {% endif %}
       {% if obligation_mode %}
-        &nbsp;<span class="badge badge-warning">Obligation</span>
+        &nbsp;<span class="badge badge-warning">
+          Obligation{% if obligation_creditor %} — owes {{ obligation_creditor }}{% endif %}
+        </span>
       {% endif %}
     </div>
 
@@ -80,7 +82,9 @@
 
     <div class="task-card__reward">
       Reward: <strong>{{ task_reward }}</strong> karma
-      {% if task.id in completed_task_ids %}&nbsp;<span class="badge badge-success">Completed</span>{% endif %}
+      {% if task.id in completed_task_ids %}
+        &nbsp;<span class="badge badge-success">Completed</span>
+      {% endif %}
     </div>
 
     {% if webhook_stats %}
@@ -90,33 +94,38 @@
     </p>
     {% endif %}
 
-    <p class="small text-muted mt-1">by <a href="/u/{{ task.owner.username }}/">{{ task.owner.username }}</a></p>
+    <p class="small text-muted mt-1">
+      by <a href="/u/{{ task.owner.username }}/">{{ task.owner.username }}</a>
+    </p>
 
-    <div class="alert alert-info" id="check-loading-banner"{% if not checking_task_id %} style="display:none"{% endif %}>
+    <div class="alert alert-info" id="check-loading-banner"
+         {% if not checking_task_id %} style="display:none"{% endif %}>
       {% if checking_task_id %}Verification in progress &mdash; this card will refresh automatically&hellip;{% endif %}
     </div>
 
     <div class="card__actions">
       <form method="post" action="{% url 'feed_check' task.id %}" id="feed-check-form">
         {% csrf_token %}
-        <input type="hidden" name="completion"  value="{{ completion }}">
-        <input type="hidden" name="archive"     value="{{ archive }}">
-        <input type="hidden" name="task_types"  value="{{ selected_task_types_csv }}">
+        <input type="hidden" name="completion" value="{{ completion }}">
+        <input type="hidden" name="archive"    value="{{ archive }}">
+        <input type="hidden" name="task_types" value="{{ selected_task_types_csv }}">
         <button type="submit" class="btn btn-primary">Check</button>
       </form>
       <form method="post" action="{% url 'feed_done' task.id %}">
         {% csrf_token %}
-        <input type="hidden" name="completion"  value="{{ completion }}">
-        <input type="hidden" name="archive"     value="{{ archive }}">
-        <input type="hidden" name="task_types"  value="{{ selected_task_types_csv }}">
-        <button type="submit" class="btn btn-secondary" {% if obligation_mode %}disabled{% endif %}>Archive</button>
+        <input type="hidden" name="completion" value="{{ completion }}">
+        <input type="hidden" name="archive"    value="{{ archive }}">
+        <input type="hidden" name="task_types" value="{{ selected_task_types_csv }}">
+        <button type="submit" class="btn btn-secondary"
+                {% if obligation_mode %}disabled{% endif %}>Archive</button>
       </form>
     </div>
 
     {% if request.user.is_authenticated and request.user.id == task.owner_id %}
     <div class="card__actions">
       <a href="{% url 'task_edit' task.slug %}" class="btn btn-secondary btn-sm">Edit</a>
-      <form method="post" action="{% url 'task_delete' task.slug %}" onsubmit="return confirm('Delete this task?')">
+      <form method="post" action="{% url 'task_delete' task.slug %}"
+            onsubmit="return confirm('Delete this task?')">
         {% csrf_token %}
         <button type="submit" class="btn btn-danger btn-sm">Delete</button>
       </form>

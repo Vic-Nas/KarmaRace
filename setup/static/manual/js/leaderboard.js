@@ -29,7 +29,7 @@
 
     var karma = document.createElement('span');
     karma.className = 'lb-row__karma';
-    karma.textContent = '\u2635 ' + row.karma;
+    karma.textContent = '\u262F ' + row.karma;
 
     a.appendChild(rank);
     a.appendChild(username);
