@@ -1,0 +1,52 @@
+/* feed.css — Feed filters, type chips, karma animations */
+.feed-filters {
+  background: var(--surface); border: 1.5px solid var(--border);
+  border-radius: var(--radius); padding: .9rem 1.1rem;
+  margin-bottom: 1.2rem; box-shadow: var(--shadow-sm);
+}
+.filter-row { display: flex; align-items: center; flex-wrap: wrap; gap: .7rem; }
+.filter-row--top { margin-bottom: .7rem; }
+.filter-row--types { padding-top: .7rem; border-top: 1px solid var(--border); }
+.filter-row__title { font-size: .76rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--primary); flex-shrink: 0; }
+.filter-group { display: flex; align-items: center; gap: .4rem; }
+.filter-group > label { font-size: .76rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted); white-space: nowrap; }
+.filter-group--apply { margin-left: auto; }
+
+/* Radio toggle group */
+.btn-group { display: flex; border: 1.5px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
+.btn-group input[type="radio"] { display: none; }
+.btn-group label {
+  padding: .26rem .65rem; font-size: .78rem; font-weight: 600;
+  font-family: var(--font-body); color: var(--text-muted); background: var(--surface);
+  cursor: pointer; border: none; line-height: 1.5;
+  transition: background var(--transition), color var(--transition);
+}
+.btn-group label:not(:last-of-type) { border-right: 1px solid var(--border); }
+.btn-group input[type="radio"]:checked + label { background: var(--primary); color: #fff; }
+
+/* Type chips */
+.type-chip-group { display: flex; flex-wrap: wrap; gap: .35rem; }
+.type-chip-input { display: none; }
+.type-chip {
+  display: inline-block; padding: .18rem .6rem;
+  font-size: .76rem; font-weight: 600; font-family: var(--font-body);
+  border: 1.5px solid var(--border); border-radius: 99px;
+  cursor: pointer; color: var(--text-muted); background: var(--surface);
+  transition: all var(--transition);
+}
+.type-chip-input:checked + .type-chip { background: var(--primary); color: #fff; border-color: var(--primary); }
+.type-chip:hover { border-color: var(--primary); color: var(--primary); }
+
+/* Karma float animation */
+.karma-float {
+  position: fixed; font-family: var(--font-body); font-weight: 700; font-size: 1.2rem;
+  pointer-events: none; z-index: 9999; animation: floatUp 1.4s ease forwards;
+}
+.karma-float--gain { color: var(--success); }
+.karma-float--loss { color: var(--danger); }
+@keyframes floatUp { 0% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-3rem); } }
+.karma-pulse { animation: karmaPulse .45s ease; }
+@keyframes karmaPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.3); } }
+
+.feed-empty { padding: 3rem 0; text-align: center; color: var(--text-muted); }
+.feed-empty p { font-size: 1rem; }

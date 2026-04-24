@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% load static %}
+{% load notif_tags %}
+
+{% block title %}Preferences — KarmaRace{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/toggles.css' %}">
+<link rel="stylesheet" href="{% static 'css/prefs.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Preferences</h1>
+</div>
+
+<div class="card mb-3">
+  <h3>Karma Thresholds</h3>
+  <p class="small text-muted mt-1 mb-2">Control your personal low/high karma notification bands.</p>
+
+  <form method="post" id="prefs-form">
+    {% csrf_token %}
+
+    <div class="prefs-threshold-grid">
+      <div class="form-group mb-0">
+        <label for="karma-low-threshold">Low Threshold</label>
+        <input id="karma-low-threshold" type="number" min="0"
+               name="karma_low_threshold" value="{{ low_threshold }}" required>
+      </div>
+      <div class="form-group mb-0">
+        <label for="karma-high-threshold">High Threshold</label>
+        <input id="karma-high-threshold" type="number" min="0"
+               name="karma_high_threshold" value="{{ high_threshold }}" required>
+      </div>
+    </div>
+
+    <hr>
+    <h3>Delivery Preferences</h3>
+
+    {% if user.is_pro %}
+    <p class="small text-muted mt-1 mb-2">
+      Configure webhook and Discord delivery per event.
+      Webhook URL and secret are shared across all webhook-enabled events.
+      {% if not has_discord %}
+        <a href="{% url 'discord_entry' %}">Link Discord</a> to enable Discord notifications.
+      {% endif %}
+    </p>
+
+    <div class="pref-webhook-global">
+      <div class="form-group mb-2">
+        <label for="webhook-url">Webhook URL</label>
+        <input type="url" name="webhook_url" id="webhook-url"
+               placeholder="https://your-server.com/hook" value="{{ webhook_url }}">
+      </div>
+      <div class="form-group mb-0">
+        <label for="webhook-secret">
+          Webhook Secret
+          <span class="form-text" style="display:inline;text-transform:none;letter-spacing:0">(optional)</span>
+        </label>
+        <input type="text" name="webhook_secret" id="webhook-secret"
+               placeholder="your-secret" value="{{ webhook_secret }}">
+      </div>
+    </div>
+
+    <div class="pref-table pref-table--3col mt-2">
+      <div class="pref-table__head">
+        <span>Event</span><span>Webhook</span><span>Discord</span>
+      </div>
+      {% for event_key, event_label in all_events %}
+      {% with pref=prefs|get_item:event_key %}
+      <div class="pref-table__row">
+        <span class="pref-table__label">{{ event_label }}</span>
+        <label class="toggle">
+          <input type="checkbox" name="webhook_{{ event_key }}" value="1"
+                 {% if pref and pref.webhook_url %}checked{% endif %}>
+          <span class="toggle__track"><span class="toggle__thumb"></span></span>
+        </label>
+        <label class="toggle {% if not has_discord %}toggle--locked{% endif %}"
+               {% if not has_discord %}title="Link Discord to enable"{% endif %}>
+          <input type="checkbox" name="discord_{{ event_key }}" value="1"
+                 {% if not has_discord %}disabled{% endif %}
+                 {% if pref and pref.discord_enabled %}checked{% endif %}>
+          <span class="toggle__track"><span class="toggle__thumb"></span></span>
+        </label>
+      </div>
+      {% endwith %}
+      {% endfor %}
+    </div>
+
+    {% else %}
+    <p class="small text-muted mt-1 mb-2">
+      <a href="{% url 'billing_plan' %}">Upgrade to Pro</a> to enable webhook and Discord delivery.
+    </p>
+    <div class="pref-table pref-table--3col">
+      <div class="pref-table__head">
+        <span>Event</span><span>Webhook</span><span>Discord</span>
+      </div>
+      {% for event_key, event_label in all_events %}
+      <div class="pref-table__row pref-table__row--locked">
+        <span class="pref-table__label">{{ event_label }}</span>
+        {% for _ in "12" %}
+        <label class="toggle toggle--locked" title="Pro feature">
+          <input type="checkbox" disabled>
+          <span class="toggle__track"><span class="toggle__thumb"></span></span>
+        </label>
+        {% endfor %}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="mt-2">
+      <button type="submit" class="btn btn-primary btn-sm">Save preferences</button>
+      <span id="prefs-saved">Saved!</span>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/notifications-prefs.js' %}"></script>
+{% endblock %}

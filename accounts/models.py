@@ -8,12 +8,9 @@ class User(AbstractUser):
 
 
 class LinkedAccount(models.Model):
-    GITHUB      = 'github'
-    PRODUCTHUNT = 'producthunt'
-    PLATFORM_CHOICES = [
-        (GITHUB,      'GitHub'),
-        (PRODUCTHUNT, 'Product Hunt'),
-    ]
+    GITHUB   = 'github'
+    DISCORD  = 'discord'
+    PLATFORM_CHOICES = [(GITHUB, 'GitHub'), (DISCORD, 'Discord')]
 
     user              = models.ForeignKey(User, on_delete=models.CASCADE, related_name='linked_accounts')
     platform          = models.CharField(max_length=50, choices=PLATFORM_CHOICES)
@@ -24,11 +21,6 @@ class LinkedAccount(models.Model):
 
     class Meta:
         unique_together = [('user', 'platform'), ('platform', 'platform_id')]
-
-    # NOTE: WebhookSubscription and WebhookDelivery have been moved to the
-    # notifications app as NotificationPreference and NotificationDelivery.
-    # Remove the migration for those models from accounts once the notifications
-    # app migration is confirmed live.
 
 
 class UserPreference(models.Model):
@@ -45,3 +37,42 @@ class UserPreference(models.Model):
 
     def __str__(self):
         return f'{self.user_id} / {self.key} = {self.value}'
+
+
+class UserProfile(models.Model):
+    """Public-facing profile info. One row per user, created on demand."""
+    user          = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
+    first_name    = models.CharField(max_length=100, blank=True)
+    last_name     = models.CharField(max_length=100, blank=True)
+    contact_email = models.EmailField(blank=True)
+
+    # Visibility flags — True means the field is shown publicly.
+    show_first_name    = models.BooleanField(default=True)
+    show_last_name     = models.BooleanField(default=False)
+    show_contact_email = models.BooleanField(default=False)
+    show_github        = models.BooleanField(default=True)
+    show_karma         = models.BooleanField(default=True)
+    show_joined        = models.BooleanField(default=True)
+
+    def __str__(self):
+        return f'Profile({self.user_id})'
+
+
+class OutreachRecord(models.Model):
+    """Tracks every email address we have attempted to reach."""
+ 
+    class State(models.TextChoices):
+        PENDING = 'pending', 'Pending'
+        SENT   = 'sent',   'Sent'
+        FAILED = 'failed', 'Failed'
+ 
+    email      = models.EmailField(unique=True)
+    state      = models.CharField(max_length=10, choices=State.choices, default=State.PENDING)
+    created_at = models.DateTimeField(auto_now_add=True)
+ 
+    class Meta:
+        indexes = [models.Index(fields=['state'])]
+ 
+    def __str__(self):
+        return f'{self.email} ({self.state})'
+ 

@@ -1,0 +1,62 @@
+/* prefs.css — Preferences / Feed filter template */
+
+/* ── Section wrapper ── */
+.pref-section {
+  margin-bottom: 1.5rem;
+}
+.pref-section__title {
+  font-size: .72rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .07em; color: var(--text-muted);
+  margin-bottom: .6rem; padding-bottom: .35rem;
+  border-bottom: 1px solid var(--border);
+}
+
+/* ── Visibility toggle table ── */
+.pref-table {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--surface);
+}
+.pref-table__head {
+  display: grid; grid-template-columns: 1fr repeat(var(--cols, 2), 72px);
+  padding: .4rem 1rem;
+  background: var(--surface-alt); border-bottom: 1px solid var(--border);
+  font-size: .7rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .07em; color: var(--primary);
+}
+.pref-table__row {
+  display: grid; grid-template-columns: 1fr repeat(var(--cols, 2), 72px);
+  align-items: center; padding: .5rem 1rem;
+  border-bottom: 1px solid var(--border); background: var(--surface);
+  transition: background var(--transition);
+}
+.pref-table__row:last-child { border-bottom: none; }
+.pref-table__row:hover { background: var(--surface-alt); }
+.pref-table__row--locked { opacity: .45; pointer-events: none; }
+.pref-table__label { font-size: .875rem; color: var(--text); }
+.pref-table__cell { display: flex; align-items: center; justify-content: center; }
+
+/* Column-count helpers */
+.pref-table--2col .pref-table__head,
+.pref-table--2col .pref-table__row { --cols: 1; }
+.pref-table--3col .pref-table__head,
+.pref-table--3col .pref-table__row { --cols: 2; }
+.pref-table--4col .pref-table__head,
+.pref-table--4col .pref-table__row { --cols: 3; }
+
+/* ── Webhook / threshold ── */
+.pref-webhook-global {
+  padding: 1rem 1.1rem; background: var(--surface-alt);
+  border: 1px solid var(--border); border-radius: var(--radius);
+  margin-bottom: 1rem;
+}
+.prefs-threshold-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: .65rem;
+}
+
+/* ── Save feedback ── */
+#prefs-saved {
+  display: none; color: var(--success);
+  font-size: .82rem; font-weight: 600; margin-left: .5rem;
+}

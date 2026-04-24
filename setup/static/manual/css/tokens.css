@@ -1,0 +1,85 @@
+/* tokens.css — Design tokens */
+:root {
+  --font-body: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+  --radius-sm: 6px;
+  --radius:    10px;
+  --radius-lg: 16px;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+  --shadow:    0 4px 12px rgba(0,0,0,.08), 0 2px 4px rgba(0,0,0,.04);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,.10), 0 4px 8px rgba(0,0,0,.06);
+  --transition: .16s ease;
+  /* Footer height — used to pad body so content never hides behind it */
+  --footer-h: 48px;
+}
+
+/* ── LIGHT MODE ── */
+[data-theme="light"] {
+  --bg:            #f8f8f6;
+  --bg-alt:        #f0f0ec;
+  --surface:       #ffffff;
+  --surface-alt:   #f5f5f2;
+  --border:        #e4e4de;
+  --border-strong: #c8c8be;
+  --text:          #1a1a18;
+  --text-muted:    #6b6b60;
+  --text-inv:      #ffffff;
+
+  /* Green accent — used sparingly for brand moments only */
+  --accent:        #d97230;
+  --accent-hover:  #b85e20;
+  --accent-light:  #fdf3ec;
+
+  --karma:         #e07828;
+  --karma-light:   #fef0e3;
+
+  --primary:       #3d8c2e;
+  --primary-hover: #2e6d22;
+  --primary-light: #edf6e8;
+
+  --danger:        #c0392b; --danger-light:  #fdf0f0;
+  --success:       #2d7d22; --success-light: #edf6e8;
+  --warning:       #9a7010; --warning-light: #fdf8e6;
+  --info:          #1a6a96; --info-light:    #e8f4fb;
+
+  --nav-bg:        #1c1c1a;
+  --nav-text:      #f0f0ec;
+  --nav-link:      #a8a89e;
+  --footer-bg:     #1c1c1a;
+  --footer-text:   #a8a89e;
+}
+
+/* ── DARK MODE ── */
+[data-theme="dark"] {
+  --bg:            #111110;
+  --bg-alt:        #1a1a18;
+  --surface:       #1e1e1c;
+  --surface-alt:   #252522;
+  --border:        #303030;
+  --border-strong: #484844;
+  --text:          #e8e8e2;
+  --text-muted:    #888880;
+  --text-inv:      #111110;
+
+  --accent:        #e8883a;
+  --accent-hover:  #f0a060;
+  --accent-light:  #261800;
+
+  --karma:         #f09040;
+  --karma-light:   #2a1800;
+
+  --primary:       #5cb84a;
+  --primary-hover: #78cc64;
+  --primary-light: #1a2816;
+
+  --danger:        #e06060; --danger-light:  #260e0e;
+  --success:       #5cb84a; --success-light: #162012;
+  --warning:       #d4b040; --warning-light: #221c00;
+  --info:          #4aaac8; --info-light:    #0e1e2e;
+
+  --nav-bg:        #0d0d0c;
+  --nav-text:      #e8e8e2;
+  --nav-link:      #686860;
+  --footer-bg:     #0d0d0c;
+  --footer-text:   #686860;
+}

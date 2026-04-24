@@ -1,57 +1,56 @@
 {% extends "base.html" %}
+{% load static %}
+
+{% block title %}Privacy Policy — KarmaRace{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/prose.css' %}">
+{% endblock %}
 
 {% block content %}
-<h1>Privacy Policy</h1>
-<p class="text-muted">Last updated: April 17, 2026</p>
+<div class="kr-prose">
+  <h1>Privacy Policy</h1>
+  <span class="kr-prose__sub">Last updated: April 17, 2026</span>
 
-<p>
-	KarmaRace helps users publish and complete verifiable tasks across external platforms.
-	This policy explains what we collect, why we collect it, and how data is used.
-</p>
+  <p>KarmaRace helps users publish and complete verifiable tasks across external platforms.
+  This policy explains what we collect, why we collect it, and how data is used.</p>
 
-<h2 class="h5 mt-4">What We Collect</h2>
-<ul>
-	<li>Account information (for example: username, email from sign-in provider).</li>
-	<li>Linked provider data needed for verification (for example: GitHub username and OAuth token, Product Hunt identity and token).</li>
-	<li>Task data you create (task type, target, webhook URL, descriptions).</li>
-	<li>Verification and activity data (task checks, completion state, notifications, karma transaction records).</li>
-	<li>Basic operational logs for debugging and security.</li>
-</ul>
+  <h2>What We Collect</h2>
+  <ul>
+    <li>Account information (username, email from sign-in provider).</li>
+    <li>Linked provider data needed for verification (GitHub and Discord identity/token where connected).</li>
+    <li>Task data you create (task type, target, webhook URL, descriptions).</li>
+    <li>Verification and activity data (task checks, completion state, notifications, karma transaction records).</li>
+    <li>Basic operational logs for debugging and security.</li>
+  </ul>
 
-<h2 class="h5 mt-4">How We Use Data</h2>
-<ul>
-	<li>Provide core app features (feed ranking, task verification, karma accounting).</li>
-	<li>Run integrations with external services you connect.</li>
-	<li>Detect abuse, prevent fraud, and improve reliability.</li>
-	<li>Support account recovery, troubleshooting, and auditability.</li>
-</ul>
+  <h2>How We Use Data</h2>
+  <ul>
+    <li>Provide core app features (feed ranking, task verification, karma accounting).</li>
+    <li>Run integrations with external services you connect.</li>
+    <li>Detect abuse, prevent fraud, and improve reliability.</li>
+    <li>Support account recovery, troubleshooting, and auditability.</li>
+  </ul>
 
-<h2 class="h5 mt-4">Provider Tokens</h2>
-<p>
-	OAuth access tokens are stored to perform verification calls on your behalf.
-	You can disconnect linked accounts at any time from Linked Accounts.
-	Disconnecting removes stored linkage used by verification features.
-</p>
+  <h2>Provider Tokens</h2>
+  <p>OAuth access tokens are stored to perform verification calls on your behalf.
+  You can disconnect linked accounts at any time from Linked Accounts.
+  Disconnecting removes stored linkage used by verification features.</p>
 
-<h2 class="h5 mt-4">Data Sharing</h2>
-<p>
-	We do not sell personal data. Data may be shared with infrastructure or provider APIs only when required to operate the service.
-</p>
+  <h2>Data Sharing</h2>
+  <p>We do not sell personal data. Data may be shared with infrastructure or provider APIs only when required to operate the service.</p>
 
-<h2 class="h5 mt-4">Data Retention</h2>
-<p>
-	We retain data for service operation, audit/history needs, and security. Retention periods may vary by data type.
-</p>
+  <h2>Data Retention</h2>
+  <p>We retain data for service operation, audit/history needs, and security. Retention periods may vary by data type.</p>
 
-<h2 class="h5 mt-4">Your Controls</h2>
-<ul>
-	<li>Edit or delete your own tasks.</li>
-	<li>Disconnect linked external accounts.</li>
-	<li>Request account-related support through project channels.</li>
-</ul>
+  <h2>Your Controls</h2>
+  <ul>
+    <li>Edit or delete your own tasks.</li>
+    <li>Disconnect linked external accounts.</li>
+    <li>Request account-related support through project channels.</li>
+  </ul>
 
-<h2 class="h5 mt-4">Contact</h2>
-<p>
-	For privacy questions, use the project contact path listed in the repository.
-</p>
+  <h2>Contact</h2>
+  <p>For privacy questions, use the project contact path listed in the repository.</p>
+</div>
 {% endblock %}

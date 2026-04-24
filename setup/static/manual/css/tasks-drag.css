@@ -1,0 +1,11 @@
+/* tasks-drag.css — Task form and drag helpers */
+.mytask__actions form { margin: 0; }
+
+.task-form-card { max-width: 560px; margin: 0 auto; }
+.slug-ok  { font-size: .78rem; color: var(--success); margin-top: .25rem; }
+.slug-bad { font-size: .78rem; color: var(--danger);  margin-top: .25rem; }
+
+.empty-state { padding: 3.5rem 0; text-align: center; color: var(--text-muted); }
+.empty-state p { font-size: 1rem; }
+
+.github-target-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: .3rem; }

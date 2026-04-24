@@ -1,154 +1,154 @@
-{# /setup/templates/feed/index.html #}
 {% extends "base.html" %}
+{% load static %}
+
+{% block title %}Feed — KarmaRace{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/feed.css' %}">
+{% endblock %}
 
 {% block content %}
 
-<form method="get" class="mb-3 d-grid gap-3">
-  <div>
-    <div class="small text-muted mb-1">Completion</div>
-    <div class="btn-group" role="group" aria-label="Completion filter">
-      <input type="radio" class="btn-check" name="completion" id="completion_not_completed" value="not_completed" {% if completion == 'not_completed' %}checked{% endif %}>
-      <label class="btn btn-outline-primary btn-sm" for="completion_not_completed">Not Completed</label>
-
-      <input type="radio" class="btn-check" name="completion" id="completion_completed" value="completed" {% if completion == 'completed' %}checked{% endif %}>
-      <label class="btn btn-outline-primary btn-sm" for="completion_completed">Completed</label>
-    </div>
-  </div>
-
-  <div>
-    <div class="small text-muted mb-1">Archive</div>
-    <div class="btn-group" role="group" aria-label="Archive filter">
-      <input type="radio" class="btn-check" name="archive" id="archive_not_archived" value="not_archived" {% if archive == 'not_archived' %}checked{% endif %}>
-      <label class="btn btn-outline-secondary btn-sm" for="archive_not_archived">Not Archived</label>
-
-      <input type="radio" class="btn-check" name="archive" id="archive_archived" value="archived" {% if archive == 'archived' %}checked{% endif %}>
-      <label class="btn btn-outline-secondary btn-sm" for="archive_archived">Archived</label>
-    </div>
-  </div>
-
-  <div>
-    <div class="small text-muted mb-1">Task Type</div>
-    <div class="btn-group" role="group" aria-label="Task type filter">
-      <input type="radio" class="btn-check" name="task_family" id="task_family_webhook" value="webhook" {% if task_family == 'webhook' %}checked{% endif %}>
-      <label class="btn btn-outline-dark btn-sm" for="task_family_webhook">Webhook</label>
-
-      <input type="radio" class="btn-check" name="task_family" id="task_family_not_webhook" value="not_webhook" {% if task_family == 'not_webhook' %}checked{% endif %}>
-      <label class="btn btn-outline-dark btn-sm" for="task_family_not_webhook">Not Webhook</label>
-    </div>
-  </div>
-
-  <div>
-    {% if obligation_mode %}
-      <div class="alert alert-warning py-2 mb-0">
-        You have {{ open_obligations_count }} open obligation{{ open_obligations_count|pluralize }}.
-        Feed is locked to tasks that satisfy what you owe.
+<form method="get" class="feed-filters">
+  <div class="filter-row filter-row--top">
+    <div class="filter-group">
+      <label>Completion</label>
+      <div class="btn-group">
+        <input type="radio" name="completion" id="c_not"  value="not_completed" {% if completion == 'not_completed' %}checked{% endif %}>
+        <label for="c_not">Not done</label>
+        <input type="radio" name="completion" id="c_done" value="completed" {% if completion == 'completed' %}checked{% endif %}>
+        <label for="c_done">Done</label>
       </div>
-    {% endif %}
+    </div>
+    <div class="filter-group">
+      <label>Archive</label>
+      <div class="btn-group">
+        <input type="radio" name="archive" id="a_not"  value="not_archived" {% if archive == 'not_archived' %}checked{% endif %}>
+        <label for="a_not">Active</label>
+        <input type="radio" name="archive" id="a_arch" value="archived" {% if archive == 'archived' %}checked{% endif %}>
+        <label for="a_arch">Archived</label>
+      </div>
+    </div>
+    <div class="filter-group filter-group--apply">
+      <button type="submit" class="btn btn-primary btn-sm">Apply</button>
+      <a href="{% url 'feed' %}" class="btn btn-ghost btn-sm">Reset</a>
+    </div>
   </div>
 
-  <div>
-    <button type="submit" class="btn btn-sm btn-primary">Apply Filters</button>
+  <div class="filter-row filter-row--types">
+    <span class="filter-row__title">Type</span>
+    <div class="type-chip-group">
+      {% for type_option in all_task_types %}
+      <input type="checkbox" class="type-chip-input" id="tt_{{ forloop.counter }}"
+             name="task_types" value="{{ type_option.value }}"
+             {% if type_option.value in selected_task_types %}checked{% endif %}>
+      <label class="type-chip" for="tt_{{ forloop.counter }}">{{ type_option.label }}</label>
+      {% endfor %}
+    </div>
   </div>
 </form>
 
+{% if obligation_mode %}
+<div class="alert alert-warning">
+  You have {{ open_obligations_count }} open obligation{{ open_obligations_count|pluralize }}.
+  Feed is locked to tasks that clear your debts first.
+</div>
+{% endif %}
+
 {% if feed_empty %}
-  {% if obligation_mode %}
-    <p>No eligible tasks are currently available to clear your open obligations. Check back later.</p>
-  {% else %}
-    <p>No more tasks to test right now.</p>
-  {% endif %}
-
-{% else %}
-  <h1>
-    {% if task.target_url %}
-      <a href="{{ task.target_url }}" target="_blank" rel="noopener noreferrer">{{ task.get_type_display }}</a>
-    {% else %}
-      {{ task.get_type_display }}
-    {% endif %}
+  <div class="feed-empty">
     {% if obligation_mode %}
-      <span class="badge text-bg-warning ms-2">Obligation</span>
+      <p>No eligible tasks to clear your obligations right now. Check back soon.</p>
+    {% else %}
+      <p>No tasks to test right now. <a href="{% url 'task_create' %}">Post your own</a>.</p>
     {% endif %}
-  </h1>
-  <p>{{ task.description }}</p>
-  <p><strong>Target:</strong> {{ task.target_id }}</p>
-  <p><strong>Reward:</strong> {{ task_reward }} karma {% if task.id in completed_task_ids %}✓{% endif %}</p>
-  {% if webhook_stats %}
-    <p>
-      <strong>Webhook Failure Rate:</strong>
-      {{ webhook_stats.tried_failed }} / ({{ webhook_stats.completed }} + {{ webhook_stats.tried_failed }} + {{ webhook_stats.not_tried }} + epsilon)
-      = {{ webhook_stats.failure_rate|floatformat:2 }}
-    </p>
-  {% endif %}
-  <p class="text-muted">by {{ task.owner.username }}</p>
-
-  {% if checking_task_id %}
-    <div class="alert alert-info py-2" id="check-loading-banner">
-      Checking in progress... this card will refresh when done.
-    </div>
-  {% endif %}
-
-  <div class="d-flex gap-2">
-    <form method="post" action="{% url 'feed_check' task.id %}">
-      {% csrf_token %}
-      <input type="hidden" name="completion" value="{{ completion }}">
-      <input type="hidden" name="archive" value="{{ archive }}">
-      <input type="hidden" name="task_family" value="{{ task_family }}">
-      <button type="submit" class="btn btn-primary">Check</button>
-    </form>
-    <form method="post" action="{% url 'feed_done' task.id %}">
-      {% csrf_token %}
-      <input type="hidden" name="completion" value="{{ completion }}">
-      <input type="hidden" name="archive" value="{{ archive }}">
-      <input type="hidden" name="task_family" value="{{ task_family }}">
-      <button type="submit" class="btn btn-outline-secondary" {% if obligation_mode %}disabled{% endif %}>Archive</button>
-    </form>
   </div>
+{% else %}
+  <div class="card task-card">
+    <div class="task-card__type">
+      {% if task.target_url %}
+        <a href="{{ task.target_url }}" target="_blank" rel="noopener noreferrer">{{ task.get_type_display }}</a>
+      {% else %}
+        {{ task.get_type_display }}
+      {% endif %}
+      {% if obligation_mode %}
+        &nbsp;<span class="badge badge-warning">
+          Obligation{% if obligation_creditor %} — owes {{ obligation_creditor }}{% endif %}
+        </span>
+      {% endif %}
+    </div>
 
-  {% if request.user.is_authenticated and request.user.id == task.owner_id %}
-    <div class="mt-3 d-flex gap-2">
-      <a href="{% url 'task_edit' task.id %}" class="btn btn-outline-secondary btn-sm">Edit</a>
-      <form method="post" action="{% url 'task_delete' task.id %}" onsubmit="return confirm('Delete this task?')">
+    <div class="task-card__desc">{{ task.description }}</div>
+
+    <div class="task-card__reward">
+      Reward: <strong>{{ task_reward }}</strong> karma
+      {% if task.id in completed_task_ids %}
+        &nbsp;<span class="badge badge-success">Completed</span>
+      {% endif %}
+    </div>
+
+    {% if webhook_stats %}
+    <p class="small text-muted mt-1">
+      Webhook failure rate: {{ webhook_stats.failure_rate_percent }}%
+      ({{ webhook_stats.tried_failed }} failed / {{ webhook_stats.completed }} completed)
+    </p>
+    {% endif %}
+
+    <p class="small text-muted mt-1">
+      by <a href="/u/{{ task.owner.username }}/">{{ task.owner.username }}</a>
+    </p>
+
+    <div class="alert alert-info" id="check-loading-banner"
+         {% if not checking_task_id %} style="display:none"{% endif %}>
+      {% if checking_task_id %}Verification in progress &mdash; this card will refresh automatically&hellip;{% endif %}
+    </div>
+
+    <div class="card__actions">
+      <form method="post" action="{% url 'feed_check' task.id %}" id="feed-check-form">
         {% csrf_token %}
-        <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
+        <input type="hidden" name="completion" value="{{ completion }}">
+        <input type="hidden" name="archive"    value="{{ archive }}">
+        <input type="hidden" name="task_types" value="{{ selected_task_types_csv }}">
+        <button type="submit" class="btn btn-primary">Check</button>
+      </form>
+      <form method="post" action="{% url 'feed_done' task.id %}">
+        {% csrf_token %}
+        <input type="hidden" name="completion" value="{{ completion }}">
+        <input type="hidden" name="archive"    value="{{ archive }}">
+        <input type="hidden" name="task_types" value="{{ selected_task_types_csv }}">
+        <button type="submit" class="btn btn-secondary"
+                {% if obligation_mode %}disabled{% endif %}>Archive</button>
       </form>
     </div>
-  {% endif %}
 
+    {% if request.user.is_authenticated and request.user.id == task.owner_id %}
+    <div class="card__actions">
+      <a href="{% url 'task_edit' task.slug %}" class="btn btn-secondary btn-sm">Edit</a>
+      <form method="post" action="{% url 'task_delete' task.slug %}"
+            onsubmit="return confirm('Delete this task?')">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+      </form>
+    </div>
+    {% endif %}
+  </div>
 {% endif %}
 
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/feed-check.js' %}"></script>
+<script src="{% static 'js/feed-check-poll.js' %}"></script>
 {% if checking_task_id %}
-  <script>
-    (function () {
-      const statusUrl = "{% url 'feed_check_status' checking_task_id %}";
-      const pollMs = 1200;
-      const maxMs = 30000;
-      let elapsed = 0;
-
-      const timer = setInterval(async function () {
-        elapsed += pollMs;
-        try {
-          const response = await fetch(statusUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
-          if (!response.ok) {
-            return;
-          }
-          const data = await response.json();
-          if (data.state && data.state !== 'PENDING') {
-            clearInterval(timer);
-            const url = new URL(window.location.href);
-            url.searchParams.delete('checking_task');
-            window.location.href = url.toString();
-            return;
-          }
-        } catch (e) {
-          // Keep trying until timeout.
-        }
-
-        if (elapsed >= maxMs) {
-          clearInterval(timer);
-        }
-      }, pollMs);
-    })();
-  </script>
+<script>FeedCheck.start("{% url 'feed_check_status' checking_task_id %}");</script>
 {% endif %}
-
+{% if task %}
+<script>
+FeedCheck.bindForm(
+  "#feed-check-form",
+  "{% url 'feed_check' task.id %}",
+  "{% url 'feed_check_status' task.id %}"
+);
+</script>
+{% endif %}
 {% endblock %}

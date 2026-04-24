@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Leaderboard — KarmaRace{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/leaderboard.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Leaderboard</h1>
+  <span class="lb-live-dot" title="Live updates"></span>
+</div>
+
+<form method="get" class="lb-search">
+  <input type="text" name="q" id="lb-search-input"
+         value="{{ search }}" placeholder="Search username…">
+  <button type="submit" class="btn btn-primary btn-sm">Search</button>
+  {% if search %}
+  <a href="{% url 'leaderboard' %}" class="btn btn-outline-secondary btn-sm">Clear</a>
+  {% endif %}
+</form>
+
+<div class="lb-table" id="lb-table">
+  {% for row in rows %}
+  <a href="/u/{{ row.username }}/" class="lb-row">
+    <span class="lb-row__rank
+      {% if row.rank == 1 %}lb-row__rank--gold
+      {% elif row.rank == 2 %}lb-row__rank--silver
+      {% elif row.rank == 3 %}lb-row__rank--bronze
+      {% endif %}">#{{ row.rank }}</span>
+    <span class="lb-row__username">{{ row.username }}</span>
+    <span class="lb-row__karma">&#9775; {{ row.karma }}</span>
+  </a>
+  {% empty %}
+  <div class="lb-empty">
+    No results{% if search %} for &ldquo;{{ search }}&rdquo;{% endif %}.
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/leaderboard.js' %}"></script>
+{% endblock %}

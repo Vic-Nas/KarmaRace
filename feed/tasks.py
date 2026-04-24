@@ -1,17 +1,15 @@
 import logging
 
-import procrastinate
+from procrastinate.contrib.django import app
 from django.db import transaction
 
 from karma.models import KarmaTransaction
 from karma.services import credit_karma, debit_karma
-from setup.platform_rules import KARMA_REWARDS_BY_TASK_TYPE
+from tasks.check_feedback import msg
 from tasks.models import Task, TaskCompletion
 from tasks.services import verify_task_with_details, settle_or_create_obligation
 
 logger = logging.getLogger(__name__)
-
-app = procrastinate.App(connector=procrastinate.SyncPsycopgConnector())
 
 
 @app.task
@@ -26,7 +24,7 @@ def process_task_check(task_id: int, tester_id: int):
     completion, _ = TaskCompletion.objects.get_or_create(
         task=task,
         tester_id=tester_id,
-        defaults={'state': TaskCompletion.State.PENDING},
+        defaults={'state': TaskCompletion.State.PENDING, 'result_detail': ''},
     )
 
     if completion.state == TaskCompletion.State.CONFIRMED:
@@ -39,9 +37,10 @@ def process_task_check(task_id: int, tester_id: int):
         if ok:
             if completion.state != TaskCompletion.State.CONFIRMED:
                 completion.state = TaskCompletion.State.CONFIRMED
-                completion.save(update_fields=['state'])
+                completion.result_detail = msg('CHECK_CONFIRMED')
+                completion.save(update_fields=['state', 'result_detail'])
 
-                reward = int(KARMA_REWARDS_BY_TASK_TYPE.get(task.type, 0) or 0)
+                reward = task.karma_reward
                 if reward > 0:
                     credit_karma(
                         user=completion.tester,
@@ -67,12 +66,8 @@ def process_task_check(task_id: int, tester_id: int):
                 logger.info('process_task_check: task %s confirmed for tester %s', task.pk, tester_id)
         else:
             completion.state = TaskCompletion.State.FAILED
-            completion.save(update_fields=['state'])
-            logger.info(
-                'process_task_check: task %s failed for tester %s: %s',
-                task.pk,
-                tester_id,
-                detail,
-            )
+            completion.result_detail = detail or msg('CHECK_FAILED_GENERIC')
+            completion.save(update_fields=['state', 'result_detail'])
+            logger.info('process_task_check: task %s failed for tester %s: %s', task.pk, tester_id, detail)
 
         task.save(update_fields=['tried_count', 'succeed_count'])

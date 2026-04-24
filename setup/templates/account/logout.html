@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% load static %}
+
+{% block title %}Sign Out — KarmaRace{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/accounts.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="auth-center">
+  <h1>Sign Out</h1>
+  <p class="text-muted">Are you sure you want to sign out?</p>
+  <div class="auth-box">
+    <form method="post" action="{% url 'account_logout' %}">
+      {% csrf_token %}
+      {% if redirect_field_value %}
+      <input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}">
+      {% endif %}
+      <button type="submit" class="btn btn-primary">Sign Out</button>
+    </form>
+    <div>
+      <a href="/" class="btn btn-secondary btn-sm">Cancel</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

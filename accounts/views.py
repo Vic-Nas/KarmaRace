@@ -3,13 +3,16 @@ from urllib.parse import urlencode
 
 import requests
 from allauth.socialaccount.models import SocialAccount, SocialToken
-from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.shortcuts import redirect, render
+from django.shortcuts import redirect, render, get_object_or_404
+from django.urls import reverse
 from django.views.decorators.http import require_POST
 
-from accounts.models import LinkedAccount
+from accounts import discord as discord_api
+from accounts.models import LinkedAccount, UserPreference, UserProfile
+from notifications.models import Notification, NotificationPreference
+from setup.platform_rules import KARMA_HIGH_THRESHOLD, KARMA_LOW_THRESHOLD
 
 
 @login_required
@@ -30,34 +33,23 @@ def linked_accounts(request):
 				'access_token': github_token.token if github_token else '',
 			},
 		)
-
-	github = LinkedAccount.objects.filter(user=request.user, platform=LinkedAccount.GITHUB).first()
-	producthunt = LinkedAccount.objects.filter(user=request.user, platform=LinkedAccount.PRODUCTHUNT).first()
-
-	return render(request, 'accounts/linked_accounts.html', {
-		'github': github,
-		'producthunt': producthunt,
-	})
+	github  = LinkedAccount.objects.filter(user=request.user, platform=LinkedAccount.GITHUB).first()
+	discord = LinkedAccount.objects.filter(user=request.user, platform=LinkedAccount.DISCORD).first()
+	return render(request, 'accounts/linked_accounts.html', {'github': github, 'discord': discord})
 
 
 @login_required
 def connect_account(request, platform):
 	if platform == LinkedAccount.GITHUB:
 		return redirect('/accounts/github/login/?process=connect&next=/app/accounts/linked-accounts/')
-
-	if platform == LinkedAccount.PRODUCTHUNT:
+	if platform == LinkedAccount.DISCORD:
+		if not discord_api.is_configured():
+			messages.error(request, 'Discord integration is not configured.')
+			return redirect('linked_accounts')
 		state = secrets.token_urlsafe(24)
-		request.session['ph_oauth_state'] = state
-		redirect_uri = request.build_absolute_uri('/app/accounts/producthunt/callback/')
-
-		params = urlencode({
-			'client_id': settings.PH_CLIENT_ID,
-			'redirect_uri': redirect_uri,
-			'response_type': 'code',
-			'state': state,
-		})
-		return redirect(f'https://api.producthunt.com/v2/oauth/authorize?{params}')
-
+		request.session['discord_oauth_state'] = state
+		redirect_uri = request.build_absolute_uri('/app/accounts/discord/callback/')
+		return redirect(discord_api.authorize_url(redirect_uri=redirect_uri, state=state))
 	messages.error(request, 'Unknown platform.')
 	return redirect('linked_accounts')
 
@@ -67,87 +59,197 @@ def github_connect(request):
 	return connect_account(request, LinkedAccount.GITHUB)
 
 
-@login_required
-def producthunt_connect(request):
-	return connect_account(request, LinkedAccount.PRODUCTHUNT)
+def _redirect_login_with_next(request):
+	params = urlencode({'process': 'login', 'next': request.get_full_path()})
+	return redirect(f"{reverse('google_login')}?{params}")
 
 
-@login_required
-def producthunt_callback(request):
-	expected_state = request.session.pop('ph_oauth_state', None)
-	state = request.GET.get('state')
-	code = request.GET.get('code')
-
-	if not expected_state or state != expected_state:
-		messages.error(request, 'Product Hunt OAuth state mismatch.')
-		return redirect('linked_accounts')
-
-	if not code:
-		messages.error(request, 'Product Hunt OAuth did not return an authorization code.')
-		return redirect('linked_accounts')
-
-	redirect_uri = request.build_absolute_uri('/app/accounts/producthunt/callback/')
+def _sync_discord_membership(request, linked):
 	try:
-		token_resp = requests.post(
-			'https://api.producthunt.com/v2/oauth/token',
-			data={
-				'grant_type': 'authorization_code',
-				'client_id': settings.PH_CLIENT_ID,
-				'client_secret': settings.PH_CLIENT_SECRET,
-				'redirect_uri': redirect_uri,
-				'code': code,
-			},
-			timeout=15,
-		)
-		token_resp.raise_for_status()
-		token_data = token_resp.json()
-		access_token = token_data.get('access_token', '')
-		if not access_token:
-			messages.error(request, 'Product Hunt OAuth token response was missing access_token.')
-			return redirect('linked_accounts')
+		if discord_api.is_member(linked.platform_id):
+			discord_api.sync_nickname(linked.platform_id, request.user.username)
+			discord_api.ensure_role(linked.platform_id)
+			return True
+	except requests.RequestException:
+		messages.warning(request, 'Could not verify Discord membership right now. Please try again.')
+		return None
+	linked.delete()
+	messages.info(request, 'Discord link expired. Please reconnect.')
+	return False
 
-		profile_resp = requests.post(
-			'https://api.producthunt.com/v2/api/graphql',
-			json={'query': 'query { viewer { id username } }'},
-			headers={
-				'Authorization': f'Bearer {access_token}',
-				'Content-Type': 'application/json',
-			},
-			timeout=15,
-		)
-		profile_resp.raise_for_status()
-		viewer = profile_resp.json().get('data', {}).get('viewer') or {}
 
-		platform_id = str(viewer.get('id') or f'producthunt-{request.user.pk}')
-		username = (viewer.get('username') or '').strip()
+def discord_entry(request):
+	if not request.user.is_authenticated:
+		return _redirect_login_with_next(request)
+	linked = LinkedAccount.objects.filter(user=request.user, platform=LinkedAccount.DISCORD).first()
+	if linked:
+		result = _sync_discord_membership(request, linked)
+		if result is True:
+			return redirect(discord_api.guild_jump_url())
+		if result is False:
+			return connect_account(request, LinkedAccount.DISCORD)
+		return redirect('linked_accounts')
+	return connect_account(request, LinkedAccount.DISCORD)
 
+
+def discord_callback(request):
+	if not request.user.is_authenticated:
+		return _redirect_login_with_next(request)
+	code  = request.GET.get('code', '').strip()
+	state = request.GET.get('state', '').strip()
+	if not code or state != request.session.pop('discord_oauth_state', ''):
+		messages.error(request, 'Discord OAuth failed: invalid state or missing code.')
+		return redirect('linked_accounts')
+	try:
+		redirect_uri  = request.build_absolute_uri('/app/accounts/discord/callback/')
+		access_token  = discord_api.exchange_code_for_token(code, redirect_uri)
+		identity      = discord_api.fetch_identity(access_token)
+		discord_api.ensure_guild_membership(identity.user_id, access_token, request.user.username)
+		discord_api.ensure_role(identity.user_id)
 		LinkedAccount.objects.update_or_create(
-			user=request.user,
-			platform=LinkedAccount.PRODUCTHUNT,
-			defaults={
-				'platform_id': platform_id,
-				'platform_username': username,
-				'access_token': access_token,
-			},
+			user=request.user, platform=LinkedAccount.DISCORD,
+			defaults={'platform_id': identity.user_id, 'platform_username': identity.username},
 		)
-		messages.success(request, 'Product Hunt account linked successfully.')
-	except requests.RequestException as exc:
-		messages.error(request, f'Product Hunt OAuth failed: {exc}')
-
+		messages.success(request, 'Discord account linked.')
+	except Exception as exc:
+		messages.error(request, f'Discord linking failed: {exc}')
 	return redirect('linked_accounts')
 
 
 @login_required
 @require_POST
 def unlink_account(request, platform):
-	if platform not in {LinkedAccount.GITHUB, LinkedAccount.PRODUCTHUNT}:
+	if platform not in {LinkedAccount.GITHUB, LinkedAccount.DISCORD}:
 		messages.error(request, 'Unknown platform.')
 		return redirect('linked_accounts')
-
 	if platform == LinkedAccount.GITHUB:
 		SocialAccount.objects.filter(user=request.user, provider='github').delete()
-
 	LinkedAccount.objects.filter(user=request.user, platform=platform).delete()
 	messages.success(request, f'{platform.title()} account disconnected.')
 	return redirect('linked_accounts')
 
+
+@login_required
+def preferences(request):
+	if request.method == 'POST':
+		try:
+			low_value  = int((request.POST.get('karma_low_threshold')  or '').strip())
+			high_value = int((request.POST.get('karma_high_threshold') or '').strip())
+			if low_value < 0 or high_value < 0:
+				raise ValueError('Thresholds must be non-negative.')
+			if high_value <= low_value:
+				raise ValueError('High threshold must be greater than low threshold.')
+		except ValueError as exc:
+			messages.error(request, str(exc))
+			return redirect('preferences')
+
+		UserPreference.objects.update_or_create(
+			user=request.user, key='karma_low_threshold',  defaults={'value': str(low_value)},
+		)
+		UserPreference.objects.update_or_create(
+			user=request.user, key='karma_high_threshold', defaults={'value': str(high_value)},
+		)
+
+		if request.user.is_pro:
+			webhook_url    = (request.POST.get('webhook_url')    or '').strip()
+			webhook_secret = (request.POST.get('webhook_secret') or '').strip()
+			for event, _ in Notification.Event.choices:
+				webhook_on = request.POST.get(f'webhook_{event}') == '1'
+				discord_on = request.POST.get(f'discord_{event}') == '1'
+				defaults   = {
+					'webhook_url':     webhook_url if webhook_on else '',
+					'discord_enabled': discord_on,
+				}
+				if hasattr(NotificationPreference, 'webhook_secret'):
+					defaults['webhook_secret'] = webhook_secret if webhook_on else ''
+				NotificationPreference.objects.update_or_create(
+					user=request.user, event=event, defaults=defaults,
+				)
+
+		messages.success(request, 'Preferences saved.')
+		return redirect('preferences')
+
+	prefs = {}
+	webhook_url = webhook_secret = ''
+	if request.user.is_pro:
+		for pref in NotificationPreference.objects.filter(user=request.user):
+			prefs[pref.event] = pref
+			if not webhook_url and pref.webhook_url:
+				webhook_url = pref.webhook_url
+			if not webhook_secret and getattr(pref, 'webhook_secret', ''):
+				webhook_secret = pref.webhook_secret
+
+	low_pref  = UserPreference.objects.filter(user=request.user, key='karma_low_threshold').first()
+	high_pref = UserPreference.objects.filter(user=request.user, key='karma_high_threshold').first()
+	has_discord = LinkedAccount.objects.filter(user=request.user, platform=LinkedAccount.DISCORD).exists()
+
+	return render(request, 'accounts/preferences.html', {
+		'prefs':         prefs,
+		'webhook_url':   webhook_url,
+		'webhook_secret': webhook_secret,
+		'all_events':    Notification.Event.choices,
+		'low_threshold':  low_pref.value  if low_pref  else str(KARMA_LOW_THRESHOLD),
+		'high_threshold': high_pref.value if high_pref else str(KARMA_HIGH_THRESHOLD),
+		'has_discord':   has_discord,
+	})
+
+
+@login_required
+def edit_profile(request):
+	profile, _ = UserProfile.objects.get_or_create(user=request.user)
+
+	if request.method == 'POST':
+		profile.first_name = (request.POST.get('first_name') or '').strip()[:100]
+		profile.last_name = (request.POST.get('last_name') or '').strip()[:100]
+		profile.contact_email = (request.POST.get('contact_email') or '').strip()[:254]
+		profile.show_first_name = request.POST.get('show_first_name') == '1'
+		profile.show_last_name = request.POST.get('show_last_name') == '1'
+		profile.show_contact_email = request.POST.get('show_contact_email') == '1'
+		profile.show_github = request.POST.get('show_github') == '1'
+		profile.show_karma = request.POST.get('show_karma') == '1'
+		profile.show_joined = request.POST.get('show_joined') == '1'
+		profile.save()
+		messages.success(request, 'Profile saved.')
+		return redirect('edit_profile')
+
+	visibility_fields = [
+		('show_first_name', 'First name', profile.show_first_name),
+		('show_last_name', 'Last name', profile.show_last_name),
+		('show_contact_email', 'Contact email', profile.show_contact_email),
+		('show_github', 'GitHub link', profile.show_github),
+		('show_karma', 'Karma balance', profile.show_karma),
+		('show_joined', 'Member since', profile.show_joined),
+	]
+
+	return render(request, 'accounts/edit_profile.html', {
+		'profile': profile,
+		'visibility_fields': visibility_fields,
+	})
+
+
+def public_profile(request, username):
+	from django.contrib.auth import get_user_model
+	from karma.services import get_balance
+	from tasks.models import Task, TaskCompletion
+
+	User = get_user_model()
+	profile_user = get_object_or_404(User, username=username)
+	profile, _   = UserProfile.objects.get_or_create(user=profile_user)
+	is_own       = request.user.is_authenticated and request.user == profile_user
+
+	karma           = get_balance(profile_user)
+	task_count      = Task.objects.filter(owner=profile_user, is_deleted=False).count()
+	completed_count = TaskCompletion.objects.filter(
+		tester=profile_user, state=TaskCompletion.State.CONFIRMED,
+	).count()
+	github = LinkedAccount.objects.filter(user=profile_user, platform=LinkedAccount.GITHUB).first()
+
+	return render(request, 'accounts/profile.html', {
+		'profile_user':     profile_user,
+		'profile':          profile,
+		'karma':            karma if (profile.show_karma or is_own) else None,
+		'task_count':       task_count,
+		'completed_count':  completed_count,
+		'github':           github if (profile.show_github or is_own) else None,
+		'is_own':           is_own,
+	})

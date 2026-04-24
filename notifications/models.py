@@ -7,6 +7,7 @@ class Notification(models.Model):
     class Event(models.TextChoices):
         TASK_CONFIRMED     = 'TASK_CONFIRMED'
         TASK_HEALTH_FAILED = 'TASK_HEALTH_FAILED'
+        WEBHOOK_CHECK      = 'WEBHOOK_CHECK'
         KARMA_LOW          = 'KARMA_LOW'
         KARMA_RESTORED     = 'KARMA_RESTORED'
         PROJECT_STATE      = 'PROJECT_STATE'
@@ -25,10 +26,10 @@ class Notification(models.Model):
 
 
 class NotificationPreference(models.Model):
-    user          = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='notification_preferences')
-    event         = models.CharField(max_length=30, choices=Notification.Event.choices)
-    email_enabled = models.BooleanField(default=False)
-    webhook_url   = models.URLField(blank=True)
+    user             = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='notification_preferences')
+    event            = models.CharField(max_length=30, choices=Notification.Event.choices)
+    webhook_url      = models.URLField(blank=True)
+    discord_enabled  = models.BooleanField(default=False)
 
     class Meta:
         unique_together = [('user', 'event')]
@@ -36,8 +37,8 @@ class NotificationPreference(models.Model):
 
 class NotificationDelivery(models.Model):
     class Channel(models.TextChoices):
-        EMAIL   = 'EMAIL'
         WEBHOOK = 'WEBHOOK'
+        DISCORD = 'DISCORD'
 
     class State(models.TextChoices):
         SUCCESS = 'SUCCESS'

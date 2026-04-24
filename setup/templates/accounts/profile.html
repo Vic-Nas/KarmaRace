@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ profile_user.username }} — KarmaRace{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/profile.css' %}">
+<link rel="stylesheet" href="{% static 'css/toggles.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="profile-header">
+  <div class="profile-header__avatar">{{ profile_user.username|slice:":1"|upper }}</div>
+  <div class="profile-header__info">
+    <h1 class="profile-header__username">{{ profile_user.username }}</h1>
+    {% if profile.show_first_name and profile.first_name %}
+    <p class="profile-header__name">
+      {{ profile.first_name }}{% if profile.show_last_name and profile.last_name %} {{ profile.last_name }}{% endif %}
+    </p>
+    {% endif %}
+    {% if profile.show_joined %}
+    <p class="text-muted small">Member since {{ profile_user.date_joined|date:"N Y" }}</p>
+    {% endif %}
+  </div>
+</div>
+
+<div class="profile-stats">
+  {% if karma is not None %}
+  <div class="profile-stat">
+    <span class="profile-stat__value">{{ karma }}</span>
+    <span class="profile-stat__label">Karma</span>
+  </div>
+  {% endif %}
+  <div class="profile-stat">
+    <span class="profile-stat__value">{{ task_count }}</span>
+    <span class="profile-stat__label">Tasks published</span>
+  </div>
+  <div class="profile-stat">
+    <span class="profile-stat__value">{{ completed_count }}</span>
+    <span class="profile-stat__label">Tasks completed</span>
+  </div>
+</div>
+
+{% if github and profile.show_github %}
+<div class="card mt-2">
+  <div class="card-header">GitHub</div>
+  <a href="https://github.com/{{ github.platform_username }}" target="_blank"
+     rel="noopener noreferrer" class="profile-link">
+    ⌥ {{ github.platform_username }}
+  </a>
+</div>
+{% endif %}
+
+{% if profile.show_contact_email and profile.contact_email %}
+<div class="card mt-2">
+  <div class="card-header">Contact</div>
+  <a href="mailto:{{ profile.contact_email }}" class="profile-link">{{ profile.contact_email }}</a>
+</div>
+{% endif %}
+
+{% if is_own %}
+<div class="card mt-3">
+  <div class="card-header">Profile Settings</div>
+  <div class="profile-edit-cta">
+    <p class="text-muted mb-2">Edit your public profile details and visibility in the dedicated editor.</p>
+    <a href="{% url 'edit_profile' %}" class="btn btn-primary btn-sm">Edit Profile</a>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

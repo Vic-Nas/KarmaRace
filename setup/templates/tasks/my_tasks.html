@@ -1,53 +1,86 @@
 {% extends "base.html" %}
+{% load static %}
+
+{% block title %}My Tasks — KarmaRace{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/tasks.css' %}">
+<link rel="stylesheet" href="{% static 'css/tasks-drag.css' %}">
+{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <h1 class="mb-0">My Tasks</h1>
-  <a href="{% url 'task_create' %}" class="btn btn-primary">+ New Task</a>
+<div class="page-header">
+  <h1>My Tasks</h1>
+  <a href="{% url 'task_create' %}" class="btn btn-primary btn-sm">+ New Task</a>
 </div>
 
 {% if tasks %}
-  <div class="list-group">
-    {% for task in tasks %}
-      <div class="list-group-item d-flex justify-content-between align-items-start">
-        <div>
-          <div class="fw-semibold">
-            {% if task.target_url %}
-              <a href="{{ task.target_url }}" target="_blank" rel="noopener noreferrer">{{ task.get_type_display }}</a>
-            {% else %}
-              {{ task.get_type_display }}
-            {% endif %}
-          </div>
-          <div class="small text-muted">Target: {{ task.target_id }}</div>
-          <div class="small">{{ task.description }}</div>
-          <span class="badge {% if task.hidden %}bg-secondary{% else %}bg-success{% endif %} mt-2">
-            {% if task.hidden %}Unpublished{% else %}Published{% endif %}
-          </span>
-        </div>
-        <div class="d-flex gap-2">
-          <a href="{% url 'task_edit' task.pk %}" class="btn btn-sm btn-outline-secondary">Edit</a>
+<p class="small text-muted mb-2">Drag ☰ to reorder. Top task shows first in the feed.</p>
+<div class="mytask-list" id="mytask-list">
+  {% for task in tasks %}
+  <div class="mytask-item" data-id="{{ task.pk }}">
 
-          {% if task.hidden %}
-            <form method="post" action="{% url 'task_publish' task.pk %}">
-              {% csrf_token %}
-              <button type="submit" class="btn btn-sm btn-outline-success">Publish</button>
-            </form>
-          {% else %}
-            <form method="post" action="{% url 'task_unpublish' task.pk %}">
-              {% csrf_token %}
-              <button type="submit" class="btn btn-sm btn-outline-warning">Unpublish</button>
-            </form>
-          {% endif %}
+    <span class="mytask__handle" title="Drag to reorder">☰</span>
 
-          <form method="post" action="{% url 'task_delete' task.pk %}" onsubmit="return confirm('Delete this task?')">
-            {% csrf_token %}
-            <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
-          </form>
-        </div>
+    <div class="mytask__left">
+      <div class="mytask__title">
+        {% if task.target_url %}
+          <a href="{{ task.target_url }}" target="_blank" rel="noopener noreferrer">{{ task.get_type_display }}</a>
+        {% else %}
+          {{ task.get_type_display }}
+        {% endif %}
+        {% if task.priority > 0 %}
+          <span class="badge badge-info mytask__priority-badge">Prioritised</span>
+        {% endif %}
       </div>
-    {% endfor %}
+      <div class="mytask__target">{{ task.target_id }}</div>
+      {% if task.description %}<div class="mytask__desc">{{ task.description }}</div>{% endif %}
+    </div>
+
+    <div class="mytask__right">
+      <span class="badge {% if task.hidden %}badge-muted{% else %}badge-success{% endif %}">
+        {% if task.hidden %}Unpublished{% else %}Published{% endif %}
+      </span>
+
+      {% if task.type == 'WEBHOOK' %}
+      <span class="mytask__health">
+        <span class="text-success">{{ task.webhook_health_success_count }}✓</span>
+        <span class="text-danger">{{ task.webhook_health_failure_count }}✗</span>
+      </span>
+      {% endif %}
+
+      <div class="mytask__actions">
+        <a href="{% url 'task_edit' task.slug %}" class="btn btn-secondary btn-sm">Edit</a>
+        {% if task.hidden %}
+          <form method="post" action="{% url 'task_publish' task.slug %}">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-success btn-sm">Publish</button>
+          </form>
+        {% else %}
+          <form method="post" action="{% url 'task_unpublish' task.slug %}">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-secondary btn-sm">Unpublish</button>
+          </form>
+        {% endif %}
+        <form method="post" action="{% url 'task_delete' task.slug %}"
+              onsubmit="return confirm('Delete this task?')">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+        </form>
+      </div>
+    </div>
+
   </div>
+  {% endfor %}
+</div>
 {% else %}
-  <p class="text-muted">You do not have any tasks yet.</p>
+<div class="empty-state">
+  <p>No tasks yet. Create one and start earning karma from testers.</p>
+  <a href="{% url 'task_create' %}" class="btn btn-primary mt-2">Create first task</a>
+</div>
 {% endif %}
+{% endblock %}
+
+{% block extra_js %}
+{% if tasks %}<script src="{% static 'js/task-reorder.js' %}"></script>{% endif %}
 {% endblock %}

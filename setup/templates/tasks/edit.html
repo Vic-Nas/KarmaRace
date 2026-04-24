@@ -1,65 +1,87 @@
 {% extends "base.html" %}
+{% load static %}
+
+{% block title %}{% if is_create %}New Task{% else %}Edit Task{% endif %} — KarmaRace{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/tasks.css' %}">
+{% endblock %}
 
 {% block content %}
-<h1>{% if is_create %}New Task{% else %}Edit Task{% endif %}</h1>
+<div class="page-header">
+  <h1>{% if is_create %}New Task{% else %}Edit Task{% endif %}</h1>
+  <a href="{% url 'my_tasks' %}" class="btn btn-secondary btn-sm">&larr; My Tasks</a>
+</div>
 
-<form method="post">
-  {% csrf_token %}
+<div class="card task-form-card">
+  <form method="post" data-task-id="{% if task %}{{ task.pk }}{% endif %}">
+    {% csrf_token %}
 
-  <div class="mb-3">
-    <label for="id_type" class="form-label">Type</label>
-    {{ form.type }}
-  </div>
+    <div class="form-group">
+      <label for="id_type">Type</label>
+      {{ form.type }}
+    </div>
 
-  <div class="mb-3">
-    <label for="id_target_id" class="form-label">Target</label>
-    {{ form.target_id }}
-    <div class="form-text">GitHub: <code>owner/repo</code> &nbsp;·&nbsp; Product Hunt: post slug &nbsp;·&nbsp; Webhook: full URL</div>
-  </div>
+    <div class="form-group">
+      <label for="id_slug">Slug</label>
+      {{ form.slug }}
+      <div class="form-text">Custom URL slug. Must be unique among your tasks.</div>
+      <div class="small mt-1" id="slug-availability" data-check-url="{% url 'task_slug_available' %}"></div>
+    </div>
 
-  <div class="mb-3" id="webhook-secret-row" style="display:none">
-    <label for="id_webhook_secret" class="form-label">Webhook secret <span class="text-muted">(optional)</span></label>
-    {{ form.webhook_secret }}
-  </div>
+    <div class="form-group" id="target-input-row">
+      <label for="id_target_id">Target</label>
+      {{ form.target_id }}
+      <div class="form-text" id="target-help-text">Webhook: full URL</div>
+    </div>
 
-  <div class="mb-3">
-    <label for="id_description" class="form-label">Instructions for testers</label>
-    {{ form.description }}
-  </div>
+    <div class="form-group" id="github-target-row" style="display:none"
+         data-has-choices="{% if form.github_repo_choices %}1{% else %}0{% endif %}">
+      <div class="github-target-info">
+        <label for="id_github_target_select">GitHub Repository</label>
+        <a class="btn btn-secondary btn-sm"
+           href="{% if is_create %}{% url 'task_create' %}{% else %}{% url 'task_edit' task.slug %}{% endif %}?reload_repos=1">
+          Reload repos
+        </a>
+      </div>
+      <select id="id_github_target_select" class="form-select">
+        <option value="">Select repository</option>
+        {% for value, label in form.github_repo_choices %}
+        <option value="{{ value }}" {% if value == form.github_repo_selected %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <div class="form-text">Only public repos with push access are listed.</div>
+      {% if form.github_repo_load_error %}
+      <div class="alert alert-warning mt-1">{{ form.github_repo_load_error }}</div>
+      {% endif %}
+    </div>
 
-  {% if form.errors %}
+    <div class="form-group" id="webhook-secret-row" style="display:none">
+      <label for="id_webhook_secret">Webhook Secret <span class="form-text" style="display:inline">(optional)</span></label>
+      {{ form.webhook_secret }}
+      <div class="form-text">Sent as Bearer token when KarmaRace calls your webhook.</div>
+    </div>
+
+    <div class="form-group">
+      <label for="id_description">Instructions for testers</label>
+      {{ form.description }}
+    </div>
+
+    {% if form.errors %}
     <div class="alert alert-danger">
       {% for field in form %}{% for e in field.errors %}<div>{{ field.label }}: {{ e }}</div>{% endfor %}{% endfor %}
       {% for e in form.non_field_errors %}<div>{{ e }}</div>{% endfor %}
     </div>
-  {% endif %}
+    {% endif %}
 
-  <button type="submit" class="btn btn-primary">Save Task</button>
-  <a href="{% url 'feed' %}" class="btn btn-outline-secondary">Cancel</a>
-</form>
+    <div class="card__actions">
+      <button type="submit" class="btn btn-primary" id="task-save-btn">Save Task</button>
+      <a href="{% url 'my_tasks' %}" class="btn btn-secondary">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}
 
-<script>
-  const typeSelect = document.getElementById('id_type');
-  const secretRow = document.getElementById('webhook-secret-row');
-  const descriptionInput = document.getElementById('id_description');
-
-  function toggleSecret() {
-    secretRow.style.display = typeSelect.value === 'WEBHOOK' ? '' : 'none';
-  }
-
-  function toggleDescription() {
-    const isWebhook = typeSelect.value === 'WEBHOOK';
-    descriptionInput.disabled = !isWebhook;
-    if (!isWebhook) {
-      descriptionInput.classList.add('bg-light');
-    } else {
-      descriptionInput.classList.remove('bg-light');
-    }
-  }
-
-  typeSelect.addEventListener('change', toggleSecret);
-  typeSelect.addEventListener('change', toggleDescription);
-  toggleSecret();
-  toggleDescription();
-</script>
+{% block extra_js %}
+<script src="{% static 'js/task-edit.js' %}"></script>
 {% endblock %}

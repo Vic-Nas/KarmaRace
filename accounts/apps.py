@@ -26,6 +26,9 @@ class AccountsConfig(AppConfig):
     name = 'accounts'
 
     def ready(self):
+        import accounts.signals  # noqa: F401
+        import accounts.outreach  # noqa: F401
+
         post_migrate.connect(
             ensure_site_config,
             dispatch_uid="accounts.ensure_site_config",

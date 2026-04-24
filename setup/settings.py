@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     'allauth.socialaccount',
     'allauth.socialaccount.providers.google',
     'allauth.socialaccount.providers.github',
+    'allauth.socialaccount.providers.discord',
 
     'feed',
     'karma',
@@ -63,10 +64,17 @@ AUTHENTICATION_BACKENDS = ['allauth.account.auth_backends.AuthenticationBackend'
 ACCOUNT_SIGNUP_FIELDS = []
 SOCIALACCOUNT_ONLY = True
 SOCIALACCOUNT_STORE_TOKENS = True
+SOCIALACCOUNT_LOGIN_ON_GET = True
 
 ACCOUNT_EMAIL_VERIFICATION = 'none'
 LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/'
+
+# Respect reverse-proxy scheme/host (e.g., Tailscale Funnel) so OAuth callbacks
+# are built with https:// when the public edge terminates TLS.
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+USE_X_FORWARDED_HOST = True
+ACCOUNT_DEFAULT_HTTP_PROTOCOL = 'https'
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -93,6 +101,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'accounts.context_processors.navbar_karma',
+                'setup.context_processors.ads',
             ],
         },
     },
@@ -155,6 +164,13 @@ GOOGLE_CLIENT_SECRET = env('GOOGLE_CLIENT_SECRET')
 GITHUB_CLIENT_ID = env('GITHUB_CLIENT_ID', default='')
 GITHUB_CLIENT_SECRET = env('GITHUB_CLIENT_SECRET', default='')
 
+# Discord OAuth + guild sync
+DISCORD_CLIENT_ID = env('DISCORD_CLIENT_ID', default='')
+DISCORD_CLIENT_SECRET = env('DISCORD_CLIENT_SECRET', default='')
+DISCORD_BOT_TOKEN = env('DISCORD_BOT_TOKEN', default='')
+DISCORD_GUILD_ID = env('DISCORD_GUILD_ID', default='')
+DISCORD_ROLE_ID = env('DISCORD_ROLE_ID', default='')
+
 SOCIALACCOUNT_PROVIDERS = {
     'google': {
         'APP': {
@@ -169,6 +185,13 @@ SOCIALACCOUNT_PROVIDERS = {
             'secret': GITHUB_CLIENT_SECRET,
         },
         'SCOPE': ['read:user'],
+    },
+    'discord': {
+        'APP': {
+            'client_id': DISCORD_CLIENT_ID,
+            'secret': DISCORD_CLIENT_SECRET,
+        },
+        'SCOPE': ['identify', 'guilds.join'],
     },
 }
 
@@ -186,13 +209,10 @@ RESEND_API_KEY        = os.environ.get('RESEND_API_KEY')
 RESEND_FROM_EMAIL     = os.environ.get('RESEND_FROM_EMAIL', f'noreply@{DOMAIN}')
 RESEND_WEBHOOK_SECRET = os.environ.get('RESEND_WEBHOOK_SECRET', '')
 
-# PH
-PH_DEV_TOKEN = env('PH_DEV_TOKEN')
-PH_CLIENT_ID = env('PH_CLIENT_ID', default='')
-PH_CLIENT_SECRET = env('PH_CLIENT_SECRET', default='')
-
 # GitHub (server credential for GitHub API calls)
 GITHUB_TOKEN = os.environ.get('GITHUB_TOKEN', '')
+REACH = env.bool('REACH', default=False)
+
 
 # Procrastinate (background jobs — uses the same Postgres DATABASE_URL)
 PROCRASTINATE_CONNECTORS = {

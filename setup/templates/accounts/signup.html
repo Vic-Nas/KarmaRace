@@ -1,10 +1,15 @@
-{# /setup/templates/accounts/signup.html #}
 {% extends "base.html" %}
+{% load static %}
+
+{% block title %}Sign Up — KarmaRace{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/accounts.css' %}">
+{% endblock %}
+
 {% block content %}
-<h2>Sign up</h2>
-<form method="post" style="max-width: 400px">
-  {% csrf_token %}
-  {{ form.as_p }}
-  <button type="submit" class="btn btn-primary mt-2">Create account</button>
-</form>
+<div class="auth-center">
+  <h1>Create Account</h1>
+  {% block inner %}{% endblock %}
+</div>
 {% endblock %}

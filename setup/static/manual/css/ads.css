@@ -1,0 +1,46 @@
+/* ads.css — Ad box containers */
+.ad-box {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  min-height: 150px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: box-shadow var(--transition);
+}
+.ad-box:hover { box-shadow: var(--shadow-sm); }
+.ad-box::before {
+  content: 'Ad';
+  position: absolute; top: 5px; right: 8px;
+  font-size: .6rem; color: var(--border-strong);
+  text-transform: uppercase; letter-spacing: .08em;
+  pointer-events: none;
+  font-family: var(--font-body);
+}
+.ad-box .adsbygoogle { display: block !important; width: 100% !important; height: 100% !important; min-height: 140px; }
+
+.ad-fallback {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: .4rem;
+  padding: 1rem .75rem; width: 100%; height: 100%; min-height: 140px;
+  text-decoration: none !important; color: var(--text); text-align: center;
+  transition: background var(--transition);
+}
+.ad-fallback:hover { background: var(--surface-alt); color: var(--text); }
+.ad-fallback__logo {
+  width: 38px; height: 38px; border-radius: 8px; object-fit: contain;
+  box-shadow: var(--shadow-sm);
+}
+.ad-fallback__name { font-weight: 600; font-size: .85rem; color: var(--text); }
+.ad-fallback__tag  { font-size: .72rem; color: var(--accent); font-style: italic; }
+.ad-fallback__desc { font-size: .7rem; color: var(--text-muted); line-height: 1.4; max-width: 140px; }
+.ad-fallback__cta {
+  margin-top: .25rem;
+  font-size: .7rem; font-weight: 600;
+  color: #fff; background: var(--accent);
+  padding: .18rem .5rem; border-radius: 99px;
+  text-transform: uppercase; letter-spacing: .04em;
+}

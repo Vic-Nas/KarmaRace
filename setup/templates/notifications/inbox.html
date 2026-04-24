@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% load static %}
+{% load notif_tags %}
+
+{% block title %}Notifications — KarmaRace{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/notifications.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Notifications</h1>
+  <div class="d-flex gap-1 align-items-center">
+    <a href="{% url 'preferences' %}" class="btn btn-secondary btn-sm">Preferences</a>
+    {% if notifications %}
+    <form method="post" action="{% url 'notifications_mark_all_read' %}" class="m-0">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-secondary btn-sm">Mark all read</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+<div class="notif-filters">
+  <form method="get" class="d-flex flex-wrap gap-1 align-items-end w-100">
+    <div class="form-group mb-0" style="flex:1 1 200px">
+      <label for="notif-q">Search</label>
+      <input type="text" id="notif-q" name="q" value="{{ search_query }}"
+             placeholder="Summary, event, or payload">
+    </div>
+    <div class="form-group mb-0" style="flex:1 1 160px">
+      <label for="notif-event">Event</label>
+      <select id="notif-event" name="event" class="form-select">
+        <option value="">All events</option>
+        {% for value, label in events %}
+        <option value="{{ value }}" {% if selected_event == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-group mb-0" style="flex:1 1 140px">
+      <label for="notif-task">Task</label>
+      <select id="notif-task" name="task_id" class="form-select">
+        <option value="">All tasks</option>
+        {% for task_id in task_ids %}
+        <option value="{{ task_id }}" {% if selected_task_id == task_id %}selected{% endif %}>Task #{{ task_id }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-group mb-0">
+      <label>&nbsp;</label>
+      <button class="btn btn-primary" type="submit">Apply</button>
+    </div>
+  </form>
+</div>
+
+{% if notifications %}
+<div class="list-group">
+  {% for notif in notifications %}
+  <details class="list-group-item {% if not notif.read_at %}list-group-item-warning{% endif %}">
+    <summary>
+      <div>
+        <div class="small text-muted">{{ notif.get_event_display }}</div>
+        <div>{{ summaries|get_item:notif.pk }}</div>
+      </div>
+      <div class="small text-muted text-nowrap">{{ notif.created_at|timesince }} ago</div>
+    </summary>
+    <div class="mt-2">
+      <div class="small text-muted mb-1">Payload</div>
+      <pre><code>{{ payload_pretty|get_item:notif.pk }}</code></pre>
+      {% if notif.event == 'WEBHOOK_CHECK' and notif.payload.task_id %}
+      <a class="btn btn-outline-primary btn-sm" href="{% url 'feed' %}?task_id={{ notif.payload.task_id }}">Open Task</a>
+      {% endif %}
+    </div>
+  </details>
+  {% endfor %}
+</div>
+{% else %}
+<div class="alert alert-light">
+  No notifications yet. Complete tasks to earn karma and receive updates.
+</div>
+{% endif %}
+{% endblock %}
