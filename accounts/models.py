@@ -56,3 +56,23 @@ class UserProfile(models.Model):
 
     def __str__(self):
         return f'Profile({self.user_id})'
+
+
+class OutreachRecord(models.Model):
+    """Tracks every email address we have attempted to reach."""
+ 
+    class State(models.TextChoices):
+        PENDING = 'pending', 'Pending'
+        SENT   = 'sent',   'Sent'
+        FAILED = 'failed', 'Failed'
+ 
+    email      = models.EmailField(unique=True)
+    state      = models.CharField(max_length=10, choices=State.choices, default=State.PENDING)
+    created_at = models.DateTimeField(auto_now_add=True)
+ 
+    class Meta:
+        indexes = [models.Index(fields=['state'])]
+ 
+    def __str__(self):
+        return f'{self.email} ({self.state})'
+ 

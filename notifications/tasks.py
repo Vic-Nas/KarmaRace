@@ -4,7 +4,7 @@ import requests
 
 from procrastinate.contrib.django import app
 
-from notifications.models import Notification, NotificationPreference, NotificationDelivery
+from notifications.models import NotificationPreference, NotificationDelivery
 
 logger = logging.getLogger(__name__)
 
@@ -79,7 +79,6 @@ def deliver_notification_discord(preference_id: int, payload: dict, attempt: int
     state = NotificationDelivery.State.FAILED
     try:
         from accounts import discord as discord_api
-        from django.conf import settings
 
         label = EVENT_LABELS.get(pref.event, pref.event)
         task_id = payload.get('task_id')
@@ -122,22 +121,4 @@ def deliver_notification_discord(preference_id: int, payload: dict, attempt: int
     NotificationDelivery.objects.create(
         preference=pref, channel=NotificationDelivery.Channel.DISCORD,
         payload=payload, state=state, attempts=attempt,
-    )
-
-
-@app.task
-def notify_task_health_failed(task_id: int):
-    from tasks.models import Task
-    from notifications.services import notify
-
-    try:
-        task = Task.objects.select_related('owner').get(pk=task_id)
-    except Task.DoesNotExist:
-        logger.error('notify_task_health_failed: task %s not found', task_id)
-        return
-
-    notify(
-        user=task.owner,
-        event=Notification.Event.TASK_HEALTH_FAILED,
-        payload={'task_id': task.pk, 'task_type': task.type, 'target_id': task.target_id, 'owner_id': task.owner_id},
     )

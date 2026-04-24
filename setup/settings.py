@@ -211,6 +211,8 @@ RESEND_WEBHOOK_SECRET = os.environ.get('RESEND_WEBHOOK_SECRET', '')
 
 # GitHub (server credential for GitHub API calls)
 GITHUB_TOKEN = os.environ.get('GITHUB_TOKEN', '')
+REACH = env.bool('REACH', default=False)
+
 
 # Procrastinate (background jobs — uses the same Postgres DATABASE_URL)
 PROCRASTINATE_CONNECTORS = {

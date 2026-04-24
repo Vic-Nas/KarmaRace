@@ -27,6 +27,7 @@ class AccountsConfig(AppConfig):
 
     def ready(self):
         import accounts.signals  # noqa: F401
+        import accounts.outreach  # noqa: F401
 
         post_migrate.connect(
             ensure_site_config,
