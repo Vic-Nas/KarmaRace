@@ -39,7 +39,7 @@
 
     {% if user.is_pro %}
     <p class="small text-muted mt-1 mb-2">
-      Configure email, webhook, and Discord delivery per event.
+      Configure webhook and Discord delivery per event.
       Webhook URL and secret are shared across all webhook-enabled events.
       {% if not has_discord %}
         <a href="{% url 'discord_entry' %}">Link Discord</a> to enable Discord notifications.
@@ -62,19 +62,14 @@
       </div>
     </div>
 
-    <div class="pref-table pref-table--4col mt-2">
+    <div class="pref-table pref-table--3col mt-2">
       <div class="pref-table__head">
-        <span>Event</span><span>Email</span><span>Webhook</span><span>Discord</span>
+        <span>Event</span><span>Webhook</span><span>Discord</span>
       </div>
       {% for event_key, event_label in all_events %}
       {% with pref=prefs|get_item:event_key %}
       <div class="pref-table__row">
         <span class="pref-table__label">{{ event_label }}</span>
-        <label class="toggle">
-          <input type="checkbox" name="email_{{ event_key }}" value="1"
-                 {% if pref and pref.email_enabled %}checked{% endif %}>
-          <span class="toggle__track"><span class="toggle__thumb"></span></span>
-        </label>
         <label class="toggle">
           <input type="checkbox" name="webhook_{{ event_key }}" value="1"
                  {% if pref and pref.webhook_url %}checked{% endif %}>
@@ -94,16 +89,16 @@
 
     {% else %}
     <p class="small text-muted mt-1 mb-2">
-      <a href="{% url 'billing_plan' %}">Upgrade to Pro</a> to enable email, webhook, and Discord delivery.
+      <a href="{% url 'billing_plan' %}">Upgrade to Pro</a> to enable webhook and Discord delivery.
     </p>
-    <div class="pref-table pref-table--4col">
+    <div class="pref-table pref-table--3col">
       <div class="pref-table__head">
-        <span>Event</span><span>Email</span><span>Webhook</span><span>Discord</span>
+        <span>Event</span><span>Webhook</span><span>Discord</span>
       </div>
       {% for event_key, event_label in all_events %}
       <div class="pref-table__row pref-table__row--locked">
         <span class="pref-table__label">{{ event_label }}</span>
-        {% for _ in "123" %}
+        {% for _ in "12" %}
         <label class="toggle toggle--locked" title="Pro feature">
           <input type="checkbox" disabled>
           <span class="toggle__track"><span class="toggle__thumb"></span></span>

@@ -31,38 +31,6 @@ def _retry_or_log(task_fn, preference_id, payload, attempt, max_attempts):
 
 
 @app.task
-def deliver_notification_email(preference_id: int, payload: dict, attempt: int = 1, max_attempts: int = 3):
-    from django.conf import settings
-
-    try:
-        pref = NotificationPreference.objects.select_related('user').get(pk=preference_id)
-    except NotificationPreference.DoesNotExist:
-        logger.error('deliver_notification_email: preference %s not found', preference_id)
-        return
-
-    state = NotificationDelivery.State.FAILED
-    try:
-        import resend
-        resend.api_key = settings.RESEND_API_KEY
-        resend.Emails.send({
-            'from':    settings.RESEND_FROM_EMAIL,
-            'to':      pref.user.email,
-            'subject': f'KarmaRace — {pref.event}',
-            'text':    str(payload),
-        })
-        state = NotificationDelivery.State.SUCCESS
-    except Exception as exc:
-        logger.error('deliver_notification_email: attempt %s/%s failed for preference %s: %s',
-                     attempt, max_attempts, preference_id, exc)
-        _retry_or_log(deliver_notification_email, preference_id, payload, attempt, max_attempts)
-
-    NotificationDelivery.objects.create(
-        preference=pref, channel=NotificationDelivery.Channel.EMAIL,
-        payload=payload, state=state, attempts=attempt,
-    )
-
-
-@app.task
 def deliver_notification_webhook(preference_id: int, payload: dict, attempt: int = 1, max_attempts: int = 3):
     try:
         pref = NotificationPreference.objects.get(pk=preference_id)

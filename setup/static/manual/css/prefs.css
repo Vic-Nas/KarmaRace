@@ -40,6 +40,8 @@
 /* Column-count helpers */
 .pref-table--2col .pref-table__head,
 .pref-table--2col .pref-table__row { --cols: 1; }
+.pref-table--3col .pref-table__head,
+.pref-table--3col .pref-table__row { --cols: 2; }
 .pref-table--4col .pref-table__head,
 .pref-table--4col .pref-table__row { --cols: 3; }
 

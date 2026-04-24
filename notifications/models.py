@@ -28,7 +28,6 @@ class Notification(models.Model):
 class NotificationPreference(models.Model):
     user             = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='notification_preferences')
     event            = models.CharField(max_length=30, choices=Notification.Event.choices)
-    email_enabled    = models.BooleanField(default=False)
     webhook_url      = models.URLField(blank=True)
     discord_enabled  = models.BooleanField(default=False)
 
@@ -38,7 +37,6 @@ class NotificationPreference(models.Model):
 
 class NotificationDelivery(models.Model):
     class Channel(models.TextChoices):
-        EMAIL   = 'EMAIL'
         WEBHOOK = 'WEBHOOK'
         DISCORD = 'DISCORD'
 

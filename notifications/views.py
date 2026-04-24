@@ -152,12 +152,10 @@ def save_preferences(request):
     webhook_secret = (request.POST.get('webhook_secret', '') or '').strip()
 
     for event, _ in Notification.Event.choices:
-        email_enabled   = request.POST.get(f'email_{event}') == '1'
         webhook_enabled = request.POST.get(f'webhook_{event}') == '1'
         discord_enabled = request.POST.get(f'discord_{event}') == '1'
 
         defaults = {
-            'email_enabled':   email_enabled,
             'webhook_url':     webhook_url if webhook_enabled else '',
             'discord_enabled': discord_enabled,
         }

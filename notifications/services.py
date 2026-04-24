@@ -11,8 +11,8 @@ def notify(user, event, payload: dict):
     Central notification dispatch.
 
     1. Always writes a Notification row for in-app display.
-    2. If the user is Pro and has a NotificationPreference for this event,
-       dispatches to enabled channels: email, webhook, discord.
+     2. If the user is Pro and has a NotificationPreference for this event,
+         dispatches to enabled channels: webhook, discord.
     """
     notification = Notification.objects.create(user=user, event=event, payload=payload)
 
@@ -23,9 +23,6 @@ def notify(user, event, payload: dict):
         pref = NotificationPreference.objects.get(user=user, event=event)
     except NotificationPreference.DoesNotExist:
         return notification
-
-    if pref.email_enabled:
-        _queue_delivery('email', pref, payload)
 
     if pref.webhook_url:
         _queue_delivery('webhook', pref, payload)
@@ -41,7 +38,6 @@ def _queue_delivery(channel: str, pref, payload: dict):
     from notifications import tasks as notif_tasks
 
     task_fn = {
-        'email':   notif_tasks.deliver_notification_email,
         'webhook': notif_tasks.deliver_notification_webhook,
         'discord': notif_tasks.deliver_notification_discord,
     }.get(channel)

@@ -29,7 +29,7 @@
 
   <div class="kr-help-section">
     <h2>The Feed</h2>
-    <p>The feed shows tasks from other users ranked by owner karma, then task reward, then creation time. You never see your own tasks in the feed.</p>
+    <p>The feed shows tasks from other users ranked by task reward(function of owner karma), then creation time. You never see your own tasks in the feed.</p>
     <p>Use the filters to narrow down by completion status, archive status, or task type (GitHub Star, GitHub Fork, Webhook).</p>
   </div>
 
@@ -66,6 +66,7 @@ Authorization: Bearer {task.webhook_secret}
 
   <div class="kr-help-section">
     <h2>Notification Events</h2>
+    <p>Notification events are always available in-app. Pro users can additionally enable webhook and Discord delivery per event.</p>
     <ul>
       <li><strong>TASK_CONFIRMED</strong> — <code>{"task_id": number, "delta": number}</code></li>
       <li><strong>TASK_HEALTH_FAILED</strong> — <code>{"task_id": number, "task_type": string, "target_id": string}</code></li>
@@ -96,7 +97,7 @@ Authorization: Bearer {task.webhook_secret}
 
   <div class="kr-help-section">
     <h2>Pro Plan</h2>
-    <p>Pro removes ads and unlocks Webhook tasks. See the <a href="{% url 'billing_plan' %}">billing page</a> for details.</p>
+    <p>Pro removes ads, unlocks Webhook tasks, and enables webhook/Discord notification delivery controls. See the <a href="{% url 'billing_plan' %}">billing page</a> for details.</p>
   </div>
 
 </div>
