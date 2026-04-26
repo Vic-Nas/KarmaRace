@@ -10,7 +10,7 @@ from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from accounts import discord as discord_api
-from accounts.models import LinkedAccount, UserPreference, UserProfile
+from accounts.models import LinkedAccount, UserPreference, UserProfile, VerifiedEmail
 from notifications.models import Notification, NotificationPreference
 from setup.platform_rules import KARMA_HIGH_THRESHOLD, KARMA_LOW_THRESHOLD
 
@@ -35,7 +35,15 @@ def linked_accounts(request):
 		)
 	github  = LinkedAccount.objects.filter(user=request.user, platform=LinkedAccount.GITHUB).first()
 	discord = LinkedAccount.objects.filter(user=request.user, platform=LinkedAccount.DISCORD).first()
-	return render(request, 'accounts/linked_accounts.html', {'github': github, 'discord': discord})
+	google_social = SocialAccount.objects.filter(user=request.user, provider='google').first()
+	primary_email = (google_social.extra_data.get('email') or '').strip().lower() if google_social else ''
+	verified_emails = list(request.user.verified_emails.order_by('verified_at'))
+	return render(request, 'accounts/linked_accounts.html', {
+		'github': github,
+		'discord': discord,
+		'verified_emails': verified_emails,
+		'primary_email': primary_email,
+	})
 
 
 @login_required
@@ -52,11 +60,6 @@ def connect_account(request, platform):
 		return redirect(discord_api.authorize_url(redirect_uri=redirect_uri, state=state))
 	messages.error(request, 'Unknown platform.')
 	return redirect('linked_accounts')
-
-
-@login_required
-def github_connect(request):
-	return connect_account(request, LinkedAccount.GITHUB)
 
 
 def _redirect_login_with_next(request):
@@ -127,6 +130,93 @@ def unlink_account(request, platform):
 	LinkedAccount.objects.filter(user=request.user, platform=platform).delete()
 	messages.success(request, f'{platform.title()} account disconnected.')
 	return redirect('linked_accounts')
+
+
+@login_required
+def verify_email_start(request):
+	state = secrets.token_urlsafe(24)
+	request.session['email_verify_state'] = state
+	redirect_uri = request.build_absolute_uri(reverse('verify_email_callback'))
+	params = urlencode({
+		'client_id': _google_client_id(),
+		'redirect_uri': redirect_uri,
+		'response_type': 'code',
+		'scope': 'email',
+		'state': state,
+		'access_type': 'online',
+		'prompt': 'select_account',
+	})
+	return redirect(f'https://accounts.google.com/o/oauth2/v2/auth?{params}')
+
+
+@login_required
+def verify_email_callback(request):
+	code  = request.GET.get('code', '').strip()
+	state = request.GET.get('state', '').strip()
+	if not code or state != request.session.pop('email_verify_state', ''):
+		messages.error(request, 'Email verification failed: invalid state or missing code.')
+		return redirect('linked_accounts')
+	try:
+		redirect_uri = request.build_absolute_uri(reverse('verify_email_callback'))
+		email = _exchange_google_code_for_email(code, redirect_uri)
+	except Exception as exc:
+		messages.error(request, f'Email verification failed: {exc}')
+		return redirect('linked_accounts')
+	if not email:
+		messages.error(request, 'Could not retrieve email from Google.')
+		return redirect('linked_accounts')
+	existing = VerifiedEmail.objects.filter(email=email).exclude(user=request.user).first()
+	if existing:
+		messages.error(request, f'{email} is already linked to another account.')
+		return redirect('linked_accounts')
+	_, created = VerifiedEmail.objects.get_or_create(user=request.user, email=email)
+	if created:
+		messages.success(request, f'{email} verified and added.')
+	else:
+		messages.info(request, f'{email} is already on your account.')
+	return redirect('linked_accounts')
+
+
+@login_required
+@require_POST
+def remove_verified_email(request, email_id):
+	ve = get_object_or_404(VerifiedEmail, pk=email_id, user=request.user)
+	google_social = SocialAccount.objects.filter(user=request.user, provider='google').first()
+	primary_email = (google_social.extra_data.get('email') or '').strip().lower() if google_social else ''
+	if ve.email.lower() == primary_email:
+		messages.error(request, 'Cannot remove your primary Google login email.')
+		return redirect('linked_accounts')
+	ve.delete()
+	messages.success(request, f'{ve.email} removed.')
+	return redirect('linked_accounts')
+
+
+def _google_client_id():
+	from django.conf import settings
+	return settings.SOCIALACCOUNT_PROVIDERS['google']['APP']['client_id']
+
+
+def _exchange_google_code_for_email(code, redirect_uri):
+	from django.conf import settings
+	google_cfg = settings.SOCIALACCOUNT_PROVIDERS['google']['APP']
+	token_resp = requests.post('https://oauth2.googleapis.com/token', data={
+		'code': code,
+		'client_id': google_cfg['client_id'],
+		'client_secret': google_cfg['secret'],
+		'redirect_uri': redirect_uri,
+		'grant_type': 'authorization_code',
+	}, timeout=10)
+	token_resp.raise_for_status()
+	access_token = token_resp.json().get('access_token', '')
+	if not access_token:
+		raise ValueError('No access token returned by Google.')
+	info_resp = requests.get(
+		'https://www.googleapis.com/oauth2/v3/userinfo',
+		headers={'Authorization': f'Bearer {access_token}'},
+		timeout=10,
+	)
+	info_resp.raise_for_status()
+	return (info_resp.json().get('email') or '').strip().lower()
 
 
 @login_required

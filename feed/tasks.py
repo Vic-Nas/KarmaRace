@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 @app.task
-def process_task_check(task_id: int, tester_id: int):
+def process_task_check(task_id: int, tester_id: int, google_email: str = ''):
     """Background verification for a queued task check."""
     try:
         task = Task.objects.select_related('owner').get(pk=task_id, is_deleted=False, hidden=False)
@@ -33,7 +33,7 @@ def process_task_check(task_id: int, tester_id: int):
     with transaction.atomic():
         task.tried_count += 1
 
-        ok, detail = verify_task_with_details(task, completion.tester)
+        ok, detail = verify_task_with_details(task, completion.tester, google_email=google_email)
         if ok:
             if completion.state != TaskCompletion.State.CONFIRMED:
                 completion.state = TaskCompletion.State.CONFIRMED

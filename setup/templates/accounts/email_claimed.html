@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+
+{% block title %}Email Already Linked — KarmaRace{% endblock %}
+
+{% block content %}
+<div class="auth-center">
+  <h1>Email Already Linked</h1>
+  <p>The Google account <strong>{{ email }}</strong> is already linked to a different KarmaRace account.</p>
+  <p>If you believe your account has been compromised, or if you're signing in with the wrong Google account, please try again with a different one.</p>
+  <a href="{% url 'google_login' %}" class="btn btn-primary">Sign in with a different Google account</a>
+</div>
+{% endblock %}

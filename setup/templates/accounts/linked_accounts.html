@@ -59,4 +59,29 @@
   </div>
 
 </div>
+
+<div class="page-header mt-4">
+  <h2>Verified Emails</h2>
+  <a href="{% url 'verify_email_start' %}" class="btn btn-primary btn-sm">+ Verify new email</a>
+</div>
+<p class="text-muted mb-3">Select one of these when checking a webhook task. KarmaRace signs the payload so the task owner can confirm it came from us.</p>
+
+{% if verified_emails %}
+<ul class="linked-emails-list">
+  {% for ve in verified_emails %}
+  <li class="linked-emails-list__item">
+    <span>{{ ve.email }}{% if ve.email == primary_email %} <span class="badge badge-success">primary</span>{% endif %}</span>
+    {% if ve.email != primary_email %}
+    <form method="post" action="{% url 'remove_verified_email' ve.pk %}">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-secondary btn-sm">Remove</button>
+    </form>
+    {% endif %}
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<p class="text-muted">No verified emails yet. Click <em>Verify new email</em> to add one.</p>
+{% endif %}
+
 {% endblock %}

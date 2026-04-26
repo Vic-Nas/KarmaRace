@@ -41,10 +41,6 @@ def _normalize_task_types(values):
     return normalized or list(ALL_TASK_TYPES)
 
 
-def _task_types_csv(task_types):
-    return ','.join(task_types)
-
-
 def _load_filter_preferences(user):
     if not user.is_authenticated:
         return DEFAULT_COMPLETION, DEFAULT_ARCHIVE, list(ALL_TASK_TYPES)
@@ -68,7 +64,7 @@ def _save_filter_preferences(user, completion, archive, task_types):
     for key, value in {
         PREF_FEED_COMPLETION: completion,
         PREF_FEED_ARCHIVE:    archive,
-        PREF_FEED_TASK_TYPES: _task_types_csv(_normalize_task_types(task_types)),
+        PREF_FEED_TASK_TYPES: ','.join(_normalize_task_types(task_types)),
     }.items():
         UserPreference.objects.update_or_create(user=user, key=key, defaults={'value': value})
 
@@ -207,6 +203,10 @@ def feed(request):
             ).values_list('task_id', flat=True)
         )
 
+    verified_emails = []
+    if request.user.is_authenticated and task and task.type == Task.Type.WEBHOOK:
+        verified_emails = list(request.user.verified_emails.values_list('email', flat=True).order_by('verified_at'))
+
     is_checking = False
     if task and request.user.is_authenticated and checking_task_id:
         try:
@@ -234,7 +234,7 @@ def feed(request):
         'completion':            completion,
         'archive':               archive,
         'selected_task_types':   selected_types,
-        'selected_task_types_csv': _task_types_csv(selected_types),
+        'selected_task_types_csv': ','.join(selected_types),
         'all_task_types': [
             {'value': t, 'label': TASK_TYPE_LABELS.get(t, t.replace('_', ' ').title())}
             for t in ALL_TASK_TYPES
@@ -244,6 +244,7 @@ def feed(request):
         'obligation_creditor':   obligation_creditor,
         'webhook_stats':         _webhook_stats(task) if task else None,
         'checking_task_id':      task.id if is_checking else '',
+        'verified_emails':       verified_emails,
     })
 
 
@@ -315,6 +316,12 @@ def check(request, task_id):
     if precheck_error:
         return respond(TaskCompletion.State.FAILED, precheck_error)
 
+    google_email = ''
+    if task.type == Task.Type.WEBHOOK:
+        google_email = (request.POST.get('google_email') or '').strip()
+        if not google_email:
+            return respond(TaskCompletion.State.FAILED, 'Select a verified email before checking a webhook task.')
+
     completion, created = TaskCompletion.objects.get_or_create(
         task=task, tester=request.user, defaults={'state': TaskCompletion.State.PENDING},
     )
@@ -338,10 +345,10 @@ def check(request, task_id):
         completion.save(update_fields=['state', 'result_detail', 'created_at'])
 
     try:
-        process_task_check.defer(task_id=task.pk, tester_id=request.user.pk)
+        process_task_check.defer(task_id=task.pk, tester_id=request.user.pk, google_email=google_email)
     except Exception:
         try:
-            process_task_check(task_id=task.pk, tester_id=request.user.pk)
+            process_task_check(task_id=task.pk, tester_id=request.user.pk, google_email=google_email)
             completion.refresh_from_db(fields=['state', 'result_detail'])
             if completion.state == TaskCompletion.State.CONFIRMED:
                 from karma.services import get_balance

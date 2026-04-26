@@ -58,6 +58,15 @@ class UserProfile(models.Model):
         return f'Profile({self.user_id})'
 
 
+class VerifiedEmail(models.Model):
+    user        = models.ForeignKey(User, on_delete=models.CASCADE, related_name='verified_emails')
+    email       = models.EmailField(unique=True)
+    verified_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f'{self.user_id} — {self.email}'
+
+
 class OutreachRecord(models.Model):
     """Tracks every email address we have attempted to reach."""
  

@@ -20,7 +20,6 @@ from setup.platform_rules import (
 logger = logging.getLogger(__name__)
 
 HEALTH_HIDE_THRESHOLD = 2
-HEALTH_CHECK_ATTEMPTS = 1
 GITHUB_REPO_CHOICES_CACHE_SECONDS = 900
 
 
@@ -28,12 +27,7 @@ GITHUB_REPO_CHOICES_CACHE_SECONDS = 900
 # Verification dispatcher
 # ---------------------------------------------------------------------------
 
-def verify_task(task, tester) -> bool:
-    ok, _ = verify_task_with_details(task, tester)
-    return ok
-
-
-def verify_task_with_details(task, tester):
+def verify_task_with_details(task, tester, google_email=''):
     dispatch = {
         Task.Type.GITHUB_STAR: verify_github_with_details,
         Task.Type.GITHUB_FORK: verify_github_with_details,
@@ -43,6 +37,8 @@ def verify_task_with_details(task, tester):
     if verifier is None:
         logger.error('verify_task: unknown task type %s', task.type)
         return False, msg('UNKNOWN_TASK_TYPE')
+    if task.type == Task.Type.WEBHOOK:
+        return verifier(task, tester, google_email=google_email)
     return verifier(task, tester)
 
 
@@ -96,16 +92,16 @@ def verify_github_with_details(task, tester):
         return False, msg('GITHUB_REQUEST_FAILED', error=exc)
 
 
-def verify_webhook_with_details(task, tester):
-    platform_username = (
-        tester.linked_accounts
-        .filter(platform='github')
-        .values_list('platform_username', flat=True)
-        .first()
-    ) or ''
-
+def verify_webhook_with_details(task, tester, google_email=''):
+    import hmac, hashlib
+    email = (google_email or '').strip()
+    sig = hmac.new(
+        (task.webhook_secret or '').encode(),
+        f"{task.slug}:{email}".encode(),
+        hashlib.sha256,
+    ).hexdigest()
     headers = {'Authorization': f'Bearer {task.webhook_secret}'} if task.webhook_secret else {}
-    sent_payload = {'task_slug': task.slug, 'platform_username': platform_username}
+    sent_payload = {'task_slug': task.slug, 'google_email': email, 'signature': sig}
 
     def notify_owner(status, detail):
         _notify_webhook_attempt(
@@ -249,7 +245,7 @@ def _check_webhook_endpoint_contract_detailed(task):
             'Expected: full http/https URL; Got: missing scheme or host.'
         )
     expected = '{"verified": true|false}'
-    payload = {'task_slug': task.slug, 'platform_username': 'probe-user'}
+    payload = {'task_slug': task.slug, 'google_email': 'probe@karmarace.com', 'signature': 'probe'}
     headers = {'Content-Type': 'application/json'}
     if task.webhook_secret:
         headers['Authorization'] = f'Bearer {task.webhook_secret}'
@@ -296,16 +292,6 @@ def _check_webhook_endpoint_contract_detailed(task):
         )
 
 
-def _webhook_user_facing_reason(detail):
-    if 'missing scheme or host' in detail:
-        return 'Webhook URL is invalid. Use a full http/https URL.'
-    if 'non-JSON body' in detail:
-        return 'Webhook endpoint must return JSON with "verified": true or false.'
-    if 'request error=' in detail:
-        return 'Webhook endpoint is unreachable from the server.'
-    return 'Webhook endpoint must return JSON with "verified": true or false.'
-
-
 def _check_webhook_target_format(task):
     from urllib.parse import urlparse
     parsed = urlparse((task.target_id or '').strip())
@@ -334,7 +320,7 @@ def on_task_unhidden(task):
 # ---------------------------------------------------------------------------
 
 def run_health_check(task) -> bool:
-    healthy, reason = _check_task_health_with_retry(task)
+    healthy, reason = _check_task_health_with_reason(task)
 
     if task.type == Task.Type.WEBHOOK:
         if not healthy and reason and not task.health_last_failure_reason:
@@ -371,18 +357,6 @@ def run_health_check(task) -> bool:
         _notify_health_failed(task)
 
     return False
-
-
-def _check_task_health_with_retry(task):
-    import time
-    reason = 'Health check failed.'
-    for attempt in range(1, HEALTH_CHECK_ATTEMPTS + 1):
-        healthy, reason = _check_task_health_with_reason(task)
-        if healthy:
-            return True, ''
-        if attempt < HEALTH_CHECK_ATTEMPTS:
-            time.sleep(2 ** (attempt - 1))
-    return False, reason
 
 
 def _notify_health_failed(task):
@@ -428,7 +402,7 @@ def _check_task_health_with_reason(task):
             webhook_reason = _check_webhook_endpoint_contract_detailed(task)
             if webhook_reason is None:
                 return True, ''
-            return False, _webhook_user_facing_reason(webhook_reason)
+            return False, webhook_reason
 
     except requests.RequestException as exc:
         logger.error('run_health_check: request failed for task %s: %s', task.pk, exc)

@@ -1,10 +1,39 @@
-from django.db.models.signals import post_save, pre_save
+from django.db.models.signals import pre_save, post_save
 from django.dispatch import receiver
 
 import requests
 
 from accounts import discord as discord_api
-from accounts.models import LinkedAccount, User
+from accounts.models import LinkedAccount, User, VerifiedEmail
+
+
+def _seed_verified_email_from_social(social_account):
+    if social_account.provider != 'google':
+        return
+    email = (social_account.extra_data.get('email') or '').strip().lower()
+    if email:
+        VerifiedEmail.objects.get_or_create(user=social_account.user, email=email)
+
+
+try:
+    from allauth.socialaccount.signals import social_account_added, social_account_updated
+
+    @receiver(social_account_added)
+    def _on_social_account_added(sender, request, sociallogin, **kwargs):
+        try:
+            _seed_verified_email_from_social(sociallogin.account)
+        except Exception:
+            pass
+
+    @receiver(social_account_updated)
+    def _on_social_account_updated(sender, request, sociallogin, **kwargs):
+        try:
+            _seed_verified_email_from_social(sociallogin.account)
+        except Exception:
+            pass
+
+except ImportError:
+    pass
 
 
 @receiver(pre_save, sender=User)
