@@ -108,7 +108,9 @@ def discord_callback(request):
 		access_token  = discord_api.exchange_code_for_token(code, redirect_uri)
 		identity      = discord_api.fetch_identity(access_token)
 		discord_api.ensure_guild_membership(identity.user_id, access_token, request.user.username)
-		discord_api.ensure_role(identity.user_id)
+		# Pass the currently-logged-in Django user so the role selection logic can
+		# immediately pick the correct per-category role (superuser/staff/user).
+		discord_api.ensure_role(identity.user_id, request.user)
 		LinkedAccount.objects.update_or_create(
 			user=request.user, platform=LinkedAccount.DISCORD,
 			defaults={'platform_id': identity.user_id, 'platform_username': identity.username},

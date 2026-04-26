@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Optional
 
 import requests
 from django.conf import settings
@@ -16,12 +17,17 @@ class DiscordIdentity:
 
 
 def is_configured() -> bool:
+    # Consider integration configured if basic credentials + guild are present
+    # and at least one role configuration exists (legacy single-role or
+    # the new per-category role vars).
     return bool(
         settings.DISCORD_CLIENT_ID
         and settings.DISCORD_CLIENT_SECRET
         and settings.DISCORD_BOT_TOKEN
         and settings.DISCORD_GUILD_ID
-        and settings.DISCORD_ROLE_ID
+        and settings.DISCORD_USER_ROLE_ID
+        and settings.DISCORD_USER_STAFF_ID
+        and settings.DISCORD_USER_SUPERUSER_ID
     )
 
 
@@ -107,9 +113,56 @@ def ensure_guild_membership(discord_user_id: str, user_access_token: str, nickna
         resp.raise_for_status()
 
 
-def ensure_role(discord_user_id: str) -> None:
+def ensure_role(discord_user_id: str, local_user: Optional[object] = None) -> None:
+    """
+    Ensure the appropriate role is assigned to the guild member.
+
+    Role selection order:
+    - If `local_user` provided or a `LinkedAccount` exists for this platform_id,
+      prefer per-category role IDs (`DISCORD_SUPERUSER_ROLE_ID`,
+      `DISCORD_STAFF_ROLE_ID`, `DISCORD_USER_ROLE_ID`) based on
+      `user.is_superuser` / `user.is_staff`.
+    - Fall back to `DISCORD_USER_ROLE_ID` if present.
+    - Finally fall back to legacy `DISCORD_ROLE_ID` if set.
+
+    If no role id is determined, this is a no-op.
+    """
+    role_id = ''
+    user = None
+    if local_user is not None:
+        user = local_user
+    else:
+        try:
+            from accounts.models import LinkedAccount
+
+            la = (
+                LinkedAccount.objects.filter(platform=LinkedAccount.DISCORD, platform_id=discord_user_id)
+                .select_related('user')
+                .first()
+            )
+            if la:
+                user = la.user
+        except Exception:
+            user = None
+
+    # Prefer per-category role IDs when a user is known
+    if user:
+        if getattr(user, 'is_superuser', False) and getattr(settings, 'DISCORD_SUPERUSER_ROLE_ID', ''):
+            role_id = settings.DISCORD_SUPERUSER_ROLE_ID
+        elif getattr(user, 'is_staff', False) and getattr(settings, 'DISCORD_STAFF_ROLE_ID', ''):
+            role_id = settings.DISCORD_STAFF_ROLE_ID
+        elif getattr(settings, 'DISCORD_USER_ROLE_ID', ''):
+            role_id = settings.DISCORD_USER_ROLE_ID
+
+    # Legacy fallback
+    if not role_id:
+        role_id = getattr(settings, 'DISCORD_ROLE_ID', '') or ''
+
+    if not role_id:
+        return
+
     resp = requests.put(
-        f"{_member_url(discord_user_id)}/roles/{settings.DISCORD_ROLE_ID}",
+        f"{_member_url(discord_user_id)}/roles/{role_id}",
         headers=_bot_headers(),
         timeout=15,
     )
