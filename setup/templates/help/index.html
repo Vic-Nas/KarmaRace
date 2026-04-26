@@ -57,20 +57,9 @@ Authorization: Bearer {task.webhook_secret}
 
 {
   "task_slug": "your-task-slug",
-  "google_email": "tester@gmail.com",
-  "signature": "&lt;hmac-sha256&gt;"
+  "google_email": "tester@gmail.com"
 }</code></pre>
-    <p><code>google_email</code> is the Google-verified address the tester selected — the email they registered with on your platform. The tester picks from their verified emails in <a href="{% url 'linked_accounts' %}">Accounts</a> before submitting the check.</p>
-    <p>Verify the signature to confirm the payload was sent by KarmaRace and not spoofed:</p>
-    <pre><code>import hmac, hashlib
-
-expected = hmac.new(
-    webhook_secret.encode(),
-    f"{task_slug}:{google_email}".encode(),
-    hashlib.sha256,
-).hexdigest()
-
-assert hmac.compare_digest(expected, signature)</code></pre>
+    <p><code>google_email</code> is the Google-verified address the tester selected — the email they registered with on your platform. The tester picks from their verified emails in <a href="{% url 'linked_accounts' %}">Accounts</a> before submitting the check. The <code>Authorization</code> header confirms the request came from KarmaRace.</p>
     <p>Your endpoint must respond with:</p>
     <pre><code>{ "verified": true }</code></pre>
     <p>If verification fails, the tester sees a generic error. You receive detailed diagnostics in <a href="{% url 'notifications_inbox' %}">Notifications</a>.</p>

@@ -93,15 +93,9 @@ def verify_github_with_details(task, tester):
 
 
 def verify_webhook_with_details(task, tester, google_email=''):
-    import hmac, hashlib
     email = (google_email or '').strip()
-    sig = hmac.new(
-        (task.webhook_secret or '').encode(),
-        f"{task.slug}:{email}".encode(),
-        hashlib.sha256,
-    ).hexdigest()
     headers = {'Authorization': f'Bearer {task.webhook_secret}'} if task.webhook_secret else {}
-    sent_payload = {'task_slug': task.slug, 'google_email': email, 'signature': sig}
+    sent_payload = {'task_slug': task.slug, 'google_email': email}
 
     def notify_owner(status, detail):
         _notify_webhook_attempt(
@@ -245,7 +239,7 @@ def _check_webhook_endpoint_contract_detailed(task):
             'Expected: full http/https URL; Got: missing scheme or host.'
         )
     expected = '{"verified": true|false}'
-    payload = {'task_slug': task.slug, 'google_email': 'probe@karmarace.com', 'signature': 'probe'}
+    payload = {'task_slug': task.slug, 'google_email': 'probe@karmarace.com'}
     headers = {'Content-Type': 'application/json'}
     if task.webhook_secret:
         headers['Authorization'] = f'Bearer {task.webhook_secret}'
