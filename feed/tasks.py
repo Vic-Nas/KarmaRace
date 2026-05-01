@@ -4,7 +4,8 @@ from procrastinate.contrib.django import app
 from django.db import transaction
 
 from karma.models import KarmaTransaction
-from karma.services import credit_karma, debit_karma
+from karma.services import credit_karma, debit_karma, get_balance
+from setup.platform_rules import karma_reward_for_task
 from tasks.check_feedback import msg
 from tasks.models import Task, TaskCompletion
 from tasks.services import verify_task_with_details, settle_or_create_obligation
@@ -40,17 +41,19 @@ def process_task_check(task_id: int, tester_id: int, google_email: str = ''):
                 completion.result_detail = msg('CHECK_CONFIRMED')
                 completion.save(update_fields=['state', 'result_detail'])
 
-                reward = task.karma_reward
-                if reward > 0:
+                tester_reward = completion.reward
+                owner_cost = karma_reward_for_task(get_balance(task.owner), task.type)
+                if tester_reward > 0:
                     credit_karma(
                         user=completion.tester,
-                        delta=reward,
+                        delta=tester_reward,
                         reason=KarmaTransaction.Reason.TASK_EARNED,
                         related_object_id=task.pk,
                     )
+                if owner_cost > 0:
                     debit_karma(
                         user=task.owner,
-                        delta=reward,
+                        delta=owner_cost,
                         reason=KarmaTransaction.Reason.TASK_COST,
                         related_object_id=task.pk,
                     )

@@ -11,7 +11,7 @@ from .forms import TaskForm
 from .models import Task
 from .services import (
     on_task_unhidden, soft_delete_task,
-    get_task_configuration_failure, assign_task_karma_reward,
+    get_task_configuration_failure,
 )
 
 
@@ -54,7 +54,6 @@ def task_create(request):
         if task.type != Task.Type.WEBHOOK:
             task.webhook_secret = ''
         task.save()
-        assign_task_karma_reward(task)
         return redirect('my_tasks')
     return render(request, 'tasks/edit.html', {'task': None, 'form': form, 'is_create': True})
 

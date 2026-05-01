@@ -16,7 +16,6 @@ class Task(models.Model):
     description    = models.TextField()
     target_id      = models.CharField(max_length=500)
     webhook_secret = models.CharField(max_length=255, blank=True, default='')
-    karma_reward   = models.PositiveSmallIntegerField(default=0)
     priority       = models.PositiveSmallIntegerField(default=0, db_index=True)
     succeed_count  = models.PositiveIntegerField(default=0)
     tried_count    = models.PositiveIntegerField(default=0)
@@ -73,6 +72,7 @@ class TaskCompletion(models.Model):
     tester        = models.ForeignKey(User, on_delete=models.CASCADE, related_name='task_completions')
     state         = models.CharField(max_length=10, choices=State.choices, default=State.PENDING)
     result_detail = models.TextField(blank=True, default='')
+    reward        = models.PositiveSmallIntegerField(default=0)
     created_at    = models.DateTimeField(auto_now_add=True)
 
     class Meta:

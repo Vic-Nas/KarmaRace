@@ -9,7 +9,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from tasks.check_feedback import msg
-from tasks.models import Task, TaskCompletion
+from tasks.models import Task, TaskCompletion, ReciprocityObligation
 
 from .filtering import DEFAULT_COMPLETION, DEFAULT_ARCHIVE, SESSION_FEED_PIN_KEY, normalize_task_types
 
@@ -18,11 +18,11 @@ def redirect_to_feed_with_filters(request, extra_params=None):
     """Redirect back to feed with current filter settings."""
     from django.urls import reverse
     from django.utils.http import urlencode
-    
-    completion    = (request.POST.get('completion') or DEFAULT_COMPLETION).strip() or DEFAULT_COMPLETION
-    archive       = (request.POST.get('archive') or DEFAULT_ARCHIVE).strip() or DEFAULT_ARCHIVE
+
+    completion     = (request.POST.get('completion') or DEFAULT_COMPLETION).strip() or DEFAULT_COMPLETION
+    archive        = (request.POST.get('archive') or DEFAULT_ARCHIVE).strip() or DEFAULT_ARCHIVE
     selected_types = normalize_task_types(request.POST.getlist('task_types'))
-    
+
     from .filtering import save_filter_preferences
     save_filter_preferences(request.user, completion, archive, selected_types)
     params = {k: v for k, v in (extra_params or {}).items() if v not in (None, '', [])}
@@ -38,14 +38,48 @@ def precheck_linked_account(user, task):
     return None
 
 
+def _compute_completion_reward(user, task):
+    """
+    Snapshot the karma reward at check time.
+
+    If this completion settles an open obligation toward the task owner,
+    reward the tester as if they had completed the top free-feed task instead
+    (opportunity cost compensation). The owner still pays only their normal reward.
+    If no obligation applies, return the normal computed reward.
+    """
+    from karma.services import get_balance
+    from setup.platform_rules import karma_reward_for_task
+    from .queries import feed_queryset
+
+    normal_reward = karma_reward_for_task(get_balance(task.owner), task.type)
+
+    has_obligation = ReciprocityObligation.objects.filter(
+        debtor=user,
+        creditor=task.owner,
+        task_type=task.type,
+        state=ReciprocityObligation.State.OPEN,
+    ).exists()
+
+    if not has_obligation:
+        return normal_reward
+
+    # Find top task user would have gotten without obligations
+    top_free_task = feed_queryset(user, completion='not_completed', archive='not_archived').first()
+    if top_free_task is None:
+        return normal_reward
+
+    opportunity_reward = karma_reward_for_task(top_free_task.owner_balance, top_free_task.type)
+    return max(normal_reward, opportunity_reward)
+
+
 @require_POST
 def done(request, task_id):
     """Archive a task."""
     if not request.user.is_authenticated:
         return redirect('account_login')
-    
+
     from .queries import active_lock_obligations, open_obligations
-    
+
     obligations = active_lock_obligations(request.user, open_obligations(request.user))
     if obligations:
         messages.error(request, msg('ARCHIVE_DISABLED_OBLIGATIONS'))
@@ -66,7 +100,7 @@ def check(request, task_id):
     def respond(state, detail='', extra_params=None):
         if is_ajax:
             payload = {'state': state}
-            if detail:      payload['detail'] = detail
+            if detail:       payload['detail'] = detail
             if extra_params: payload.update(extra_params)
             return JsonResponse(payload)
         if state == TaskCompletion.State.CONFIRMED:
@@ -100,8 +134,11 @@ def check(request, task_id):
         if not google_email:
             return respond(TaskCompletion.State.FAILED, 'Select a verified email before checking a webhook task.')
 
+    reward = _compute_completion_reward(request.user, task)
+
     completion, created = TaskCompletion.objects.get_or_create(
-        task=task, tester=request.user, defaults={'state': TaskCompletion.State.PENDING},
+        task=task, tester=request.user,
+        defaults={'state': TaskCompletion.State.PENDING, 'reward': reward},
     )
 
     if completion.state == TaskCompletion.State.CONFIRMED:
@@ -119,25 +156,11 @@ def check(request, task_id):
     if not created:
         completion.state         = TaskCompletion.State.PENDING
         completion.result_detail = ''
+        completion.reward        = reward
         completion.created_at    = timezone.now()
-        completion.save(update_fields=['state', 'result_detail', 'created_at'])
+        completion.save(update_fields=['state', 'result_detail', 'reward', 'created_at'])
 
-    try:
-        process_task_check.defer(task_id=task.pk, tester_id=request.user.pk, google_email=google_email)
-    except Exception:
-        try:
-            process_task_check(task_id=task.pk, tester_id=request.user.pk, google_email=google_email)
-            completion.refresh_from_db(fields=['state', 'result_detail'])
-            if completion.state == TaskCompletion.State.CONFIRMED:
-                from karma.services import get_balance
-                return respond(TaskCompletion.State.CONFIRMED, msg('QUEUE_UNAVAILABLE_CONFIRMED'),
-                               extra_params={'karma_delta': task.karma_reward, 'karma_balance': get_balance(request.user)})
-            return respond(TaskCompletion.State.FAILED, completion.result_detail or msg('QUEUE_UNAVAILABLE_FAILED'))
-        except Exception:
-            completion.state         = TaskCompletion.State.FAILED
-            completion.result_detail = msg('QUEUE_FAILED')
-            completion.save(update_fields=['state', 'result_detail'])
-            return respond(TaskCompletion.State.FAILED, msg('QUEUE_FAILED'))
+    process_task_check.defer(task_id=task.pk, tester_id=request.user.pk, google_email=google_email)
 
     return respond(TaskCompletion.State.PENDING, msg('CHECK_STARTED'))
 
@@ -160,8 +183,7 @@ def check_status(request, task_id):
                              'detail': completion.result_detail or msg('CHECK_FAILED_GENERIC')})
     if completion.state == TaskCompletion.State.CONFIRMED:
         from karma.services import get_balance
-        task = Task.objects.filter(pk=task_id).first()
         return JsonResponse({'state': completion.state, 'detail': msg('CHECK_CONFIRMED'),
-                             'karma_delta': task.karma_reward if task else 0,
+                             'karma_delta': completion.reward,
                              'karma_balance': get_balance(request.user)})
     return JsonResponse({'state': completion.state})

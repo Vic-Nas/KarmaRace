@@ -4,7 +4,6 @@ from .core import (
     verify_task_with_details,
     soft_delete_task,
     settle_or_create_obligation,
-    assign_task_karma_reward,
     on_task_unhidden,
 )
 
@@ -29,7 +28,6 @@ __all__ = [
     'verify_task_with_details',
     'soft_delete_task',
     'settle_or_create_obligation',
-    'assign_task_karma_reward',
     'on_task_unhidden',
     'run_health_check',
     'can_run_manual_health_check',

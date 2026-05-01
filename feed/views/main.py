@@ -4,6 +4,7 @@ from django.shortcuts import render, redirect
 from django.urls import reverse
 from django.utils.http import urlencode
 
+from setup.platform_rules import karma_reward_for_task
 from tasks.check_feedback import msg
 from tasks.models import Task, TaskCompletion
 from .filtering import (
@@ -83,7 +84,7 @@ def feed(request):
 
     return render(request, 'feed/index.html', {
         'task':                  task,
-        'task_reward':           task.karma_reward if task else '?',
+        'task_reward':           karma_reward_for_task(task.owner_balance, task.type) if task else '?',
         'completed_task_ids':    completed_task_ids,
         'feed_empty':            task is None,
         'completion':            completion,

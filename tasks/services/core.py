@@ -5,7 +5,7 @@ from django.db import transaction
 
 from tasks.models import Task, TaskCompletion, ReciprocityObligation
 from tasks.check_feedback import msg
-from setup.platform_rules import karma_reward_for_task
+
 
 logger = logging.getLogger(__name__)
 
@@ -66,14 +66,6 @@ def settle_or_create_obligation(actor, counterparty, task_type, completed_task):
         source_task=completed_task,
     )
     return 'created'
-
-
-def assign_task_karma_reward(task):
-    """Compute and persist karma_reward based on owner's current balance."""
-    from karma.services import get_balance
-    owner_karma = get_balance(task.owner)
-    task.karma_reward = karma_reward_for_task(owner_karma, task.type)
-    task.save(update_fields=['karma_reward'])
 
 
 def on_task_unhidden(task):

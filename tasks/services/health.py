@@ -9,11 +9,10 @@ from setup.platform_rules import (
     WEBHOOK_BAD_CHECK_RATIO_THRESHOLD,
     WEBHOOK_BAD_CHECK_MIN_CALLS,
     WEBHOOK_HEALTH_CHECK_RATE_LIMIT_SECONDS,
+    GITHUB_HEALTH_HIDE_STREAK_THRESHOLD,
 )
 
 logger = logging.getLogger(__name__)
-
-HEALTH_HIDE_THRESHOLD = 2
 
 
 def run_health_check(task) -> bool:
@@ -43,7 +42,7 @@ def run_health_check(task) -> bool:
     task.health_last_failure_reason = reason or 'Health check failed.'
     update_fields.extend(['health_failure_streak', 'health_last_failure_reason'])
 
-    should_hide = task.health_failure_streak >= HEALTH_HIDE_THRESHOLD
+    should_hide = task.health_failure_streak >= GITHUB_HEALTH_HIDE_STREAK_THRESHOLD
     transitioned_to_hidden = should_hide and not task.hidden
     if transitioned_to_hidden:
         task.hidden = True
