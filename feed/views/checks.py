@@ -1,0 +1,167 @@
+"""Task checking and completion views."""
+from datetime import timedelta
+
+from django.conf import settings
+from django.contrib import messages
+from django.http import JsonResponse
+from django.shortcuts import redirect, get_object_or_404
+from django.utils import timezone
+from django.views.decorators.http import require_POST
+
+from tasks.check_feedback import msg
+from tasks.models import Task, TaskCompletion
+
+from .filtering import DEFAULT_COMPLETION, DEFAULT_ARCHIVE, SESSION_FEED_PIN_KEY, normalize_task_types
+
+
+def redirect_to_feed_with_filters(request, extra_params=None):
+    """Redirect back to feed with current filter settings."""
+    from django.urls import reverse
+    from django.utils.http import urlencode
+    
+    completion    = (request.POST.get('completion') or DEFAULT_COMPLETION).strip() or DEFAULT_COMPLETION
+    archive       = (request.POST.get('archive') or DEFAULT_ARCHIVE).strip() or DEFAULT_ARCHIVE
+    selected_types = normalize_task_types(request.POST.getlist('task_types'))
+    
+    from .filtering import save_filter_preferences
+    save_filter_preferences(request.user, completion, archive, selected_types)
+    params = {k: v for k, v in (extra_params or {}).items() if v not in (None, '', [])}
+    url = reverse('feed')
+    return redirect(f'{url}?{urlencode(params, doseq=True)}') if params else redirect(url)
+
+
+def precheck_linked_account(user, task):
+    """Check if user has required linked account for task type."""
+    if task.type in (Task.Type.GITHUB_STAR, Task.Type.GITHUB_FORK):
+        if not user.linked_accounts.filter(platform='github').exists():
+            return msg('GITHUB_LINK_REQUIRED')
+    return None
+
+
+@require_POST
+def done(request, task_id):
+    """Archive a task."""
+    if not request.user.is_authenticated:
+        return redirect('account_login')
+    
+    from .queries import active_lock_obligations, open_obligations
+    
+    obligations = active_lock_obligations(request.user, open_obligations(request.user))
+    if obligations:
+        messages.error(request, msg('ARCHIVE_DISABLED_OBLIGATIONS'))
+        return redirect_to_feed_with_filters(request)
+    task = get_object_or_404(Task, pk=task_id, is_deleted=False, hidden=False)
+    if task.owner_id != request.user.id:
+        task.archived_by.add(request.user)
+        if request.session.get(SESSION_FEED_PIN_KEY) == task.id:
+            request.session.pop(SESSION_FEED_PIN_KEY, None)
+    return redirect_to_feed_with_filters(request)
+
+
+@require_POST
+def check(request, task_id):
+    """Check a task (submit completion attempt)."""
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+
+    def respond(state, detail='', extra_params=None):
+        if is_ajax:
+            payload = {'state': state}
+            if detail:      payload['detail'] = detail
+            if extra_params: payload.update(extra_params)
+            return JsonResponse(payload)
+        if state == TaskCompletion.State.CONFIRMED:
+            messages.success(request, detail or msg('CHECK_CONFIRMED'))
+            return redirect_to_feed_with_filters(request)
+        if state == TaskCompletion.State.FAILED:
+            messages.error(request, detail or msg('CHECK_FAILED_GENERIC'))
+            return redirect_to_feed_with_filters(request)
+        if state == TaskCompletion.State.PENDING:
+            messages.info(request, detail or msg('CHECK_STARTED'))
+            return redirect_to_feed_with_filters(request, extra_params={'checking_task': str(task.pk)})
+        return redirect_to_feed_with_filters(request)
+
+    if not request.user.is_authenticated:
+        if is_ajax:
+            return JsonResponse({'state': 'UNAUTHENTICATED', 'detail': 'Sign in required.'}, status=401)
+        return redirect('account_login')
+
+    from feed.tasks import process_task_check
+    task = get_object_or_404(Task, pk=task_id, is_deleted=False, hidden=False)
+    if task.owner_id == request.user.id:
+        return respond(TaskCompletion.State.FAILED, 'You cannot check your own task.')
+
+    precheck_error = precheck_linked_account(request.user, task)
+    if precheck_error:
+        return respond(TaskCompletion.State.FAILED, precheck_error)
+
+    google_email = ''
+    if task.type == Task.Type.WEBHOOK:
+        google_email = (request.POST.get('google_email') or '').strip()
+        if not google_email:
+            return respond(TaskCompletion.State.FAILED, 'Select a verified email before checking a webhook task.')
+
+    completion, created = TaskCompletion.objects.get_or_create(
+        task=task, tester=request.user, defaults={'state': TaskCompletion.State.PENDING},
+    )
+
+    if completion.state == TaskCompletion.State.CONFIRMED:
+        from karma.services import get_balance
+        return respond(TaskCompletion.State.CONFIRMED, msg('ALREADY_CONFIRMED'),
+                       extra_params={'karma_delta': 0, 'karma_balance': get_balance(request.user)})
+
+    if completion.state == TaskCompletion.State.PENDING and not created:
+        if completion.created_at <= timezone.now() - timedelta(seconds=45):
+            completion.state = TaskCompletion.State.FAILED
+            completion.save(update_fields=['state'])
+        else:
+            return respond(TaskCompletion.State.PENDING, msg('CHECK_IN_PROGRESS'))
+
+    if not created:
+        completion.state         = TaskCompletion.State.PENDING
+        completion.result_detail = ''
+        completion.created_at    = timezone.now()
+        completion.save(update_fields=['state', 'result_detail', 'created_at'])
+
+    try:
+        process_task_check.defer(task_id=task.pk, tester_id=request.user.pk, google_email=google_email)
+    except Exception:
+        try:
+            process_task_check(task_id=task.pk, tester_id=request.user.pk, google_email=google_email)
+            completion.refresh_from_db(fields=['state', 'result_detail'])
+            if completion.state == TaskCompletion.State.CONFIRMED:
+                from karma.services import get_balance
+                return respond(TaskCompletion.State.CONFIRMED, msg('QUEUE_UNAVAILABLE_CONFIRMED'),
+                               extra_params={'karma_delta': task.karma_reward, 'karma_balance': get_balance(request.user)})
+            return respond(TaskCompletion.State.FAILED, completion.result_detail or msg('QUEUE_UNAVAILABLE_FAILED'))
+        except Exception:
+            completion.state         = TaskCompletion.State.FAILED
+            completion.result_detail = msg('QUEUE_FAILED')
+            completion.save(update_fields=['state', 'result_detail'])
+            return respond(TaskCompletion.State.FAILED, msg('QUEUE_FAILED'))
+
+    return respond(TaskCompletion.State.PENDING, msg('CHECK_STARTED'))
+
+
+def check_status(request, task_id):
+    """Poll for task check status."""
+    if not request.user.is_authenticated:
+        return JsonResponse({'state': 'UNAUTHENTICATED'}, status=401)
+    completion = TaskCompletion.objects.filter(task_id=task_id, tester=request.user).first()
+    if completion is None:
+        return JsonResponse({'state': 'NOT_STARTED'})
+    if (completion.state == TaskCompletion.State.PENDING
+            and completion.created_at <= timezone.now() - timedelta(seconds=45)):
+        completion.state         = TaskCompletion.State.FAILED
+        completion.result_detail = msg('CHECK_TIMEOUT_WORKER_HINT') if settings.DEBUG else msg('CHECK_TIMEOUT')
+        completion.save(update_fields=['state', 'result_detail'])
+        return JsonResponse({'state': TaskCompletion.State.FAILED, 'detail': completion.result_detail})
+    if completion.state == TaskCompletion.State.FAILED:
+        return JsonResponse({'state': completion.state,
+                             'detail': completion.result_detail or msg('CHECK_FAILED_GENERIC')})
+    if completion.state == TaskCompletion.State.CONFIRMED:
+        from karma.services import get_balance
+        task = Task.objects.filter(pk=task_id).first()
+        return JsonResponse({'state': completion.state, 'detail': msg('CHECK_CONFIRMED'),
+                             'karma_delta': task.karma_reward if task else 0,
+                             'karma_balance': get_balance(request.user)})
+    return JsonResponse({'state': completion.state})

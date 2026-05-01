@@ -1,0 +1,114 @@
+"""Email template builders for outreach."""
+
+
+def build_html(domain: str) -> str:
+	"""Build HTML email template."""
+	root      = "https://" + domain
+	help_href = root + "/help"
+	priv_href = root + "/legal/privacy"
+
+	css = (
+		"body,table,td,a{-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;}"
+		"table,td{mso-table-lspace:0pt;mso-table-rspace:0pt;border-collapse:collapse;}"
+		"body{margin:0;padding:0;background-color:#0f0f0f;"
+		"font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#e8e8e8;}"
+		".wrapper{width:100%;background-color:#0f0f0f;}"
+		".container{max-width:560px;margin:0 auto;padding:40px 24px;}"
+		".logo{font-size:28px;letter-spacing:-0.5px;color:#fff;font-weight:700;margin-bottom:8px;}"
+		".logo span{color:#a78bfa;}"
+		".tagline{font-size:12px;letter-spacing:2px;text-transform:uppercase;"
+		"color:#555;margin-bottom:36px;}"
+		".hero{font-size:22px;font-weight:700;line-height:1.35;color:#fff;margin-bottom:16px;}"
+		".hero em{font-style:normal;color:#a78bfa;}"
+		"p{font-size:15px;line-height:1.7;color:#aaa;margin:0 0 16px 0;}"
+		".steps{margin:24px 0;padding:0;list-style:none;}"
+		".steps li{font-size:14px;color:#ccc;padding:10px 0;"
+		"border-bottom:1px solid #1e1e1e;display:flex;gap:12px;align-items:flex-start;}"
+		".steps li:last-child{border-bottom:none;}"
+		".step-num{display:inline-block;min-width:22px;height:22px;line-height:22px;"
+		"text-align:center;background:#1e1e1e;color:#a78bfa;font-size:11px;"
+		"font-weight:700;border-radius:4px;flex-shrink:0;}"
+		".cta-wrap{text-align:center;margin:32px 0 24px;}"
+		".cta{display:inline-block;background:#a78bfa;color:#0f0f0f !important;"
+		"font-size:15px;font-weight:700;text-decoration:none;"
+		"padding:14px 36px;border-radius:6px;letter-spacing:0.3px;}"
+		".footer{margin-top:40px;padding-top:20px;border-top:1px solid #1e1e1e;"
+		"font-size:12px;color:#444;line-height:1.6;}"
+		".footer a{color:#555;text-decoration:none;}"
+		"@media only screen and (max-width:600px){"
+		".container{padding:28px 16px;}.hero{font-size:19px;}}"
+	)
+
+	return (
+		"<!DOCTYPE html>"
+		'<html lang="en"><head>'
+		'<meta charset="UTF-8">'
+		'<meta name="viewport" content="width=device-width, initial-scale=1.0">'
+		"<title>KarmaRace</title>"
+		"<!--[if mso]><noscript><xml><o:OfficeDocumentSettings>"
+		"<o:PixelsPerInch>96</o:PixelsPerInch>"
+		"</o:OfficeDocumentSettings></xml></noscript><![endif]-->"
+		"<style>" + css + "</style>"
+		"</head><body>"
+		'<div class="wrapper"><div class="container">'
+		'<div class="logo">&#9775; Karma<span>Race</span></div>'
+		'<div class="tagline">Task exchange for developers</div>'
+		'<div class="hero">Your project deserves users.<br>Not a <em>marketing budget</em>.</div>'
+		"<p>Big products win feeds because they outspend you &mdash; not because they&rsquo;re"
+		" better. KarmaRace levels that. It&rsquo;s a free task-exchange community where"
+		" builders publish clear task requests and other users complete them for karma.</p>"
+		"<p>No ads. No algorithms for sale. Just reciprocity &mdash; you do something for"
+		" someone, they do something for you. Karma tracks the balance and ranks the feed.</p>"
+		"<p><strong>What KarmaRace is for:</strong> turning growth goals into clear tasks"
+		" users can complete (GitHub star/fork goals, webhook checks, and platform-specific"
+		" actions) without paying for shallow reach.</p>"
+		'<ul class="steps">'
+		'<li><span class="step-num">1</span> Connect account(s) needed for the tasks you want to run</li>'
+		'<li><span class="step-num">2</span> Publish tasks so users know exactly what your platform needs</li>'
+		'<li><span class="step-num">3</span> Complete tasks for others to earn karma</li>'
+		'<li><span class="step-num">4</span> Karma lifts your visibility &mdash; no wallet required</li>'
+		"</ul>"
+		'<p style="color:#777;font-size:13px;">Reciprocity is automatic &mdash; if someone'
+		" completes your task, a reverse obligation is created and settled fairly before the"
+		" feed reopens. Nobody freeloads.</p>"
+		'<div class="cta-wrap">'
+		'<a class="cta" href="' + root + '">Join free &rarr;</a>'
+		"</div>"
+		'<div class="footer">'
+		"You&rsquo;re receiving this because you build things worth discovering.<br>"
+		"No tracking pixels. No follow-up drip. Just this one email.<br><br>"
+		"&copy; 2025 KarmaRace &mdash; "
+		'<a href="' + help_href + '">Help</a> &middot; '
+		'<a href="' + priv_href + '">Privacy</a>'
+		"</div>"
+		"</div></div></body></html>"
+	)
+
+
+def build_plaintext(domain: str) -> str:
+	"""Build plaintext email template."""
+	root = "https://" + domain
+	return (
+		"\u262f KarmaRace \u2014 Task exchange for developers\n"
+		"-------------------------------------------\n\n"
+		"Your project deserves users. Not a marketing budget.\n\n"
+		"Big products win feeds because they outspend you \u2014 not because they're better.\n"
+		"KarmaRace levels that. It's a free task-exchange community where builders\n"
+		"publish clear task requests and other users complete them for karma.\n\n"
+		"No ads. No algorithms for sale. Just reciprocity \u2014 karma tracks the balance\n"
+		"and ranks the feed.\n\n"
+		"WHAT KARMARACE IS FOR\n"
+		"  - Turning growth goals into clear tasks users can complete\n"
+		"  - Running GitHub and webhook verification tasks with real outcomes\n"
+		"  - Getting traction without buying ads\n\n"
+		"HOW IT WORKS\n"
+		"  1. Connect account(s) needed for the tasks you want to run\n"
+		"  2. Publish tasks so users know exactly what your platform needs\n"
+		"  3. Complete tasks for others to earn karma\n"
+		"  4. Karma lifts your visibility \u2014 no wallet required\n\n"
+		"Join free: " + root + "\n\n"
+		"---\n"
+		"You're receiving this because you build things worth discovering.\n"
+		"No tracking pixels. No follow-up drip. Just this one email.\n"
+		"KarmaRace \u2014 " + root + "/legal/privacy\n"
+	)

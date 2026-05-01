@@ -116,3 +116,46 @@ def _maybe_notify_karma_threshold_transition(user, new_balance: int, threshold: 
         event=target_event,
         payload={'balance': new_balance, 'threshold': threshold},
     )
+
+
+def adjust_karma_by_staff(user, delta: int, reason: str = None):
+    """
+    Staff adjustment to user karma. Auto-detects credit/debit by sign.
+    
+    Args:
+        user: Target user
+        delta: Amount to adjust (positive = credit, negative = debit)
+        reason: Optional staff-provided reason for the adjustment
+    
+    Returns:
+        New balance
+    """
+    balance = get_balance(user)
+    
+    # Create transaction (delta sign determines direction)
+    KarmaTransaction.objects.create(
+        user=user,
+        delta=delta,
+        reason='STAFF_ADJUSTMENT',
+        related_object_id=None,
+    )
+    
+    new_balance = balance + delta
+    
+    # Notify user of adjustment
+    try:
+        from notifications.models import Notification
+        from notifications.services import notify
+        notify(
+            user=user,
+            event=Notification.Event.KARMA_ADJUSTED,
+            payload={
+                'delta': delta,
+                'new_balance': new_balance,
+                'reason': reason or 'Karma adjustment by platform staff',
+            },
+        )
+    except Exception:
+        pass  # Notification failure shouldn't block adjustment
+    
+    return new_balance

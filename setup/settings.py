@@ -157,69 +157,23 @@ STATICFILES_DIRS = [BASE_DIR / 'setup' / 'static' / 'manual']
 STATIC_ROOT = BASE_DIR / 'setup' / 'static' / 'cache'
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
-# Google
-GOOGLE_CLIENT_ID = env('GOOGLE_CLIENT_ID')
-GOOGLE_CLIENT_SECRET = env('GOOGLE_CLIENT_SECRET')
+# OAuth providers (Google, GitHub, Discord)
+from .settings_oauth import (
+    GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET,
+    GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET,
+    DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET, DISCORD_BOT_TOKEN,
+    DISCORD_GUILD_ID, DISCORD_USER_ROLE_ID, DISCORD_STAFF_ROLE_ID, DISCORD_SUPERUSER_ROLE_ID,
+    SOCIALACCOUNT_PROVIDERS,
+)
 
-# GitHub OAuth
-GITHUB_CLIENT_ID = env('GITHUB_CLIENT_ID', default='')
-GITHUB_CLIENT_SECRET = env('GITHUB_CLIENT_SECRET', default='')
+# Third-party services (Adsense, Stripe, Resend, GitHub API, Procrastinate)
+from .settings_services import (
+    ADSENSE_CLIENT_ID, ADSENSE_SLOTS,
+    STRIPE_SECRET_KEY, STRIPE_PRICE_ID, STRIPE_WEBHOOK_SECRET,
+    RESEND_API_KEY, RESEND_WEBHOOK_SECRET,
+    GITHUB_TOKEN, REACH, DAILY_REACH,
+    PROCRASTINATE_CONNECTORS,
+)
 
-# Discord OAuth + guild sync
-DISCORD_CLIENT_ID = env('DISCORD_CLIENT_ID', default='')
-DISCORD_CLIENT_SECRET = env('DISCORD_CLIENT_SECRET', default='')
-DISCORD_BOT_TOKEN = env('DISCORD_BOT_TOKEN', default='')
-DISCORD_GUILD_ID = env('DISCORD_GUILD_ID', default='')
-DISCORD_USER_ROLE_ID = env('DISCORD_USER_ROLE_ID', default='')
-DISCORD_STAFF_ROLE_ID = env('DISCORD_STAFF_ROLE_ID', default='')
-DISCORD_SUPERUSER_ROLE_ID = env('DISCORD_SUPERUSER_ROLE_ID', default='')
-
-SOCIALACCOUNT_PROVIDERS = {
-    'google': {
-        'APP': {
-            'client_id': GOOGLE_CLIENT_ID,
-            'secret': GOOGLE_CLIENT_SECRET,
-        },
-        'SCOPE': ['profile', 'email'],
-    },
-    'github': {
-        'APP': {
-            'client_id': GITHUB_CLIENT_ID,
-            'secret': GITHUB_CLIENT_SECRET,
-        },
-        'SCOPE': ['read:user'],
-    },
-    'discord': {
-        'APP': {
-            'client_id': DISCORD_CLIENT_ID,
-            'secret': DISCORD_CLIENT_SECRET,
-        },
-        'SCOPE': ['identify', 'guilds.join'],
-    },
-}
-
-# Ads
-ADSENSE_CLIENT_ID = env('ADSENSE_CLIENT_ID')
-ADSENSE_SLOTS     = env('ADSENSE_SLOTS').split(',')
-
-# Stripe
-STRIPE_SECRET_KEY     = env('STRIPE_SECRET_KEY')
-STRIPE_PRICE_ID       = env('STRIPE_PRICE_ID')
-STRIPE_WEBHOOK_SECRET = env('STRIPE_WEBHOOK_SECRET')
-
-# Resend
-RESEND_API_KEY        = os.environ.get('RESEND_API_KEY')
-RESEND_FROM_EMAIL     = os.environ.get('RESEND_FROM_EMAIL', f'noreply@{DOMAIN}')
-RESEND_WEBHOOK_SECRET = os.environ.get('RESEND_WEBHOOK_SECRET', '')
-
-# GitHub (server credential for GitHub API calls)
-GITHUB_TOKEN = os.environ.get('GITHUB_TOKEN', '')
-REACH = env.bool('REACH', default=False)
-
-
-# Procrastinate (background jobs — uses the same Postgres DATABASE_URL)
-PROCRASTINATE_CONNECTORS = {
-    'default': {
-        'CONNECTOR': 'procrastinate.contrib.django.DjangoSyncConnector',
-    }
-}
+# Resend email sender (use DOMAIN if not configured in env)
+RESEND_FROM_EMAIL = os.environ.get('RESEND_FROM_EMAIL') or f'noreply@{DOMAIN}'

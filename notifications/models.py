@@ -5,15 +5,16 @@ from django.db import models
 
 class Notification(models.Model):
     class Event(models.TextChoices):
-        TASK_CONFIRMED     = 'TASK_CONFIRMED'
-        TASK_HEALTH_FAILED = 'TASK_HEALTH_FAILED'
-        WEBHOOK_CHECK      = 'WEBHOOK_CHECK'
-        KARMA_LOW          = 'KARMA_LOW'
-        KARMA_RESTORED     = 'KARMA_RESTORED'
-        PROJECT_STATE      = 'PROJECT_STATE'
-        APPRECIATION       = 'APPRECIATION'
-        FLAG_UP_RECEIVED   = 'FLAG_UP_RECEIVED'
-        FLAG_UP_SENT       = 'FLAG_UP_SENT'
+        TASK_CONFIRMED        = 'TASK_CONFIRMED'
+        TASK_HEALTH_FAILED    = 'TASK_HEALTH_FAILED'
+        WEBHOOK_CHECK         = 'WEBHOOK_CHECK'
+        KARMA_LOW             = 'KARMA_LOW'
+        KARMA_RESTORED        = 'KARMA_RESTORED'
+        KARMA_ADJUSTED        = 'KARMA_ADJUSTED'
+        PROJECT_STATE         = 'PROJECT_STATE'
+        APPRECIATION          = 'APPRECIATION'
+        FLAG_UP_RECEIVED      = 'FLAG_UP_RECEIVED'
+        FLAG_UP_SENT          = 'FLAG_UP_SENT'
 
     user       = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='notifications')
     event      = models.CharField(max_length=30, choices=Event.choices)

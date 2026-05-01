@@ -68,20 +68,43 @@ class VerifiedEmail(models.Model):
 
 
 class OutreachRecord(models.Model):
-    """Tracks every email address we have attempted to reach."""
- 
-    class State(models.TextChoices):
-        PENDING = 'pending', 'Pending'
-        SENT   = 'sent',   'Sent'
-        FAILED = 'failed', 'Failed'
- 
+    """Pending outreach queue. Ephemeral — deleted after send attempt."""
+
     email      = models.EmailField(unique=True)
-    state      = models.CharField(max_length=10, choices=State.choices, default=State.PENDING)
+    score      = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
- 
+
     class Meta:
-        indexes = [models.Index(fields=['state'])]
- 
+        indexes = [models.Index(fields=['-score'])]
+
     def __str__(self):
-        return f'{self.email} ({self.state})'
+        return f'{self.email} (score={self.score})'
+
+
+class OutreachContactedEmail(models.Model):
+    """Permanent dedup log: emails we've already attempted to reach."""
+
+    email        = models.EmailField(unique=True)
+    contacted_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.email
+
+
+class OutreachDailyStats(models.Model):
+    """Latest daily outreach results. One row per date, updated each run."""
+
+    date           = models.DateField(unique=True)
+    queued_count   = models.IntegerField(default=0)
+    sent_count     = models.IntegerField(default=0)
+    failed_count   = models.IntegerField(default=0)
+    pending_after  = models.IntegerField(default=0)
+    harvested      = models.IntegerField(default=0)
+    updated_at     = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-date']
+
+    def __str__(self):
+        return f'{self.date}: sent={self.sent_count} failed={self.failed_count}'
  
