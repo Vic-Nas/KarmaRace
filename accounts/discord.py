@@ -25,7 +25,6 @@ def is_configured() -> bool:
         and settings.DISCORD_USER_ROLE_ID
         and settings.DISCORD_STAFF_ROLE_ID
         and settings.DISCORD_SUPERUSER_ROLE_ID
-        and settings.DISCORD_NOTIFS_CHANNEL_ID
     )
 
 

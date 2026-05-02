@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Pick a Username — KarmaRace{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/accounts.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="auth-center">
+  <h1>Pick a username</h1>
+  <p class="text-muted">This is how you'll appear on KarmaRace. You can't change it later.</p>
+
+  <form method="post" class="username-form" id="username-form" autocomplete="off">
+    {% csrf_token %}
+    <div class="form-group">
+      <label for="id_username">Username</label>
+      <input
+        type="text"
+        id="id_username"
+        name="username"
+        class="form-control"
+        value="{{ suggestion }}"
+        maxlength="30"
+        required
+        autofocus
+      >
+      <div class="username-feedback" id="username-feedback"></div>
+      {% if error %}
+      <div class="form-text" style="color:var(--danger)">{{ error }}</div>
+      {% endif %}
+    </div>
+    <button type="submit" class="btn btn-primary" id="submit-btn">Set username</button>
+  </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  var input    = document.getElementById('id_username');
+  var feedback = document.getElementById('username-feedback');
+  var btn      = document.getElementById('submit-btn');
+  var timer    = null;
+  var last     = '';
+
+  function check(val) {
+    if (val === last) return;
+    last = val;
+    clearTimeout(timer);
+    if (!val) { feedback.textContent = ''; feedback.className = 'username-feedback'; return; }
+    feedback.textContent = '…';
+    feedback.className = 'username-feedback';
+    timer = setTimeout(function () {
+      fetch('{% url "username_check" %}?username=' + encodeURIComponent(val))
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          if (data.available) {
+            feedback.textContent = '✓ Available';
+            feedback.className = 'username-feedback username-feedback--ok';
+            btn.disabled = false;
+          } else {
+            feedback.textContent = data.reason === 'invalid'
+              ? '3–30 characters, letters/numbers/underscores only'
+              : '✗ Already taken';
+            feedback.className = 'username-feedback username-feedback--err';
+            btn.disabled = true;
+          }
+        })
+        .catch(function () { feedback.textContent = ''; });
+    }, 350);
+  }
+
+  input.addEventListener('input', function () { check(this.value.trim()); });
+  check(input.value.trim());
+})();
+</script>
+{% endblock %}

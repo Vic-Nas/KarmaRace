@@ -50,3 +50,24 @@
 
 .feed-empty { padding: 3rem 0; text-align: center; color: var(--text-muted); }
 .feed-empty p { font-size: 1rem; }
+
+/* Card actions — Check and Archive on the same row */
+.card__actions {
+  display: flex;
+  align-items: flex-start;
+  gap: .6rem;
+  flex-wrap: wrap;
+  margin-top: .9rem;
+}
+.card__actions form { margin: 0; }
+
+/* Email picker sits above the action row, not inside it */
+.feed-email-picker {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  flex-wrap: wrap;
+  margin-bottom: .6rem;
+}
+.feed-email-picker label { font-size: .78rem; font-weight: 600; color: var(--text-muted); white-space: nowrap; margin: 0; }
+.feed-email-picker select { width: auto; flex: 1 1 200px; }

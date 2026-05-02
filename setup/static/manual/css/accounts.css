@@ -44,3 +44,9 @@
   border: none;
   border-top: 1px solid var(--color-border);
 }
+
+/* Username picker */
+.username-form { max-width: 360px; margin: 2rem auto 0; text-align: left; }
+.username-feedback { font-size: .8rem; margin-top: .3rem; min-height: 1.1em; }
+.username-feedback--ok  { color: var(--success); }
+.username-feedback--err { color: var(--danger); }
