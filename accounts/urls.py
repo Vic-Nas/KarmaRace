@@ -13,4 +13,5 @@ urlpatterns = [
 	path('verified-emails/callback/', views.verify_email_callback, name='verify_email_callback'),
 	path('verified-emails/<int:email_id>/remove/', views.remove_verified_email, name='remove_verified_email'),
 	path('profile/edit/', views.edit_profile, name='edit_profile'),
+	path('verify/', views.verify_karmarace_hook, name='verify_karmarace_hook'),
 ]
