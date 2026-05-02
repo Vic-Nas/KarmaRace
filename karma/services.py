@@ -132,11 +132,10 @@ def adjust_karma_by_staff(user, delta: int, reason: str = None):
     """
     balance = get_balance(user)
     
-    # Create transaction (delta sign determines direction)
     KarmaTransaction.objects.create(
         user=user,
         delta=delta,
-        reason='STAFF_ADJUSTMENT',
+        reason=KarmaTransaction.Reason.STAFF_ADJUSTMENT,
         related_object_id=None,
     )
     
@@ -152,7 +151,7 @@ def adjust_karma_by_staff(user, delta: int, reason: str = None):
             payload={
                 'delta': delta,
                 'new_balance': new_balance,
-                'reason': reason or 'Karma adjustment by platform staff',
+                'reason': reason or 'Staff adjustment',
             },
         )
     except Exception:

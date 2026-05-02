@@ -3,10 +3,13 @@ import json
 import time
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.decorators import login_required
 from django.db.models import Sum, Value
 from django.db.models.functions import Coalesce
-from django.http import StreamingHttpResponse
+from django.http import JsonResponse, StreamingHttpResponse
 from django.shortcuts import render
+
+from karma.services import get_balance
 
 User = get_user_model()
 
@@ -27,6 +30,12 @@ def _leaderboard_rows(search=''):
         {'rank': rank, 'username': user.username, 'karma': user.karma}
         for rank, user in enumerate(qs[:LEADERBOARD_SIZE], start=1)
     ]
+
+
+@login_required
+def balance(request):
+    """API endpoint to get current user's karma balance."""
+    return JsonResponse({'balance': get_balance(request.user)})
 
 
 def leaderboard(request):

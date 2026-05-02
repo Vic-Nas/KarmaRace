@@ -6,8 +6,9 @@
   
   <form method="post" class="module">
     {% csrf_token %}
-    
-    <!-- Preserve selected user IDs -->
+    <input type="hidden" name="action" value="adjust_karma">
+    <input type="hidden" name="index" value="0">
+    <input type="hidden" name="select_across" value="0">
     {% for user in queryset %}
       <input type="hidden" name="_selected_action" value="{{ user.pk }}">
     {% endfor %}
