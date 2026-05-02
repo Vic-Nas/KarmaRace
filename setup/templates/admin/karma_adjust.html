@@ -7,6 +7,11 @@
   <form method="post" class="module">
     {% csrf_token %}
     
+    <!-- Preserve selected user IDs -->
+    {% for user in queryset %}
+      <input type="hidden" name="_selected_action" value="{{ user.pk }}">
+    {% endfor %}
+    
     <fieldset class="module aligned">
       <div class="form-row">
         <div>
@@ -37,4 +42,5 @@
   </ul>
 </div>
 {% endblock %}
+
 
