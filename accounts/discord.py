@@ -26,8 +26,8 @@ def is_configured() -> bool:
         and settings.DISCORD_BOT_TOKEN
         and settings.DISCORD_GUILD_ID
         and settings.DISCORD_USER_ROLE_ID
-        and settings.DISCORD_USER_STAFF_ID
-        and settings.DISCORD_USER_SUPERUSER_ID
+        and settings.DISCORD_STAFF_ID
+        and settings.DISCORD_SUPERUSER_ID
     )
 
 
