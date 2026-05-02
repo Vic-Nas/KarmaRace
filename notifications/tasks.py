@@ -22,6 +22,40 @@ EVENT_LABELS = {
 }
 
 
+def _build_discord_message(event, payload, label):
+    lines = [f'**{label}**']
+    if event == 'KARMA_ADJUSTED':
+        delta = payload.get('delta', 0)
+        sign = '+' if delta >= 0 else ''
+        lines.append(f'Amount: **{sign}{delta}**')
+        if payload.get('new_balance') is not None:
+            lines.append(f'New balance: **{payload["new_balance"]}**')
+        if payload.get('reason'):
+            lines.append(f'Reason: {payload["reason"]}')
+    elif event == 'TASK_HEALTH_FAILED':
+        lines.append(f'Task #{payload.get("task_id", "?")}')
+        if payload.get('health_last_failure_reason'):
+            lines.append(f'Reason: {payload["health_last_failure_reason"]}')
+    elif event == 'WEBHOOK_CHECK':
+        phase = payload.get('phase', '')
+        status = payload.get('status', '')
+        lines.append(f'Task #{payload.get("task_id", "?")} — {phase} -> `{status}`')
+        if payload.get('tester_username'):
+            lines.append(f'Tester: {payload["tester_username"]}')
+        if payload.get('detail'):
+            lines.append(f'Detail: {payload["detail"]}')
+    elif event in ('KARMA_LOW', 'KARMA_RESTORED'):
+        lines.append(f'Balance: **{payload.get("balance", "?")}** (threshold {payload.get("threshold", "?")})')
+    else:
+        if payload.get('task_id'):
+            lines.append(f'Task #{payload["task_id"]}')
+        if payload.get('balance') is not None:
+            lines.append(f'Karma balance: **{payload["balance"]}**')
+        if payload.get('status'):
+            lines.append(f'Status: `{payload["status"]}`')
+    return '\n'.join(lines)
+
+
 def _retry_or_log(task_fn, preference_id, payload, attempt, max_attempts):
     if attempt < max_attempts:
         try:
@@ -57,7 +91,6 @@ def deliver_notification_webhook(preference_id: int, payload: dict, attempt: int
 
 @app.task
 def deliver_notification_discord(preference_id: int, payload: dict, attempt: int = 1, max_attempts: int = 3):
-    """Send a formatted Discord DM to the user via the bot."""
     try:
         pref = NotificationPreference.objects.select_related('user').get(pk=preference_id)
     except NotificationPreference.DoesNotExist:
@@ -82,20 +115,8 @@ def deliver_notification_discord(preference_id: int, payload: dict, attempt: int
         from accounts import discord as discord_api
 
         label = EVENT_LABELS.get(pref.event, pref.event)
-        task_id = payload.get('task_id')
-        balance = payload.get('balance')
+        message = _build_discord_message(pref.event, payload, label)
 
-        lines = [f'**{label}**']
-        if task_id:
-            lines.append(f'Task #{task_id}')
-        if balance is not None:
-            lines.append(f'Karma balance: **{balance}**')
-        if payload.get('status'):
-            lines.append(f'Status: `{payload["status"]}`')
-
-        message = '\n'.join(lines)
-
-        # Open DM channel then send message via bot.
         dm_resp = requests.post(
             f'{discord_api.DISCORD_API_BASE}/users/@me/channels',
             headers=discord_api._bot_headers(),

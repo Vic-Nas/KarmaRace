@@ -1,6 +1,7 @@
 (function () {
   var POLL_MS = 5000;
-  var KARMA_EVENTS = ['TASK_CONFIRMED', 'KARMA_ADJUSTED', 'KARMA_LOW', 'KARMA_RESTORED'];
+  // TASK_CONFIRMED excluded — feed-check-poll.js already handles badge update for that
+  var KARMA_EVENTS = ['KARMA_ADJUSTED', 'KARMA_LOW', 'KARMA_RESTORED'];
 
   var ui = window._KRNotifUI;
   if (!ui) return;
@@ -23,13 +24,15 @@
       .then(function (data) {
         if (!data) return;
         ui.updateBell(data.unread_count);
+        var maxId = lastId;
         data.notifications.forEach(function (notif) {
           if (ui.seen.has(notif.id)) return;
           ui.seen.add(notif.id);
           ui.showToast(notif);
           updateKarmaBadge(notif);
-          ui.setLastSeenId(notif.id);
+          if (notif.id > maxId) maxId = notif.id;
         });
+        if (maxId > lastId) ui.setLastSeenId(maxId);
       })
       .catch(function () {});
   }

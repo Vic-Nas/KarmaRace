@@ -68,10 +68,7 @@
 <div class="kr-notif-dropdown" id="notif-dropdown">
   <div class="kr-notif-dropdown__header">
     <span>Notifications</span>
-    <form method="post" action="{% url 'notifications_mark_all_read' %}" class="m-0">
-      {% csrf_token %}
-      <button type="submit" class="btn btn-link btn-sm p-0" style="text-decoration:none">Mark all read</button>
-    </form>
+    <a href="{% url 'notifications_inbox' %}" class="small">View all</a>
   </div>
   <div class="kr-notif-dropdown__list" id="notif-drop-list">
     <div class="kr-notif-item text-muted">Loading&hellip;</div>
@@ -135,7 +132,6 @@ window.KR_ADS = {
 </script>
 {% if user.is_authenticated %}
 <script src="{% static 'js/karma.js' %}"></script>
-<script src="{% static 'js/karma-poll.js' %}"></script>
 <script src="{% static 'js/notifications.js' %}"></script>
 <script src="{% static 'js/notifications-poll.js' %}"></script>
 {% endif %}
