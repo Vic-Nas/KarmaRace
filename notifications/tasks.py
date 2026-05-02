@@ -21,39 +21,65 @@ EVENT_LABELS = {
     'FLAG_UP_SENT':       '🚩 Flag Sent',
 }
 
+# Discord embed sidebar colors
+EVENT_COLORS = {
+    'TASK_CONFIRMED':     0x5cb84a,
+    'TASK_HEALTH_FAILED': 0xe06060,
+    'WEBHOOK_CHECK':      0x4aaac8,
+    'KARMA_LOW':          0xd4b040,
+    'KARMA_RESTORED':     0x5cb84a,
+    'KARMA_ADJUSTED':     0xe8883a,
+    'PROJECT_STATE':      0x888880,
+    'APPRECIATION':       0xe06060,
+    'FLAG_UP_RECEIVED':   0xe06060,
+    'FLAG_UP_SENT':       0x4aaac8,
+}
 
-def _build_discord_message(event, payload, label):
-    lines = [f'**{label}**']
+
+def _build_embed(event, payload, label):
+    fields = []
+
     if event == 'KARMA_ADJUSTED':
         delta = payload.get('delta', 0)
         sign = '+' if delta >= 0 else ''
-        lines.append(f'Amount: **{sign}{delta}**')
+        fields.append({'name': 'Amount', 'value': f'`{sign}{delta}`', 'inline': True})
         if payload.get('new_balance') is not None:
-            lines.append(f'New balance: **{payload["new_balance"]}**')
+            fields.append({'name': 'New Balance', 'value': f'`{payload["new_balance"]}`', 'inline': True})
         if payload.get('reason'):
-            lines.append(f'Reason: {payload["reason"]}')
+            fields.append({'name': 'Reason', 'value': payload['reason'], 'inline': False})
+
     elif event == 'TASK_HEALTH_FAILED':
-        lines.append(f'Task #{payload.get("task_id", "?")}')
+        fields.append({'name': 'Task', 'value': f'#{payload.get("task_id", "?")}', 'inline': True})
         if payload.get('health_last_failure_reason'):
-            lines.append(f'Reason: {payload["health_last_failure_reason"]}')
+            fields.append({'name': 'Reason', 'value': payload['health_last_failure_reason'], 'inline': False})
+
     elif event == 'WEBHOOK_CHECK':
-        phase = payload.get('phase', '')
-        status = payload.get('status', '')
-        lines.append(f'Task #{payload.get("task_id", "?")} — {phase} -> `{status}`')
+        fields.append({'name': 'Task', 'value': f'#{payload.get("task_id", "?")}', 'inline': True})
+        fields.append({'name': 'Phase', 'value': payload.get('phase', '—'), 'inline': True})
+        fields.append({'name': 'Status', 'value': f'`{payload.get("status", "—")}`', 'inline': True})
         if payload.get('tester_username'):
-            lines.append(f'Tester: {payload["tester_username"]}')
+            fields.append({'name': 'Tester', 'value': payload['tester_username'], 'inline': True})
         if payload.get('detail'):
-            lines.append(f'Detail: {payload["detail"]}')
+            fields.append({'name': 'Detail', 'value': payload['detail'], 'inline': False})
+
     elif event in ('KARMA_LOW', 'KARMA_RESTORED'):
-        lines.append(f'Balance: **{payload.get("balance", "?")}** (threshold {payload.get("threshold", "?")})')
+        fields.append({'name': 'Balance', 'value': f'`{payload.get("balance", "?")}`', 'inline': True})
+        fields.append({'name': 'Threshold', 'value': f'`{payload.get("threshold", "?")}`', 'inline': True})
+
     else:
         if payload.get('task_id'):
-            lines.append(f'Task #{payload["task_id"]}')
+            fields.append({'name': 'Task', 'value': f'#{payload["task_id"]}', 'inline': True})
         if payload.get('balance') is not None:
-            lines.append(f'Karma balance: **{payload["balance"]}**')
+            fields.append({'name': 'Balance', 'value': f'`{payload["balance"]}`', 'inline': True})
         if payload.get('status'):
-            lines.append(f'Status: `{payload["status"]}`')
-    return '\n'.join(lines)
+            fields.append({'name': 'Status', 'value': f'`{payload["status"]}`', 'inline': True})
+
+    return {
+        'title': label,
+        'color': EVENT_COLORS.get(event, 0x888880),
+        'fields': fields,
+        'footer': {'text': 'KarmaRace'},
+    }
 
 
 def _retry_or_log(task_fn, preference_id, payload, attempt, max_attempts):
@@ -115,7 +141,7 @@ def deliver_notification_discord(preference_id: int, payload: dict, attempt: int
         from accounts import discord as discord_api
 
         label = EVENT_LABELS.get(pref.event, pref.event)
-        message = _build_discord_message(pref.event, payload, label)
+        embed = _build_embed(pref.event, payload, label)
 
         dm_resp = requests.post(
             f'{discord_api.DISCORD_API_BASE}/users/@me/channels',
@@ -129,7 +155,7 @@ def deliver_notification_discord(preference_id: int, payload: dict, attempt: int
         msg_resp = requests.post(
             f'{discord_api.DISCORD_API_BASE}/channels/{channel_id}/messages',
             headers=discord_api._bot_headers(),
-            json={'content': message},
+            json={'embeds': [embed]},
             timeout=10,
         )
         msg_resp.raise_for_status()
