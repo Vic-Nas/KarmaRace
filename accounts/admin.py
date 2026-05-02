@@ -2,6 +2,9 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 from django.urls import reverse
 from django.utils.html import format_html
+from django.shortcuts import render, redirect
+from django.contrib import messages
+from django.http import HttpResponse
 
 from accounts.models import (
     User,
@@ -36,9 +39,12 @@ class UserAdmin(DjangoUserAdmin):
 
     def adjust_karma(self, request, queryset):
         """Action to adjust karma (positive to add, negative to subtract)."""
-        if request.method == 'POST':
+        # Check if form was submitted with delta value
+        delta_str = request.POST.get('delta', '').strip()
+        
+        if delta_str:  # Form submitted
             try:
-                delta = int(request.POST.get('delta', 0))
+                delta = int(delta_str)
                 reason = request.POST.get('reason', '').strip() or 'Manual adjustment from admin'
                 
                 if delta == 0:
@@ -54,11 +60,11 @@ class UserAdmin(DjangoUserAdmin):
                     f'✓ {op.capitalize()} {abs(delta)} karma to {queryset.count()} user(s).',
                     messages.SUCCESS
                 )
-                return redirect(request.get_full_path())
             except (ValueError, TypeError):
                 self.message_user(request, 'Invalid amount.', messages.ERROR)
-                return
+            return
 
+        # Show form on initial click
         return render(
             request,
             'admin/karma_adjust.html',
