@@ -32,25 +32,26 @@ class UserAdmin(DjangoUserAdmin):
         )
     karma_balance.short_description = 'Current Karma Balance'
 
-    actions = ['adjust_karma_add', 'adjust_karma_subtract']
+    actions = ['adjust_karma']
 
-    def adjust_karma_add(self, request, queryset):
-        """Action to add karma to selected users."""
+    def adjust_karma(self, request, queryset):
+        """Action to adjust karma (positive to add, negative to subtract)."""
         if request.method == 'POST':
             try:
-                amount = int(request.POST.get('karma_amount', 0))
-                reason = request.POST.get('karma_reason', 'Manual adjustment from admin').strip()
+                delta = int(request.POST.get('delta', 0))
+                reason = request.POST.get('reason', '').strip() or 'Manual adjustment from admin'
                 
-                if amount <= 0:
-                    self.message_user(request, 'Amount must be positive.', messages.ERROR)
+                if delta == 0:
+                    self.message_user(request, 'Amount cannot be zero.', messages.ERROR)
                     return
 
                 for user in queryset:
-                    adjust_karma_by_staff(user, amount, reason)
+                    adjust_karma_by_staff(user, delta, reason)
                 
+                op = 'added' if delta > 0 else 'subtracted'
                 self.message_user(
                     request,
-                    f'✓ Added {amount} karma to {queryset.count()} user(s).',
+                    f'✓ {op.capitalize()} {abs(delta)} karma to {queryset.count()} user(s).',
                     messages.SUCCESS
                 )
                 return redirect(request.get_full_path())
@@ -61,50 +62,9 @@ class UserAdmin(DjangoUserAdmin):
         return render(
             request,
             'admin/karma_adjust.html',
-            {
-                'title': 'Add Karma',
-                'queryset': queryset,
-                'action': 'adjust_karma_add',
-                'operation': 'Add',
-            }
+            {'queryset': queryset}
         )
-    adjust_karma_add.short_description = '➕ Add Karma'
-
-    def adjust_karma_subtract(self, request, queryset):
-        """Action to subtract karma from selected users."""
-        if request.method == 'POST':
-            try:
-                amount = int(request.POST.get('karma_amount', 0))
-                reason = request.POST.get('karma_reason', 'Manual adjustment from admin').strip()
-                
-                if amount <= 0:
-                    self.message_user(request, 'Amount must be positive.', messages.ERROR)
-                    return
-
-                for user in queryset:
-                    adjust_karma_by_staff(user, -amount, reason)
-                
-                self.message_user(
-                    request,
-                    f'✓ Subtracted {amount} karma from {queryset.count()} user(s).',
-                    messages.SUCCESS
-                )
-                return redirect(request.get_full_path())
-            except (ValueError, TypeError):
-                self.message_user(request, 'Invalid amount.', messages.ERROR)
-                return
-
-        return render(
-            request,
-            'admin/karma_adjust.html',
-            {
-                'title': 'Subtract Karma',
-                'queryset': queryset,
-                'action': 'adjust_karma_subtract',
-                'operation': 'Subtract',
-            }
-        )
-    adjust_karma_subtract.short_description = '➖ Subtract Karma'
+    adjust_karma.short_description = '⚙️ Adjust Karma'
 
 
 admin.site.register(User, UserAdmin)

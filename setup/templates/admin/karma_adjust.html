@@ -1,9 +1,8 @@
 {% extends "admin/base_site.html" %}
-{% load admin_urls %}
 
 {% block content %}
 <div id="content-main">
-  <h1>{{ title }} for {{ queryset.count }} User(s)</h1>
+  <h1>Adjust Karma for {{ queryset.count }} User(s)</h1>
   
   <form method="post" class="module">
     {% csrf_token %}
@@ -11,21 +10,21 @@
     <fieldset class="module aligned">
       <div class="form-row">
         <div>
-          <label for="id_karma_amount">Karma Amount:</label>
-          <input type="number" id="id_karma_amount" name="karma_amount" min="1" required>
+          <label for="id_delta">Amount (positive=add, negative=subtract):</label>
+          <input type="number" id="id_delta" name="delta" required autofocus>
         </div>
       </div>
       
       <div class="form-row">
         <div>
-          <label for="id_karma_reason">Reason (optional):</label>
-          <textarea id="id_karma_reason" name="karma_reason" rows="3" placeholder="e.g., Bonus for participation"></textarea>
+          <label for="id_reason">Reason (optional):</label>
+          <textarea id="id_reason" name="reason" rows="2" placeholder="e.g., Bonus for participation"></textarea>
         </div>
       </div>
     </fieldset>
     
     <div class="submit-row">
-      <input type="submit" value="{{ operation }} Karma" class="default">
+      <input type="submit" value="Adjust Karma" class="default">
       <a href="../" class="button">Cancel</a>
     </div>
   </form>
@@ -38,3 +37,4 @@
   </ul>
 </div>
 {% endblock %}
+
