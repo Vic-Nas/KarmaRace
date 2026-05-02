@@ -159,22 +159,9 @@ STATIC_ROOT = BASE_DIR / 'setup' / 'static' / 'cache'
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # OAuth providers (Google, GitHub, Discord)
-from .settings_oauth import (
-    GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET,
-    GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET,
-    DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET, DISCORD_BOT_TOKEN,
-    DISCORD_GUILD_ID, DISCORD_USER_ROLE_ID, DISCORD_STAFF_ROLE_ID, DISCORD_SUPERUSER_ROLE_ID,
-    SOCIALACCOUNT_PROVIDERS,
-)
+from .settings_oauth import *
 
 # Third-party services (Adsense, Stripe, Resend, GitHub API, Procrastinate)
-from .settings_services import (
-    ADSENSE_CLIENT_ID, ADSENSE_SLOTS,
-    STRIPE_SECRET_KEY, STRIPE_PRICE_ID, STRIPE_WEBHOOK_SECRET,
-    RESEND_API_KEY, RESEND_WEBHOOK_SECRET,
-    GITHUB_TOKEN, REACH, DAILY_REACH,
-    PROCRASTINATE_CONNECTORS,
-)
-
+from .settings_services import *
 # Resend email sender (use DOMAIN if not configured in env)
 RESEND_FROM_EMAIL = os.environ.get('RESEND_FROM_EMAIL') or f'noreply@{DOMAIN}'
