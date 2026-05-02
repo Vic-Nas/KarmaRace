@@ -141,7 +141,6 @@ def adjust_karma_by_staff(user, delta: int, reason: str = None):
     
     new_balance = balance + delta
     
-    # Notify user of adjustment
     try:
         from notifications.models import Notification
         from notifications.services import notify
@@ -154,7 +153,9 @@ def adjust_karma_by_staff(user, delta: int, reason: str = None):
                 'reason': reason or 'Staff adjustment',
             },
         )
+        threshold = _karma_low_threshold(user)
+        _maybe_notify_karma_threshold_transition(user=user, new_balance=new_balance, threshold=threshold)
     except Exception:
-        pass  # Notification failure shouldn't block adjustment
-    
+        pass
+
     return new_balance
