@@ -14,6 +14,7 @@ EVENT_LABELS = {
     'WEBHOOK_CHECK':      '🔗 Webhook Check',
     'KARMA_LOW':          '📉 Karma Low',
     'KARMA_RESTORED':     '📈 Karma Restored',
+    'KARMA_ADJUSTED':     '⚖️ Karma Adjusted',
     'PROJECT_STATE':      '📌 Project Update',
     'APPRECIATION':       '❤️ Appreciation',
     'FLAG_UP_RECEIVED':   '🚩 Flag Received',
