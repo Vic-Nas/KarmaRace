@@ -17,3 +17,9 @@ urlpatterns = [
     path('', include('notifications.urls')),
     path('', include('karma.urls')),
 ]
+
+# Error handlers (when DEBUG=False)
+handler404 = views.handler404
+handler403 = views.handler403
+handler500 = views.handler500
+

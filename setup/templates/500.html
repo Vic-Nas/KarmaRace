@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Server Error — KarmaRace{% endblock %}
+
+{% block content %}
+<div style="text-align: center; padding: 4rem 2rem;">
+  <h1 style="font-size: 4rem; margin: 0; color: var(--primary);">500</h1>
+  <h2 style="font-size: 1.5rem; margin: 1rem 0; color: var(--text);">Server Error</h2>
+  <p style="color: var(--text-muted); margin: 1rem 0; font-size: 1rem;">
+    Something went wrong on our end. We're working to fix it.
+  </p>
+  <a href="/" class="btn btn-primary" style="margin-top: 2rem;">Back to Home</a>
+</div>
+{% endblock %}

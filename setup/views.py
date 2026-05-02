@@ -21,3 +21,20 @@ def public_profile_redirect(request, username):
     """Delegate to accounts.views to keep URL routing clean."""
     from accounts.views import public_profile
     return public_profile(request, username)
+
+
+# Error handlers
+def handler404(request, exception=None):
+    """Handle 404 — page not found."""
+    return render(request, '404.html', status=404)
+
+
+def handler403(request, exception=None):
+    """Handle 403 — access denied."""
+    return render(request, '403.html', status=403)
+
+
+def handler500(request):
+    """Handle 500 — server error."""
+    return render(request, '500.html', status=500)
+

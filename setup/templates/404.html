@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Page Not Found — KarmaRace{% endblock %}
+
+{% block content %}
+<div style="text-align: center; padding: 4rem 2rem;">
+  <h1 style="font-size: 4rem; margin: 0; color: var(--primary);">404</h1>
+  <h2 style="font-size: 1.5rem; margin: 1rem 0; color: var(--text);">Page Not Found</h2>
+  <p style="color: var(--text-muted); margin: 1rem 0; font-size: 1rem;">
+    The page you're looking for doesn't exist or has been moved.
+  </p>
+  <a href="/" class="btn btn-primary" style="margin-top: 2rem;">Back to Home</a>
+</div>
+{% endblock %}
