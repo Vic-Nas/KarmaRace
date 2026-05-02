@@ -1,5 +1,6 @@
 """Management command to manually send outreach emails (for missed cron)."""
 import logging
+from tqdm import tqdm
 
 from django.core.management.base import BaseCommand
 from django.conf import settings
@@ -51,29 +52,26 @@ class Command(BaseCommand):
             self.stdout.write(self.style.WARNING('No pending outreach records.'))
             return
 
-        self.stdout.write(f'Sending {len(pending)} emails...')
-
         sent = failed = 0
-        for i, record in enumerate(pending, 1):
-            ok = resend_post({
-                'from': from_addr,
-                'to': [record.email],
-                'subject': SUBJECT,
-                'html': html,
-                'text': plaintext,
-            })
-            OutreachContactedEmail.objects.get_or_create(email=record.email)
-            record.delete()
-            
-            if ok:
-                sent += 1
-                status = '✓'
-            else:
-                failed += 1
-                status = '✗'
-            
-            if i % 10 == 0 or i == len(pending):
-                self.stdout.write(f'  {i}/{len(pending)} emails processed ({sent} sent, {failed} failed)')
+        with tqdm(pending, desc='Sending emails', unit='email', dynamic_ncols=True) as pbar:
+            for record in pbar:
+                ok = resend_post({
+                    'from': from_addr,
+                    'to': [record.email],
+                    'subject': SUBJECT,
+                    'html': html,
+                    'text': plaintext,
+                })
+                OutreachContactedEmail.objects.get_or_create(email=record.email)
+                record.delete()
+                
+                if ok:
+                    sent += 1
+                else:
+                    failed += 1
+                
+                # Update progress bar suffix with stats
+                pbar.set_postfix({'sent': sent, 'failed': failed}, refresh=True)
 
         # Update daily stats
         today = timezone.now().date()

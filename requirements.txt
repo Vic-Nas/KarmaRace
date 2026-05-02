@@ -10,3 +10,4 @@ procrastinate
 psycopg[binary]>=3.1
 whitenoise
 stripe
+tqdm
