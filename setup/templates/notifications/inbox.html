@@ -12,6 +12,7 @@
 <div class="page-header">
   <h1>Notifications</h1>
   <div class="d-flex gap-1 align-items-center">
+    <a href="{% url 'help_index' %}#notification-events" target="_blank" class="btn btn-outline-secondary btn-sm">Event docs</a>
     <a href="{% url 'preferences' %}" class="btn btn-secondary btn-sm">Preferences</a>
     {% if notifications %}
     <form method="post" action="{% url 'notifications_mark_all_read' %}" class="m-0">

@@ -65,6 +65,7 @@
     <div class="pref-table pref-table--3col mt-2">
       <div class="pref-table__head">
         <span>Event</span><span>Webhook</span><span>Discord</span>
+        <div class="small text-muted" style="grid-column: 1/-1; padding-top: 0.5rem"><a href="{% url 'help_index' %}#notification-events" target="_blank">View event payloads</a></div>
       </div>
       {% for event_key, event_label in all_events %}
       {% with pref=prefs|get_item:event_key %}

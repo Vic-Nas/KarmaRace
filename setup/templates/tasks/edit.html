@@ -50,7 +50,7 @@
         <option value="{{ value }}" {% if value == form.github_repo_selected %}selected{% endif %}>{{ label }}</option>
         {% endfor %}
       </select>
-      <div class="form-text">Only public repos with push access are listed.</div>
+      <div class="form-text">Only public repos with push access are listed. <a href="{% url 'help_index' %}#task-types-verification" target="_blank">Learn more about GitHub task types</a>.</div>
       {% if form.github_repo_load_error %}
       <div class="alert alert-warning mt-1">{{ form.github_repo_load_error }}</div>
       {% endif %}
@@ -59,12 +59,13 @@
     <div class="form-group" id="webhook-secret-row" style="display:none">
       <label for="id_webhook_secret">Webhook Secret <span class="form-text" style="display:inline">(optional)</span></label>
       {{ form.webhook_secret }}
-      <div class="form-text">Sent as Bearer token when KarmaRace calls your webhook.</div>
+      <div class="form-text">Sent as Bearer token when KarmaRace calls your webhook. <a href="{% url 'help_index' %}#webhook-contract" target="_blank">View webhook contract</a>.</div>
     </div>
 
     <div class="form-group">
       <label for="id_description">Instructions for testers</label>
       {{ form.description }}
+      <div class="form-text">Clear instructions help testers succeed. <a href="{% url 'help_index' %}#reciprocity-obligations" target="_blank">Learn about reciprocity</a> and <a href="{% url 'help_index' %}#task-visibility-karma" target="_blank">task visibility</a>.</div>
     </div>
 
     {% if form.errors %}
