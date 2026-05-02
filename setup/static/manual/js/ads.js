@@ -72,20 +72,28 @@
     return ins;
   }
 
+  function loadAdsenseScript(client) {
+    if (document.querySelector('script[src*="adsbygoogle"]')) return;
+    var s = document.createElement('script');
+    s.async = true;
+    s.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=' + client;
+    s.crossOrigin = 'anonymous';
+    document.head.appendChild(s);
+  }
+
   document.addEventListener('DOMContentLoaded', function () {
     var cfg    = window.KR_ADS || {};
     var client = cfg.client || '';
     var slots  = (cfg.slots || []).filter(Boolean);
     var isPro  = !!cfg.isPro;
 
-    // Pro users: hide both sidebars — body class already handles CSS,
-    // but also empty boxes so no flash of fallback content
     if (isPro) return;
 
     var leftBoxes  = Array.from(document.querySelectorAll('.kr-ads--left  .ad-box'));
     var rightBoxes = Array.from(document.querySelectorAll('.kr-ads--right .ad-box'));
-    // slots 0-2 → left (KOHO), slots 3-5 → right (Railway)
     var allBoxes   = leftBoxes.concat(rightBoxes);
+
+    if (client && slots.length) loadAdsenseScript(client);
 
     allBoxes.forEach(function (box, i) {
       var slot    = slots[i] || null;
