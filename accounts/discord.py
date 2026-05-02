@@ -17,9 +17,6 @@ class DiscordIdentity:
 
 
 def is_configured() -> bool:
-    # Consider integration configured if basic credentials + guild are present
-    # and at least one role configuration exists (legacy single-role or
-    # the new per-category role vars).
     return bool(
         settings.DISCORD_CLIENT_ID
         and settings.DISCORD_CLIENT_SECRET
@@ -145,7 +142,6 @@ def ensure_role(discord_user_id: str, local_user: Optional[object] = None) -> No
         except Exception:
             user = None
 
-    # Prefer per-category role IDs when a user is known
     if user:
         if getattr(user, 'is_superuser', False) and getattr(settings, 'DISCORD_SUPERUSER_ROLE_ID', ''):
             role_id = settings.DISCORD_SUPERUSER_ROLE_ID
@@ -154,7 +150,6 @@ def ensure_role(discord_user_id: str, local_user: Optional[object] = None) -> No
         elif getattr(settings, 'DISCORD_USER_ROLE_ID', ''):
             role_id = settings.DISCORD_USER_ROLE_ID
 
-    # Legacy fallback
     if not role_id:
         role_id = getattr(settings, 'DISCORD_ROLE_ID', '') or ''
 
@@ -183,3 +178,79 @@ def sync_nickname(discord_user_id: str, nickname: str) -> None:
 
 def guild_jump_url() -> str:
     return f'https://discord.com/channels/{settings.DISCORD_GUILD_ID}'
+
+
+def kick_member(discord_user_id: str) -> None:
+    """
+    Remove a member from the guild.
+    Used only when a user replaces their linked Discord account with a new one.
+    404 is treated as success (already not a member).
+    """
+    resp = requests.delete(_member_url(discord_user_id), headers=_bot_headers(), timeout=15)
+    if resp.status_code not in {204, 404}:
+        resp.raise_for_status()
+
+
+def create_notifs_thread(karmarace_username: str, discord_user_id: str) -> str:
+    """
+    Create a private thread in DISCORD_NOTIFS_CHANNEL_ID named after the
+    KarmaRace username, add the user as a member, and return the thread ID.
+
+    The #notifs channel must be a text channel with View Channel denied for
+    @everyone. The bot needs CREATE_PRIVATE_THREADS and SEND_MESSAGES_IN_THREADS.
+    """
+    channel_id = settings.DISCORD_NOTIFS_CHANNEL_ID
+
+    # Type 12 = GUILD_PRIVATE_THREAD
+    resp = requests.post(
+        f'{DISCORD_API_BASE}/channels/{channel_id}/threads',
+        headers=_bot_headers(),
+        json={
+            'name': f'notifs-{karmarace_username}',
+            'type': 12,
+            'invitable': False,  # only the bot (and admins) can add members
+        },
+        timeout=15,
+    )
+    resp.raise_for_status()
+    thread_id = resp.json()['id']
+
+    add_thread_member(thread_id, discord_user_id)
+
+    return thread_id
+
+
+def add_thread_member(thread_id: str, discord_user_id: str) -> None:
+    """Add a Discord user to an existing thread."""
+    resp = requests.put(
+        f'{DISCORD_API_BASE}/channels/{thread_id}/thread-members/{discord_user_id}',
+        headers=_bot_headers(),
+        timeout=15,
+    )
+    if resp.status_code not in {200, 201, 204}:
+        resp.raise_for_status()
+
+
+def remove_thread_member(thread_id: str, discord_user_id: str) -> None:
+    """
+    Remove a Discord user from a thread.
+    404 is treated as success (already not a member).
+    """
+    resp = requests.delete(
+        f'{DISCORD_API_BASE}/channels/{thread_id}/thread-members/{discord_user_id}',
+        headers=_bot_headers(),
+        timeout=15,
+    )
+    if resp.status_code not in {200, 204, 404}:
+        resp.raise_for_status()
+
+
+def post_to_thread(thread_id: str, embed: dict) -> None:
+    """Post an embed message to a thread."""
+    resp = requests.post(
+        f'{DISCORD_API_BASE}/channels/{thread_id}/messages',
+        headers=_bot_headers(),
+        json={'embeds': [embed]},
+        timeout=10,
+    )
+    resp.raise_for_status()

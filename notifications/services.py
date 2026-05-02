@@ -6,17 +6,24 @@ from notifications.models import Notification, NotificationPreference
 logger = logging.getLogger(__name__)
 
 
+EVENTS_BYPASS_PRO_GATE = {
+    'WEBHOOK_CHECK',
+    'TASK_HEALTH_FAILED',
+}
+
+
 def notify(user, event, payload: dict):
     """
     Central notification dispatch.
 
     1. Always writes a Notification row for in-app display.
-     2. If the user is Pro and has a NotificationPreference for this event,
-         dispatches to enabled channels: webhook, discord.
+    2. If the user is Pro (or the event bypasses the Pro gate) and has a
+       NotificationPreference for this event, dispatches to enabled channels:
+       webhook, discord.
     """
     notification = Notification.objects.create(user=user, event=event, payload=payload)
 
-    if not user.is_pro:
+    if not user.is_pro and event not in EVENTS_BYPASS_PRO_GATE:
         return notification
 
     try:

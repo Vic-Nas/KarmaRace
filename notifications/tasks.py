@@ -124,6 +124,8 @@ def deliver_notification_discord(preference_id: int, payload: dict, attempt: int
         return
 
     from accounts.models import LinkedAccount
+    from accounts import discord as discord_api
+
     discord_link = LinkedAccount.objects.filter(
         user=pref.user, platform=LinkedAccount.DISCORD,
     ).first()
@@ -138,27 +140,20 @@ def deliver_notification_discord(preference_id: int, payload: dict, attempt: int
 
     state = NotificationDelivery.State.FAILED
     try:
-        from accounts import discord as discord_api
-
         label = EVENT_LABELS.get(pref.event, pref.event)
         embed = _build_embed(pref.event, payload, label)
 
-        dm_resp = requests.post(
-            f'{discord_api.DISCORD_API_BASE}/users/@me/channels',
-            headers=discord_api._bot_headers(),
-            json={'recipient_id': discord_link.platform_id},
-            timeout=10,
-        )
-        dm_resp.raise_for_status()
-        channel_id = dm_resp.json()['id']
+        # Get or create the user's private notifs thread.
+        thread_id = discord_link.discord_notifs_thread_id
+        if not thread_id:
+            thread_id = discord_api.create_notifs_thread(
+                karmarace_username=pref.user.username,
+                discord_user_id=discord_link.platform_id,
+            )
+            discord_link.discord_notifs_thread_id = thread_id
+            discord_link.save(update_fields=['discord_notifs_thread_id'])
 
-        msg_resp = requests.post(
-            f'{discord_api.DISCORD_API_BASE}/channels/{channel_id}/messages',
-            headers=discord_api._bot_headers(),
-            json={'embeds': [embed]},
-            timeout=10,
-        )
-        msg_resp.raise_for_status()
+        discord_api.post_to_thread(thread_id, embed)
         state = NotificationDelivery.State.SUCCESS
 
     except Exception as exc:

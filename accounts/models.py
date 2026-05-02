@@ -16,8 +16,9 @@ class LinkedAccount(models.Model):
     platform          = models.CharField(max_length=50, choices=PLATFORM_CHOICES)
     platform_id       = models.CharField(max_length=200)
     platform_username = models.CharField(max_length=200)
-    access_token      = models.CharField(max_length=500, blank=True)
-    connected_at      = models.DateTimeField(auto_now_add=True)
+    access_token             = models.CharField(max_length=500, blank=True)
+    discord_notifs_thread_id = models.CharField(max_length=30, blank=True, default='')
+    connected_at             = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         unique_together = [('user', 'platform'), ('platform', 'platform_id')]

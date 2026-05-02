@@ -10,7 +10,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
 from django.contrib.auth import get_user_model
 
-from accounts.models import LinkedAccount
+from accounts.models import LinkedAccount, VerifiedEmail
 from tasks.models import TaskCompletion
 
 User = get_user_model()
@@ -43,19 +43,22 @@ def verify_karmarace_hook(request):
     except json.JSONDecodeError:
         return JsonResponse({'verified': False, 'reason': 'Invalid JSON'}, status=400)
 
-    # Get user by ID or username
-    user_id = payload.get('user_id')
-    username = payload.get('username')
-    
-    if not user_id and not username:
-        return JsonResponse({'verified': False, 'reason': 'user_id or username required'}, status=400)
+    # Get user by ID, username, or verified google_email
+    user_id      = payload.get('user_id')
+    username     = payload.get('username')
+    google_email = payload.get('google_email', '').strip()
+
+    if not user_id and not username and not google_email:
+        return JsonResponse({'verified': False, 'reason': 'user_id, username, or google_email required'}, status=400)
 
     try:
         if user_id:
             user = User.objects.get(pk=user_id)
-        else:
+        elif username:
             user = User.objects.get(username=username)
-    except User.DoesNotExist:
+        else:
+            user = VerifiedEmail.objects.select_related('user').get(email=google_email).user
+    except (User.DoesNotExist, VerifiedEmail.DoesNotExist):
         return JsonResponse({'verified': False, 'reason': 'User not found'})
 
     # Optional: verify secret token

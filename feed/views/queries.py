@@ -76,7 +76,9 @@ def get_pinned_task(request, archive='not_archived', task_types=None, obligation
     pinned_id = request.session.get(SESSION_FEED_PIN_KEY)
     if not pinned_id:
         return None
-    task = Task.objects.filter(pk=pinned_id, is_deleted=False, hidden=False).select_related('owner').first()
+    task = Task.objects.filter(pk=pinned_id, is_deleted=False, hidden=False).select_related('owner').annotate(
+        owner_balance=Coalesce(Sum('owner__karma_transactions__delta'), Value(0)),
+    ).first()
     if not task or task.owner_id == request.user.id:
         request.session.pop(SESSION_FEED_PIN_KEY, None)
         return None
