@@ -19,6 +19,13 @@ def _notif_summary(notif):
         return f"Task #{p.get('task_id', '?')} failed health check."
     if event == Notification.Event.WEBHOOK_CHECK:
         return f"Webhook {p.get('phase', 'check')} for Task #{p.get('task_id', '?')} => {p.get('status', 'unknown')}"
+    if event == Notification.Event.KARMA_ADJUSTED:
+        delta = p.get('delta', 0)
+        sign = '+' if delta >= 0 else ''
+        reason = p.get('reason', 'Staff adjustment')
+        new_bal = p.get('new_balance')
+        bal_str = f' \u2192 {new_bal}' if new_bal is not None else ''
+        return f'{sign}{delta} karma{bal_str} \u2014 {reason}'
     if event == Notification.Event.KARMA_LOW:
         return 'Your karma balance is low.'
     if event == Notification.Event.KARMA_RESTORED:
