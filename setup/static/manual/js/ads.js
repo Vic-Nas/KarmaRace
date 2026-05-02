@@ -16,7 +16,7 @@
     url:  'https://railway.com/?referralCode=ZIdvo-',
     logo: 'https://railway.com/brand/logo-light.png',
     name: 'Railway',
-    tag:  'Hosts this website',
+    tag:  'Hosts KarmaRace',
     lines: [
       'Deploy any app in seconds.',
       'No DevOps. No headaches.',
