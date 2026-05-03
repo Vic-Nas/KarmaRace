@@ -73,5 +73,11 @@ def resend_post(payload: dict) -> bool:
 		with urllib.request.urlopen(req, timeout=15) as resp:
 			return resp.status in (200, 201)
 	except urllib.error.HTTPError as exc:
-		logger.error("Resend error %s: %s", exc.code, exc.read().decode(errors="replace"))
+		body = exc.read().decode(errors="replace")
+		print(f"Resend error {exc.code}: {body}")
+		logger.error("Resend error %s: %s", exc.code, body)
+		return False
+	except urllib.error.URLError as exc:
+		print(f"Resend connection error: {exc.reason}")
+		logger.error("Resend connection error: %s", exc.reason)
 		return False
