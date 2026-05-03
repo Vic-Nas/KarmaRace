@@ -1,9 +1,7 @@
 """Outreach configuration, scoring, and API helpers."""
-import json
 import logging
-import urllib.error
-import urllib.request
 
+import resend
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
@@ -13,7 +11,6 @@ logger = logging.getLogger(__name__)
 BATCH       = 500
 
 GITHUB_API  = "https://api.github.com"
-RESEND_API  = "https://api.resend.com/emails"
 SUBJECT     = "Your project deserves users — not a bigger budget"
 
 # Web-focused languages. Targets JS/TS (frontend), Go (backend services).
@@ -60,24 +57,11 @@ def gh_get(url: str):
 
 def resend_post(payload: dict) -> bool:
 	"""Send email via Resend API."""
-	req = urllib.request.Request(
-		RESEND_API,
-		data=json.dumps(payload).encode(),
-		headers={
-			"Authorization": f"Bearer {settings.RESEND_API_KEY}",
-			"Content-Type":  "application/json",
-		},
-		method="POST",
-	)
+	resend.api_key = settings.RESEND_API_KEY
 	try:
-		with urllib.request.urlopen(req, timeout=15) as resp:
-			return resp.status in (200, 201)
-	except urllib.error.HTTPError as exc:
-		body = exc.read().decode(errors="replace")
-		print(f"Resend error {exc.code}: {body}")
-		logger.error("Resend error %s: %s", exc.code, body)
-		return False
-	except urllib.error.URLError as exc:
-		print(f"Resend connection error: {exc.reason}")
-		logger.error("Resend connection error: %s", exc.reason)
+		resend.Emails.send(payload)
+		return True
+	except Exception as exc:
+		print(f"Resend error: {exc}")
+		logger.error("Resend error: %s", exc)
 		return False
