@@ -186,6 +186,7 @@ def check_status(request, task_id):
         return JsonResponse({'state': TaskCompletion.State.FAILED, 'detail': completion.result_detail})
     if completion.state == TaskCompletion.State.FAILED:
         return JsonResponse({'state': completion.state,
+                             'result_code': completion.result_code or '',
                              'detail': completion.result_detail or msg('CHECK_FAILED_GENERIC')})
     if completion.state == TaskCompletion.State.CONFIRMED:
         from karma.services import get_balance

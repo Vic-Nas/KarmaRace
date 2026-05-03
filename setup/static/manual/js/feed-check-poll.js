@@ -18,7 +18,8 @@ var FeedCheck = (function () {
             FeedCheckUI.addCompletedBadge();
             FeedCheckUI.applyKarmaUpdate(data);
           } else if (data.state === 'FAILED') {
-            FeedCheckUI.setBanner('danger', data.detail || 'Check failed. Please retry.');
+            var kind = data.result_code === 'not_verified' ? 'warning' : 'danger';
+            FeedCheckUI.setBanner(kind, data.detail || 'Check failed. Please retry.');
           } else {
             FeedCheckUI.setBanner('danger', 'Check ended unexpectedly. Please retry.');
           }
@@ -72,7 +73,8 @@ var FeedCheck = (function () {
             FeedCheckUI.addCompletedBadge();
             FeedCheckUI.applyKarmaUpdate(data);
           } else {
-            FeedCheckUI.setBanner('danger', data.detail || 'Check failed. Please retry.');
+            var kind = data.result_code === 'not_verified' ? 'warning' : 'danger';
+            FeedCheckUI.setBanner(kind, data.detail || 'Check failed. Please retry.');
           }
           FeedCheckUI.setCheckButtonDisabled(false);
           FeedCheckUI.clearCheckingParam();

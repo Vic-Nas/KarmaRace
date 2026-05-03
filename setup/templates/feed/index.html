@@ -106,69 +106,73 @@
       {% if checking_task_id %}Verification in progress &mdash; this card will refresh automatically&hellip;{% endif %}
     </div>
 
-    <div class="card__actions">
-      <form method="post" action="{% url 'feed_check' task.id %}" id="feed-check-form">
-        {% csrf_token %}
-        <input type="hidden" name="completion" value="{{ completion }}">
-        <input type="hidden" name="archive"    value="{{ archive }}">
-        <input type="hidden" name="task_types" value="{{ selected_task_types_csv }}">
-        {% if task.type == 'WEBHOOK' %}
-          {% if verified_emails %}
-          <div class="feed-email-picker">
-            <label for="webhook-email-select">Your email on this platform:</label>
-            <select name="google_email" id="webhook-email-select" required>
-              <option value="">— select —</option>
-              {% for email in verified_emails %}
-              <option value="{{ email }}">{{ email }}</option>
-              {% endfor %}
-            </select>
-            <a href="{% url 'verify_email_start' %}" class="btn btn-ghost btn-sm">+ Add email</a>
+    <form method="post" action="{% url 'feed_check' task.id %}" id="feed-check-form">
+      {% csrf_token %}
+      <input type="hidden" name="completion" value="{{ completion }}">
+      <input type="hidden" name="archive"    value="{{ archive }}">
+      <input type="hidden" name="task_types" value="{{ selected_task_types_csv }}">
+
+      {% if task.type == 'WEBHOOK' %}
+        {% if verified_emails %}
+        <div class="feed-email-picker">
+          <label for="webhook-email-select">Your email on this platform:</label>
+          <select name="google_email" id="webhook-email-select" required>
+            <option value="">— select —</option>
+            {% for email in verified_emails %}
+            <option value="{{ email }}">{{ email }}</option>
+            {% endfor %}
+          </select>
+          <a href="{% url 'verify_email_start' %}" class="btn btn-ghost btn-sm">+ Add email</a>
+        </div>
+        <div class="feed-difficulty-picker">
+          <label>How hard was this?</label>
+          <div class="diff-radios" id="diff-radios">
+            <input type="radio" name="difficulty" id="diff_1" value="1" class="diff-radio-input">
+            <label for="diff_1" class="diff-radio-label" title="Very easy">🟢</label>
+            <input type="radio" name="difficulty" id="diff_2" value="2" class="diff-radio-input">
+            <label for="diff_2" class="diff-radio-label" title="Easy">🟡</label>
+            <input type="radio" name="difficulty" id="diff_3" value="3" class="diff-radio-input">
+            <label for="diff_3" class="diff-radio-label" title="Medium">🟠</label>
+            <input type="radio" name="difficulty" id="diff_4" value="4" class="diff-radio-input">
+            <label for="diff_4" class="diff-radio-label" title="Hard">🔴</label>
+            <input type="radio" name="difficulty" id="diff_5" value="5" class="diff-radio-input">
+            <label for="diff_5" class="diff-radio-label" title="Very hard">💀</label>
           </div>
-          <div class="feed-difficulty-picker">
-            <label>How hard was this?</label>
-            <div class="diff-radios" id="diff-radios">
-              <input type="radio" name="difficulty" id="diff_1" value="1" class="diff-radio-input">
-              <label for="diff_1" class="diff-radio-label" title="Very easy">🟢</label>
-              <input type="radio" name="difficulty" id="diff_2" value="2" class="diff-radio-input">
-              <label for="diff_2" class="diff-radio-label" title="Easy">🟡</label>
-              <input type="radio" name="difficulty" id="diff_3" value="3" class="diff-radio-input">
-              <label for="diff_3" class="diff-radio-label" title="Medium">🟠</label>
-              <input type="radio" name="difficulty" id="diff_4" value="4" class="diff-radio-input">
-              <label for="diff_4" class="diff-radio-label" title="Hard">🔴</label>
-              <input type="radio" name="difficulty" id="diff_5" value="5" class="diff-radio-input">
-              <label for="diff_5" class="diff-radio-label" title="Very hard">💀</label>
-            </div>
-          </div>
-          {% else %}
-          <p class="small text-muted">
-            <a href="{% url 'linked_accounts' %}">Verify an email</a> to check webhook tasks.
-          </p>
-          {% endif %}
+        </div>
+        {% else %}
+        <p class="small text-muted">
+          <a href="{% url 'linked_accounts' %}">Verify an email</a> to check webhook tasks.
+        </p>
         {% endif %}
+      {% endif %}
+
+      <div class="card__actions">
         <button type="submit" class="btn btn-primary" id="feed-check-btn"
           {% if task.type == 'WEBHOOK' and not verified_emails %} disabled{% endif %}>Check</button>
-      </form>
-      {% if obligation_mode %}
-      <form method="post" action="{% url 'feed_switch' %}">
-        {% csrf_token %}
-        <input type="hidden" name="completion" value="{{ completion }}">
-        <input type="hidden" name="archive"    value="{{ archive }}">
-        <input type="hidden" name="task_types" value="{{ selected_task_types_csv }}">
-        <button type="submit" class="btn btn-secondary">Switch</button>
-      </form>
-      {% if obligation_task_count > 1 %}
-      <span class="obligation-task-counter">task {{ obligation_task_index }} of {{ obligation_task_count }}</span>
-      {% endif %}
-      {% else %}
-      <form method="post" action="{% url 'feed_done' task.id %}">
-        {% csrf_token %}
-        <input type="hidden" name="completion" value="{{ completion }}">
-        <input type="hidden" name="archive"    value="{{ archive }}">
-        <input type="hidden" name="task_types" value="{{ selected_task_types_csv }}">
-        <button type="submit" class="btn btn-secondary">Archive</button>
-      </form>
-      {% endif %}
-    </div>
+
+        {% if obligation_mode %}
+        </form>
+        <form method="post" action="{% url 'feed_switch' %}">
+          {% csrf_token %}
+          <input type="hidden" name="completion" value="{{ completion }}">
+          <input type="hidden" name="archive"    value="{{ archive }}">
+          <input type="hidden" name="task_types" value="{{ selected_task_types_csv }}">
+          <button type="submit" class="btn btn-secondary">Switch</button>
+        </form>
+        {% if obligation_task_count > 1 %}
+        <span class="obligation-task-counter">task {{ obligation_task_index }} of {{ obligation_task_count }}</span>
+        {% endif %}
+        {% else %}
+        </form>
+        <form method="post" action="{% url 'feed_done' task.id %}">
+          {% csrf_token %}
+          <input type="hidden" name="completion" value="{{ completion }}">
+          <input type="hidden" name="archive"    value="{{ archive }}">
+          <input type="hidden" name="task_types" value="{{ selected_task_types_csv }}">
+          <button type="submit" class="btn btn-secondary">Archive</button>
+        </form>
+        {% endif %}
+      </div>
 
     {% if request.user.is_authenticated and request.user.id == task.owner_id %}
     <div class="card__actions">

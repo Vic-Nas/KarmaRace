@@ -82,7 +82,8 @@ def process_task_check(task_id: int, tester_id: int, google_email: str = ''):
         else:
             completion.state = TaskCompletion.State.FAILED
             completion.result_detail = detail or msg('CHECK_FAILED_GENERIC')
-            completion.save(update_fields=['state', 'result_detail'])
+            completion.result_code = result_code or ''
+            completion.save(update_fields=['state', 'result_detail', 'result_code'])
             logger.info('process_task_check: task %s failed for tester %s: %s', task.pk, tester_id, detail)
 
             # Strike logic: broken webhook endpoint cancels obligation on creditor (tester).

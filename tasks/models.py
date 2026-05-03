@@ -81,6 +81,7 @@ class TaskCompletion(models.Model):
     tester        = models.ForeignKey(User, on_delete=models.CASCADE, related_name='task_completions')
     state         = models.CharField(max_length=10, choices=State.choices, default=State.PENDING)
     result_detail = models.TextField(blank=True, default='')
+    result_code   = models.CharField(max_length=32, blank=True, default='')
     reward        = models.PositiveSmallIntegerField(default=0)
     created_at    = models.DateTimeField(auto_now_add=True)
 

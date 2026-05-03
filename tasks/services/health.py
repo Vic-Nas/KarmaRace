@@ -69,8 +69,16 @@ def can_run_manual_health_check(task):
 
 
 def _record_webhook_health_outcome(task, is_success, result, reason):
-    """Record webhook health check outcome and auto-unpublish if needed."""
+    """Record webhook health check outcome and auto-unpublish if needed.
+
+    Only request_error and invalid_json count as health failures —
+    not_verified just means the user hasn't completed the task yet.
+    """
     if task.type != Task.Type.WEBHOOK:
+        return
+
+    # not_verified is not an endpoint health signal — skip health accounting entirely.
+    if result == 'not_verified':
         return
 
     update_fields = ['health_last_checked_at', 'health_last_result', 'health_last_failure_reason']

@@ -94,10 +94,11 @@ def _check_webhook_endpoint_contract_detailed(task):
 
         verified = decoded.get('verified', None)
         if isinstance(verified, bool):
+            # Endpoint is healthy — it responded with valid JSON containing a boolean verified field.
+            # We don't care whether it's true or false for the probe; that depends on the probe email.
             _record_webhook_health_outcome(
-                task, bool(verified),
-                'verified' if verified else 'not_verified',
-                'Manual webhook health check response parsed successfully.',
+                task, True, 'verified',
+                'Webhook contract check passed: endpoint returns valid JSON with boolean verified field.',
             )
             _notify_webhook_attempt(task, 'verified' if verified else 'not_verified', 'health-check',
                                     payload, {'http_status': response.status_code, 'response_json': decoded})
