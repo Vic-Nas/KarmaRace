@@ -1,17 +1,22 @@
 """Linked account management and Discord OAuth."""
+import logging
 import secrets
 from urllib.parse import urlencode
 
 import requests
 from allauth.socialaccount.models import SocialAccount, SocialToken
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.db import IntegrityError
 from django.shortcuts import redirect, render, get_object_or_404
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from accounts import discord as discord_api
 from accounts.models import LinkedAccount
+
+logger = logging.getLogger(__name__)
 
 
 @login_required
@@ -147,8 +152,16 @@ def discord_callback(request):
             },
         )
         messages.success(request, 'Discord account linked.')
+    except IntegrityError:
+        messages.error(request, 'This Discord account is already linked to another account.')
+    except requests.RequestException:
+        messages.error(request, 'Could not reach Discord right now. Please try again.')
     except Exception as exc:
-        messages.error(request, f'Discord linking failed: {exc}')
+        logger.exception('discord_callback: unexpected error for user %s', request.user.pk)
+        if settings.DEBUG:
+            messages.error(request, f'Discord linking failed: {exc}')
+        else:
+            messages.error(request, 'Something went wrong linking your Discord account. Please try again.')
     return redirect('linked_accounts')
 
 

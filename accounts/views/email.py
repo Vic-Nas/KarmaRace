@@ -1,8 +1,10 @@
 """Email verification via Google OAuth."""
+import logging
 import secrets
 from urllib.parse import urlencode
 
 import requests
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect, get_object_or_404
@@ -10,6 +12,8 @@ from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from accounts.models import VerifiedEmail
+
+logger = logging.getLogger(__name__)
 
 
 def _google_client_id():
@@ -71,8 +75,15 @@ def verify_email_callback(request):
 	try:
 		redirect_uri = request.build_absolute_uri(reverse('verify_email_callback'))
 		email = _exchange_google_code_for_email(code, redirect_uri)
+	except requests.RequestException:
+		messages.error(request, 'Could not reach Google right now. Please try again.')
+		return redirect('linked_accounts')
 	except Exception as exc:
-		messages.error(request, f'Email verification failed: {exc}')
+		logger.exception('verify_email_callback: unexpected error for user %s', request.user.pk)
+		if settings.DEBUG:
+			messages.error(request, f'Email verification failed: {exc}')
+		else:
+			messages.error(request, 'Something went wrong during email verification. Please try again.')
 		return redirect('linked_accounts')
 	if not email:
 		messages.error(request, 'Could not retrieve email from Google.')
