@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 def verify_task_with_details(task, tester, google_email=''):
-    """Verify a task completion. Dispatches by task type."""
+    """Verify a task completion. Dispatches by task type. Returns (ok, detail, result_code)."""
     from .verify import verify_github_with_details, verify_webhook_with_details
     
     dispatch = {
@@ -22,7 +22,7 @@ def verify_task_with_details(task, tester, google_email=''):
     verifier = dispatch.get(task.type)
     if verifier is None:
         logger.error('verify_task: unknown task type %s', task.type)
-        return False, msg('UNKNOWN_TASK_TYPE')
+        return False, msg('UNKNOWN_TASK_TYPE'), None
     if task.type == Task.Type.WEBHOOK:
         return verifier(task, tester, google_email=google_email)
     return verifier(task, tester)
@@ -39,7 +39,7 @@ def soft_delete_task(task):
 
 
 @transaction.atomic
-def settle_or_create_obligation(actor, counterparty, task_type, completed_task):
+def settle_or_create_obligation(actor, counterparty, task_type, completed_task, completed_task_difficulty=None):
     """Settle existing debt first; otherwise create reverse obligation."""
     if actor.pk == counterparty.pk:
         return None
@@ -64,6 +64,7 @@ def settle_or_create_obligation(actor, counterparty, task_type, completed_task):
         task_type=task_type,
         state=ReciprocityObligation.State.OPEN,
         source_task=completed_task,
+        source_difficulty=completed_task_difficulty,
     )
     return 'created'
 

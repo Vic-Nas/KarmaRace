@@ -11,7 +11,7 @@ from .filtering import (
     SESSION_FEED_PIN_KEY, DEFAULT_COMPLETION, DEFAULT_ARCHIVE,
     load_filter_preferences, save_filter_preferences, normalize_task_types, TASK_TYPE_LABELS, ALL_TASK_TYPES,
 )
-from .queries import open_obligations, active_lock_obligations, get_feed_task, get_pinned_task, webhook_stats
+from .queries import open_obligations, active_lock_obligations, get_feed_task, get_pinned_task, webhook_stats, get_obligation_tasks
 
 
 def feed(request):
@@ -76,10 +76,16 @@ def feed(request):
 
     # Which obligation does the current task satisfy?
     obligation_creditor = None
+    obligation_task_count = 0
+    obligation_task_index = 0
     if obligations and task:
         for ob in obligations:
             if ob.creditor_id == task.owner_id and ob.task_type == task.type:
                 obligation_creditor = ob.creditor.username
+                ob_tasks = get_obligation_tasks(request.user, ob)
+                obligation_task_count = len(ob_tasks)
+                session_key = f'feed_obligation_switch_{ob.creditor_id}_{ob.task_type}'
+                obligation_task_index = request.session.get(session_key, 0) % max(1, obligation_task_count)
                 break
 
     return render(request, 'feed/index.html', {
@@ -98,6 +104,8 @@ def feed(request):
         'obligation_mode':       bool(obligations),
         'open_obligations_count': len(obligations),
         'obligation_creditor':   obligation_creditor,
+        'obligation_task_count': obligation_task_count,
+        'obligation_task_index': obligation_task_index + 1,  # 1-based for display
         'webhook_stats':         webhook_stats(task) if task else None,
         'checking_task_id':      task.id if is_checking else '',
         'verified_emails':       verified_emails,

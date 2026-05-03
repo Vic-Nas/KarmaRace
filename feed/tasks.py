@@ -5,9 +5,9 @@ from django.db import transaction
 
 from karma.models import KarmaTransaction
 from karma.services import credit_karma, debit_karma, get_balance
-from setup.platform_rules import karma_reward_for_task
+from setup.platform_rules import karma_reward_for_task, WEBHOOK_OBLIGATION_ERROR_STRIKE_THRESHOLD
 from tasks.check_feedback import msg
-from tasks.models import Task, TaskCompletion
+from tasks.models import Task, TaskCompletion, ReciprocityObligation
 from tasks.services import verify_task_with_details, settle_or_create_obligation
 
 logger = logging.getLogger(__name__)
@@ -34,7 +34,7 @@ def process_task_check(task_id: int, tester_id: int, google_email: str = ''):
     with transaction.atomic():
         task.tried_count += 1
 
-        ok, detail = verify_task_with_details(task, completion.tester, google_email=google_email)
+        ok, detail, result_code = verify_task_with_details(task, completion.tester, google_email=google_email)
         if ok:
             if completion.state != TaskCompletion.State.CONFIRMED:
                 completion.state = TaskCompletion.State.CONFIRMED
@@ -58,11 +58,27 @@ def process_task_check(task_id: int, tester_id: int, google_email: str = ''):
                         related_object_id=task.pk,
                     )
 
+                # Read and apply difficulty pick for webhook tasks.
+                completed_difficulty = None
+                if task.type == Task.Type.WEBHOOK:
+                    from accounts.models import UserPreference
+                    pref_key = f'task_diff_pick_{task.pk}'
+                    pref = UserPreference.objects.filter(
+                        user=completion.tester, key=pref_key,
+                    ).first()
+                    if pref and pref.value.isdigit():
+                        completed_difficulty = int(pref.value)
+                        completed_difficulty = max(1, min(5, completed_difficulty))
+                        task.difficulty_sum += completed_difficulty
+                        task.difficulty_count += 1
+                        pref.delete()
+
                 settle_or_create_obligation(
                     actor=completion.tester,
                     counterparty=task.owner,
                     task_type=task.type,
                     completed_task=task,
+                    completed_task_difficulty=completed_difficulty,
                 )
 
                 task.succeed_count += 1
@@ -73,4 +89,36 @@ def process_task_check(task_id: int, tester_id: int, google_email: str = ''):
             completion.save(update_fields=['state', 'result_detail'])
             logger.info('process_task_check: task %s failed for tester %s: %s', task.pk, tester_id, detail)
 
-        task.save(update_fields=['tried_count', 'succeed_count'])
+            # Strike logic: broken webhook endpoint cancels obligation on creditor (tester).
+            if task.type == Task.Type.WEBHOOK and result_code in ('request_error', 'invalid_json'):
+                _maybe_cancel_obligation_on_broken_endpoint(
+                    debtor=task.owner,
+                    creditor=completion.tester,
+                )
+
+        task.save(update_fields=['tried_count', 'succeed_count', 'difficulty_sum', 'difficulty_count'])
+
+
+def _maybe_cancel_obligation_on_broken_endpoint(debtor, creditor):
+    """
+    Increment error_strike_count on the open obligation where debtor owes creditor
+    a WEBHOOK task. Cancel it when the threshold is reached.
+    """
+    obligation = ReciprocityObligation.objects.select_for_update().filter(
+        debtor=debtor,
+        creditor=creditor,
+        task_type=Task.Type.WEBHOOK,
+        state=ReciprocityObligation.State.OPEN,
+    ).order_by('created_at').first()
+
+    if obligation is None:
+        return
+
+    obligation.error_strike_count += 1
+    if obligation.error_strike_count >= WEBHOOK_OBLIGATION_ERROR_STRIKE_THRESHOLD:
+        obligation.state = ReciprocityObligation.State.CANCELLED
+        logger.info(
+            'process_task_check: obligation %s cancelled after %d broken-endpoint strikes',
+            obligation.pk, obligation.error_strike_count,
+        )
+    obligation.save(update_fields=['error_strike_count', 'state'])

@@ -133,6 +133,14 @@ def check(request, task_id):
         google_email = (request.POST.get('google_email') or '').strip()
         if not google_email:
             return respond(TaskCompletion.State.FAILED, 'Select a verified email before checking a webhook task.')
+        diff_raw = (request.POST.get('difficulty') or '').strip()
+        if not diff_raw or not diff_raw.isdigit() or not (1 <= int(diff_raw) <= 5):
+            return respond(TaskCompletion.State.FAILED, 'Rate the task difficulty (1–5) before checking.')
+        from accounts.models import UserPreference
+        UserPreference.objects.update_or_create(
+            user=request.user, key=f'task_diff_pick_{task.pk}',
+            defaults={'value': diff_raw},
+        )
 
     reward = _compute_completion_reward(request.user, task)
 
@@ -187,3 +195,37 @@ def check_status(request, task_id):
                              'karma_delta': completion.reward,
                              'karma_balance': get_balance(request.user)})
     return JsonResponse({'state': completion.state})
+
+
+@require_POST
+def switch(request):
+    """
+    Cycle to the next valid obligation task for the current creditor/type pair.
+    Session key: feed_obligation_switch_{creditor_id}_{task_type}
+    """
+    if not request.user.is_authenticated:
+        return redirect('account_login')
+
+    from .queries import open_obligations, active_lock_obligations, get_obligation_tasks
+    from .filtering import SESSION_FEED_PIN_KEY
+
+    obligations = active_lock_obligations(request.user, open_obligations(request.user))
+    if not obligations:
+        return redirect_to_feed_with_filters(request)
+
+    # Use the first (oldest) active obligation — same as feed_view priority
+    ob = obligations[0]
+    tasks = get_obligation_tasks(request.user, ob)
+    if not tasks:
+        return redirect_to_feed_with_filters(request)
+
+    session_key = f'feed_obligation_switch_{ob.creditor_id}_{ob.task_type}'
+    current_index = request.session.get(session_key, 0)
+    next_index = (current_index + 1) % len(tasks)
+    request.session[session_key] = next_index
+
+    # Pin the selected task
+    next_task = tasks[next_index]
+    request.session[SESSION_FEED_PIN_KEY] = next_task.pk
+
+    return redirect_to_feed_with_filters(request)

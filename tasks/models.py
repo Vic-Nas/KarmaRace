@@ -28,8 +28,17 @@ class Task(models.Model):
     webhook_health_success_count = models.PositiveIntegerField(default=0)
     webhook_health_failure_count = models.PositiveIntegerField(default=0)
     health_last_result  = models.CharField(max_length=64, blank=True, default='')
+    difficulty_sum   = models.PositiveIntegerField(default=0)
+    difficulty_count = models.PositiveIntegerField(default=0)
     archived_by         = models.ManyToManyField(User, blank=True, related_name='archived_tasks')
     created_at          = models.DateTimeField(auto_now_add=True)
+
+    @property
+    def difficulty(self):
+        """Average difficulty rating (1-5). Defaults to 1 if no ratings yet."""
+        if self.difficulty_count > 0:
+            return max(1, min(5, round(self.difficulty_sum / self.difficulty_count)))
+        return 1
 
     @property
     def target_url(self):
@@ -84,11 +93,14 @@ class ReciprocityObligation(models.Model):
     class State(models.TextChoices):
         OPEN      = 'OPEN'
         FULFILLED = 'FULFILLED'
+        CANCELLED = 'CANCELLED'
 
     debtor    = models.ForeignKey(User, on_delete=models.CASCADE, related_name='obligations_owed')
     creditor  = models.ForeignKey(User, on_delete=models.CASCADE, related_name='obligations_due')
     task_type = models.CharField(max_length=20, choices=Task.Type.choices)
     state     = models.CharField(max_length=12, choices=State.choices, default=State.OPEN)
+    error_strike_count = models.PositiveSmallIntegerField(default=0)
+    source_difficulty  = models.PositiveSmallIntegerField(null=True, blank=True)
     source_task = models.ForeignKey(
         Task, on_delete=models.SET_NULL, null=True, blank=True, related_name='obligations_created',
     )

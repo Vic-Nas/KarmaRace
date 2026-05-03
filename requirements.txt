@@ -5,6 +5,7 @@ django
 django-environ
 environ
 gunicorn
+PyGithub
 PyJWT>=2.0.0
 procrastinate
 psycopg[binary]>=3.1

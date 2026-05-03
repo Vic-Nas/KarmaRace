@@ -71,3 +71,54 @@
 }
 .feed-email-picker label { font-size: .78rem; font-weight: 600; color: var(--text-muted); white-space: nowrap; margin: 0; }
 .feed-email-picker select { width: auto; flex: 1 1 200px; }
+
+/* Difficulty picker */
+.feed-difficulty-picker {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  flex-wrap: wrap;
+  margin-bottom: .6rem;
+}
+.feed-difficulty-picker > label { font-size: .78rem; font-weight: 600; color: var(--text-muted); white-space: nowrap; margin: 0; }
+.diff-radios { display: flex; gap: .3rem; }
+.diff-radio-input { display: none; }
+.diff-radio-label {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 2.4rem; height: 2.4rem;
+  font-size: 1.2rem; line-height: 1;
+  border: 2px solid transparent;
+  border-radius: .5rem;
+  cursor: pointer;
+  background: var(--surface-raised, var(--surface));
+  transition: transform .1s, border-color .15s, box-shadow .15s;
+  filter: grayscale(40%);
+  opacity: .7;
+}
+.diff-radio-label:hover {
+  filter: grayscale(0%);
+  opacity: 1;
+  transform: scale(1.15);
+}
+.diff-radio-input:checked + .diff-radio-label {
+  filter: grayscale(0%);
+  opacity: 1;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 20%, transparent);
+  transform: scale(1.2);
+}
+
+/* Difficulty badge on card */
+.task-difficulty {
+  font-size: .78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: default;
+}
+
+/* Obligation task counter (N of M) */
+.obligation-task-counter {
+  font-size: .78rem;
+  color: var(--text-muted);
+  align-self: center;
+}

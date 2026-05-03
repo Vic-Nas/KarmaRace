@@ -10,9 +10,6 @@ KARMA_REWARDS_BY_TASK_TYPE = {
 KARMA_LOW_THRESHOLD = 20
 KARMA_HIGH_THRESHOLD = 100
 
-# Webhook obligations are now enabled — webhook <-> webhook reciprocity applies.
-WEBHOOK_OBLIGATIONS_ENABLED = True
-
 # Stabilizes denominator for failure-rate display.
 WEBHOOK_FAILURE_RATE_EPSILON = 1e-6
 
@@ -22,6 +19,9 @@ WEBHOOK_BAD_CHECK_MIN_CALLS = 5
 
 # Owner-triggered health checks are rate limited per task.
 WEBHOOK_HEALTH_CHECK_RATE_LIMIT_SECONDS = 60
+
+# Consecutive broken-endpoint errors before a webhook obligation is auto-cancelled.
+WEBHOOK_OBLIGATION_ERROR_STRIKE_THRESHOLD = 3
 
 # GitHub task auto-unpublish policy based on consecutive health check failures.
 GITHUB_HEALTH_HIDE_STREAK_THRESHOLD = 2
