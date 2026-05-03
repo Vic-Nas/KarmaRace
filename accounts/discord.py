@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import Optional
 
 import requests
 from django.conf import settings
 
+logger = logging.getLogger(__name__)
 
 DISCORD_API_BASE = 'https://discord.com/api/v10'
 
@@ -191,6 +193,33 @@ def kick_member(discord_user_id: str) -> None:
         resp.raise_for_status()
 
 
+def _delete_stale_notifs_threads(channel_id: str, thread_name: str) -> None:
+    """
+    Delete any existing private threads in the notifs channel with the given name.
+    Called before creating a new thread to avoid duplicates from lost thread IDs.
+    """
+    for endpoint in ('threads/active', 'threads/private/archived'):
+        try:
+            resp = requests.get(
+                f'{DISCORD_API_BASE}/channels/{channel_id}/{endpoint}',
+                headers=_bot_headers(),
+                timeout=15,
+            )
+            if resp.status_code != 200:
+                continue
+            data = resp.json()
+            threads = data if isinstance(data, list) else data.get('threads', [])
+            for thread in threads:
+                if thread.get('name') == thread_name:
+                    requests.delete(
+                        f'{DISCORD_API_BASE}/channels/{thread["id"]}',
+                        headers=_bot_headers(),
+                        timeout=15,
+                    )
+        except Exception as exc:
+            logger.warning('_delete_stale_notifs_threads: %s', exc)
+
+
 def create_notifs_thread(karmarace_username: str, discord_user_id: str) -> str:
     """
     Create a private thread in DISCORD_NOTIFS_CHANNEL_ID named after the
@@ -200,13 +229,17 @@ def create_notifs_thread(karmarace_username: str, discord_user_id: str) -> str:
     @everyone. The bot needs CREATE_PRIVATE_THREADS and SEND_MESSAGES_IN_THREADS.
     """
     channel_id = settings.DISCORD_NOTIFS_CHANNEL_ID
+    thread_name = f'notifs-{karmarace_username}'
+
+    # Clean up any stale threads with the same name (e.g. from lost thread IDs)
+    _delete_stale_notifs_threads(channel_id, thread_name)
 
     # Type 12 = GUILD_PRIVATE_THREAD
     resp = requests.post(
         f'{DISCORD_API_BASE}/channels/{channel_id}/threads',
         headers=_bot_headers(),
         json={
-            'name': f'notifs-{karmarace_username}',
+            'name': thread_name,
             'type': 12,
             'invitable': False,  # only the bot (and admins) can add members
         },
