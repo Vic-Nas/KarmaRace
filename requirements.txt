@@ -11,4 +11,5 @@ procrastinate
 psycopg[binary]>=3.1
 whitenoise
 stripe
-tqdmresend
+tqdm
+resend
