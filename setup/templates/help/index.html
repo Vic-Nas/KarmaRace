@@ -70,7 +70,7 @@ Authorization: Bearer {task.webhook_secret}
 
   <div class="kr-help-section" id="task-health">
     <h2>Task Health</h2>
-    <p><strong>GitHub tasks</strong> are health-checked periodically. If the repo becomes private or is deleted, the failure streak increments. After two consecutive failures the task is auto-unpublished and you're notified.</p>
+    <p><strong>GitHub tasks</strong> are health-checked when you manually trigger a check from your task list. If the repo is private or deleted, the failure streak increments. After two consecutive failures the task is auto-unpublished and you're notified.</p>
     <p><strong>Webhook tasks</strong> are health-checked based on all recorded verification attempts. When the failure ratio exceeds 50% after at least 5 checks, the task is auto-unpublished and you're notified. Republishing resets the health counters, so fixing your endpoint and republishing is all it takes to recover.</p>
   </div>
 

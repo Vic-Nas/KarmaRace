@@ -16,10 +16,7 @@
     <a href="{% url 'help_index' %}#notification-events" target="_blank" class="btn btn-outline-secondary btn-sm">Event docs</a>
     <a href="{% url 'preferences' %}" class="btn btn-secondary btn-sm">Preferences</a>
     {% if notifications %}
-    <form method="post" action="{% url 'notifications_mark_all_read' %}" class="m-0">
-      {% csrf_token %}
-      <button type="submit" class="btn btn-secondary btn-sm">Mark all read</button>
-    </form>
+    <button class="btn btn-secondary btn-sm" onclick="fetch('{% url 'notifications_mark_all_read' %}',{method:'POST',headers:{'X-CSRFToken':'{{ csrf_token }}'}}).then(()=>document.querySelectorAll('.notif-unread').forEach(el=>el.classList.remove('notif-unread')))">Mark all read</button>
     {% endif %}
   </div>
 </div>
