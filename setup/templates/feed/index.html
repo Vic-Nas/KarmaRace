@@ -86,14 +86,13 @@
         &nbsp;<span class="badge badge-success">Completed</span>
       {% endif %}
       {% if task.type == 'WEBHOOK' and task.difficulty_count > 0 %}
-        &nbsp;<span class="task-difficulty" title="{{ task.difficulty_count }} rating{{ task.difficulty_count|pluralize }}">{% if task.difficulty == 1 %}🟢{% elif task.difficulty == 2 %}🟡{% elif task.difficulty == 3 %}🟠{% elif task.difficulty == 4 %}🔴{% else %}💀{% endif %} {{ task.difficulty }}/5</span>
+        &nbsp;<span class="task-difficulty" title="Difficulty: {{ task.difficulty }}/5 ({{ task.difficulty_count }} rating{{ task.difficulty_count|pluralize }})">{% if task.difficulty == 1 %}🟢{% elif task.difficulty == 2 %}🟡{% elif task.difficulty == 3 %}🟠{% elif task.difficulty == 4 %}🔴{% else %}💀{% endif %}</span>
       {% endif %}
     </div>
 
     {% if webhook_stats %}
     <p class="small text-muted mt-1">
       Webhook failure rate: {{ webhook_stats.failure_rate_percent }}%
-      ({{ webhook_stats.tried_failed }} failed / {{ webhook_stats.completed }} completed)
     </p>
     {% endif %}
 
