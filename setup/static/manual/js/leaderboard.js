@@ -28,7 +28,7 @@
 
     var karma = document.createElement('span');
     karma.className = 'lb-row__karma';
-    karma.textContent = '\u2605 ' + row.karma; /* ★ star as karma symbol */
+    karma.textContent = '\u262F ' + row.karma; /* ☯ yin-yang to match navbar */
 
     a.appendChild(rank);
     a.appendChild(username);
