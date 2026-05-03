@@ -118,7 +118,7 @@ def discord_callback(request):
         ).first()
 
         old_discord_id    = existing.platform_id if existing else None
-        inherited_thread  = existing.discord_notifs_thread_id if existing else None
+        inherited_thread  = (existing.discord_notifs_thread_id if existing else None) or ''
 
         # Add new account to guild first (must happen before thread membership swap).
         discord_api.ensure_guild_membership(identity.user_id, access_token, request.user.username)
