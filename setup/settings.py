@@ -178,4 +178,4 @@ from .settings_services import (
 )
 
 # Resend email sender (use DOMAIN if not configured in env)
-RESEND_FROM_EMAIL = os.environ.get('RESEND_FROM_EMAIL') or f'noreply@{DOMAIN}'
+RESEND_FROM_EMAIL = f'noreply@{DOMAIN}'

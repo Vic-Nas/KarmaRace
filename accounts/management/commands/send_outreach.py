@@ -9,15 +9,22 @@ logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
-    help = 'Send pending outreach emails. Defaults to DAILY_REACH=100.'
+    help = 'Send pending outreach emails. Defaults to DAILY_REACH=100. Pass --email to send to a specific address.'
 
     def add_arguments(self, parser):
-        parser.add_argument(
+        group = parser.add_mutually_exclusive_group()
+        group.add_argument(
             'limit',
             nargs='?',
             type=int,
             default=None,
-            help='Max emails to send (default: DAILY_REACH from settings, typically 100)'
+            help='Max emails to send from the queue (default: DAILY_REACH from settings, typically 100)'
+        )
+        group.add_argument(
+            '--email',
+            type=str,
+            default=None,
+            help='Send directly to this email address (skips DB queue and duplicate checks)'
         )
 
     def handle(self, *args, **options):
@@ -25,17 +32,7 @@ class Command(BaseCommand):
             self.stdout.write(self.style.WARNING('REACH is disabled. Skipping.'))
             return
 
-        daily_reach = getattr(settings, 'DAILY_REACH', 100)
-        limit = options['limit'] if options['limit'] is not None else daily_reach
-
-        if limit <= 0:
-            self.stdout.write(self.style.ERROR('Limit must be positive.'))
-            return
-
-        # Import here to avoid issues if REACH is disabled
-        from django.utils import timezone
-        from accounts.models import OutreachRecord, OutreachContactedEmail, OutreachDailyStats
-        from accounts.outreach.config import RESEND_API, SUBJECT
+        from accounts.outreach.config import SUBJECT
         from accounts.outreach.email import build_html, build_plaintext
         from accounts.outreach.config import resend_post
 
@@ -43,6 +40,35 @@ class Command(BaseCommand):
         from_addr = 'KarmaRace <outreach@' + domain + '>'
         html = build_html(domain)
         plaintext = build_plaintext(domain)
+
+        target_email = options.get('email')
+
+        # --- Single-address mode ---
+        if target_email:
+            self.stdout.write(f'Sending to {target_email}...')
+            ok = resend_post({
+                'from': from_addr,
+                'to': [target_email],
+                'subject': SUBJECT,
+                'html': html,
+                'text': plaintext,
+            })
+            if ok:
+                self.stdout.write(self.style.SUCCESS(f'✓ Sent to {target_email}.'))
+            else:
+                self.stdout.write(self.style.ERROR(f'✗ Failed to send to {target_email}.'))
+            return
+
+        # --- Queue mode ---
+        from django.utils import timezone
+        from accounts.models import OutreachRecord, OutreachContactedEmail, OutreachDailyStats
+
+        daily_reach = getattr(settings, 'DAILY_REACH', 100)
+        limit = options['limit'] if options['limit'] is not None else daily_reach
+
+        if limit <= 0:
+            self.stdout.write(self.style.ERROR('Limit must be positive.'))
+            return
 
         pending = list(
             OutreachRecord.objects.order_by('-score', 'created_at')[:limit]
@@ -64,13 +90,13 @@ class Command(BaseCommand):
                 })
                 OutreachContactedEmail.objects.get_or_create(email=record.email)
                 record.delete()
-                
+
                 if ok:
                     sent += 1
                 else:
                     failed += 1
-                
-                # Update progress bar suffix with stats
+                    self.stdout.write(self.style.ERROR(f'✗ Failed to send to {record.email}.'))
+
                 pbar.set_postfix({'sent': sent, 'failed': failed}, refresh=True)
 
         # Update daily stats
