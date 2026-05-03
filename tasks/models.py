@@ -85,35 +85,3 @@ class TaskCompletion(models.Model):
 
     class Meta:
         unique_together = [('task', 'tester')]
-
-
-class ReciprocityObligation(models.Model):
-
-    class State(models.TextChoices):
-        OPEN      = 'OPEN'
-        FULFILLED = 'FULFILLED'
-        CANCELLED = 'CANCELLED'
-
-    debtor    = models.ForeignKey(User, on_delete=models.CASCADE, related_name='obligations_owed')
-    creditor  = models.ForeignKey(User, on_delete=models.CASCADE, related_name='obligations_due')
-    task_type = models.CharField(max_length=20, choices=Task.Type.choices)
-    state     = models.CharField(max_length=12, choices=State.choices, default=State.OPEN)
-    error_strike_count = models.PositiveSmallIntegerField(default=0)
-    source_difficulty  = models.PositiveSmallIntegerField(null=True, blank=True)
-    source_task = models.ForeignKey(
-        Task, on_delete=models.SET_NULL, null=True, blank=True, related_name='obligations_created',
-    )
-    fulfilled_by_task = models.ForeignKey(
-        Task, on_delete=models.SET_NULL, null=True, blank=True, related_name='obligations_fulfilled',
-    )
-    created_at   = models.DateTimeField(auto_now_add=True)
-    fulfilled_at = models.DateTimeField(null=True, blank=True)
-
-    class Meta:
-        indexes = [
-            models.Index(fields=['debtor', 'state']),
-            models.Index(fields=['debtor', 'creditor', 'task_type', 'state']),
-        ]
-
-    def __str__(self):
-        return f'{self.debtor_id} owes {self.creditor_id} ({self.task_type}) [{self.state}]'

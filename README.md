@@ -3,7 +3,7 @@
     <img src="setup/static/manual/assets/favicon.png" width="52" height="52" />
   </a>
   <h2><a href="https://karmarace.com">KarmaRace</a></h2>
-  <p>A reciprocity-based testing network for indie founders and startup builders.</p>
+  <p>A karma-based testing network for indie founders and startup builders.</p>
 </div>
 
 ---
@@ -15,11 +15,6 @@
 **2. Other founders complete your tasks** &nbsp;—&nbsp; Every action is server-side verified. No fake clicks, no gaming the system.
 
 **3. Karma drives your visibility** &nbsp;—&nbsp; High-karma contributors get prioritized in the feed. No ad budget needed.
-
-**4. Reciprocity is enforced** &nbsp;—&nbsp; If you owe actions to other users and
-they created tasks of the right type, 
-your feed locks to only tasks that satisfy those obligations 
-until they are cleared.
 
 ---
 

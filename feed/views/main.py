@@ -12,7 +12,7 @@ from .filtering import (
     SESSION_FEED_PIN_KEY, DEFAULT_COMPLETION, DEFAULT_ARCHIVE,
     load_filter_preferences, save_filter_preferences, normalize_task_types, TASK_TYPE_LABELS, ALL_TASK_TYPES,
 )
-from .queries import open_obligations, active_lock_obligations, get_feed_task, get_pinned_task, webhook_stats, get_obligation_tasks
+from .queries import get_feed_task, get_pinned_task, webhook_stats
 
 
 def feed(request):
@@ -26,9 +26,9 @@ def feed(request):
 
     has_overrides = any(k in request.GET for k in ('completion', 'archive', 'task_types'))
     if has_overrides:
-        completion         = request.GET.get('completion') or DEFAULT_COMPLETION
-        archive            = request.GET.get('archive') or DEFAULT_ARCHIVE
-        selected_types     = normalize_task_types(request.GET.getlist('task_types'))
+        completion     = request.GET.get('completion') or DEFAULT_COMPLETION
+        archive        = request.GET.get('archive') or DEFAULT_ARCHIVE
+        selected_types = normalize_task_types(request.GET.getlist('task_types'))
     else:
         completion, archive, selected_types = load_filter_preferences(request.user)
 
@@ -41,13 +41,10 @@ def feed(request):
             return redirect(f'{base}?{urlencode({"checking_task": checking_task_id})}')
         return redirect(base)
 
-    obligations = active_lock_obligations(request.user, open_obligations(request.user))
-
-    task = get_pinned_task(request, archive=archive, task_types=selected_types, obligations=obligations)
+    task = get_pinned_task(request, archive=archive, task_types=selected_types)
     if task is None:
-        task = get_feed_task(request.user, completion=completion, archive=archive,
-                             task_types=selected_types, obligations=obligations)
-        if request.user.is_authenticated and not obligations and archive == 'not_archived':
+        task = get_feed_task(request.user, completion=completion, archive=archive, task_types=selected_types)
+        if request.user.is_authenticated and archive == 'not_archived':
             request.session[SESSION_FEED_PIN_KEY] = task.id if task else None
             if not task:
                 request.session.pop(SESSION_FEED_PIN_KEY, None)
@@ -75,20 +72,6 @@ def feed(request):
                 task=task, tester=request.user, state=TaskCompletion.State.PENDING,
             ).exists()
 
-    # Which obligation does the current task satisfy?
-    obligation_creditor = None
-    obligation_task_count = 0
-    obligation_task_index = 0
-    if obligations and task:
-        for ob in obligations:
-            if ob.creditor_id == task.owner_id and ob.task_type == task.type:
-                obligation_creditor = ob.creditor.username
-                ob_tasks = get_obligation_tasks(request.user, ob)
-                obligation_task_count = len(ob_tasks)
-                session_key = f'feed_obligation_switch_{ob.creditor_id}_{ob.task_type}'
-                obligation_task_index = request.session.get(session_key, 0) % max(1, obligation_task_count)
-                break
-
     return render(request, 'feed/index.html', {
         'task':                  task,
         'task_reward':           karma_reward_for_task(task.owner_balance, task.type) if task else '?',
@@ -102,11 +85,6 @@ def feed(request):
             {'value': t, 'label': TASK_TYPE_LABELS.get(t, t.replace('_', ' ').title())}
             for t in ALL_TASK_TYPES
         ],
-        'obligation_mode':       bool(obligations),
-        'open_obligations_count': len(obligations),
-        'obligation_creditor':   obligation_creditor,
-        'obligation_task_count': obligation_task_count,
-        'obligation_task_index': obligation_task_index + 1,  # 1-based for display
         'webhook_stats':         webhook_stats(task) if task else None,
         'checking_task_id':      task.id if is_checking else '',
         'verified_emails':       verified_emails,

@@ -27,7 +27,6 @@ MESSAGES = {
     'QUEUE_UNAVAILABLE_CONFIRMED': 'Queue unavailable, but check confirmed immediately.',
     'QUEUE_UNAVAILABLE_FAILED': 'Queue unavailable, and check failed.',
     'QUEUE_FAILED': 'Could not queue async check. Please try again.',
-    'ARCHIVE_DISABLED_OBLIGATIONS': 'Archive is disabled while you have open obligations.',
     'ARCHIVED_DURING_CHECK': 'Task was archived or unpublished before verification completed.',
 }
 

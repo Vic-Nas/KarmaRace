@@ -21,9 +21,6 @@ WEBHOOK_BAD_CHECK_MIN_CALLS = 5
 # Owner-triggered health checks are rate limited per task.
 WEBHOOK_HEALTH_CHECK_RATE_LIMIT_SECONDS = 60
 
-# Consecutive broken-endpoint errors before a webhook obligation is auto-cancelled.
-WEBHOOK_OBLIGATION_ERROR_STRIKE_THRESHOLD = 3
-
 # GitHub task auto-unpublish policy based on consecutive health check failures.
 GITHUB_HEALTH_HIDE_STREAK_THRESHOLD = 2
 

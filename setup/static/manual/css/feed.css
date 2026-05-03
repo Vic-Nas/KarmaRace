@@ -115,10 +115,3 @@
   color: var(--text-muted);
   cursor: default;
 }
-
-/* Obligation task counter (N of M) */
-.obligation-task-counter {
-  font-size: .78rem;
-  color: var(--text-muted);
-  align-self: center;
-}

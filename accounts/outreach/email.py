@@ -58,8 +58,7 @@ def build_html(domain: str) -> str:
 		"<p>Big products win feeds because they outspend you &mdash; not because they&rsquo;re"
 		" better. KarmaRace levels that. It&rsquo;s a free task-exchange community where"
 		" builders publish clear task requests and other users complete them for karma.</p>"
-		"<p>No ads. No algorithms for sale. Just reciprocity &mdash; you do something for"
-		" someone, they do something for you. Karma tracks the balance and ranks the feed.</p>"
+		"<p>No ads. No algorithms for sale. Karma tracks contributions and ranks the feed.</p>"
 		"<p><strong>What KarmaRace is for:</strong> turning growth goals into clear tasks"
 		" users can complete (GitHub star/fork goals, webhook checks, and platform-specific"
 		" actions) without paying for shallow reach.</p>"
@@ -69,9 +68,8 @@ def build_html(domain: str) -> str:
 		'<li><span class="step-num">3</span> Complete tasks for others to earn karma</li>'
 		'<li><span class="step-num">4</span> Karma lifts your visibility &mdash; no wallet required</li>'
 		"</ul>"
-		'<p style="color:#777;font-size:13px;">Reciprocity is automatic &mdash; if someone'
-		" completes your task, a reverse obligation is created and settled fairly before the"
-		" feed reopens. Nobody freeloads.</p>"
+		'<p style="color:#777;font-size:13px;">Karma is automatic — completing tasks for others'
+		" earns karma that lifts your own visibility in the feed. No wallet required.</p>"
 		'<div class="cta-wrap">'
 		'<a class="cta" href="' + root + '">Join free &rarr;</a>'
 		"</div>"
@@ -96,8 +94,7 @@ def build_plaintext(domain: str) -> str:
 		"Big products win feeds because they outspend you \u2014 not because they're better.\n"
 		"KarmaRace levels that. It's a free task-exchange community where builders\n"
 		"publish clear task requests and other users complete them for karma.\n\n"
-		"No ads. No algorithms for sale. Just reciprocity \u2014 karma tracks the balance\n"
-		"and ranks the feed.\n\n"
+		"No ads. No algorithms for sale. Karma tracks contributions and ranks the feed.\n\n"
 		"WHAT KARMARACE IS FOR\n"
 		"  - Turning growth goals into clear tasks users can complete\n"
 		"  - Running GitHub and webhook verification tasks with real outcomes\n"

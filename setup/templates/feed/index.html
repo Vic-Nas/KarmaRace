@@ -49,20 +49,9 @@
   </div>
 </form>
 
-{% if obligation_mode %}
-<div class="alert alert-warning">
-  You have {{ open_obligations_count }} open obligation{{ open_obligations_count|pluralize }}.
-  Feed is locked to tasks that clear your debts first.
-</div>
-{% endif %}
-
 {% if feed_empty %}
   <div class="feed-empty">
-    {% if obligation_mode %}
-      <p>No eligible tasks to clear your obligations right now. Check back soon.</p>
-    {% else %}
-      <p>No tasks to test right now. <a href="{% url 'task_create' %}">Post your own</a>.</p>
-    {% endif %}
+    <p>No tasks to test right now. <a href="{% url 'task_create' %}">Post your own</a>.</p>
   </div>
 {% else %}
   <div class="card task-card">
@@ -71,11 +60,6 @@
         <a href="{{ task.target_url }}" target="_blank" rel="noopener noreferrer">{{ task.get_type_display }}</a>
       {% else %}
         {{ task.get_type_display }}
-      {% endif %}
-      {% if obligation_mode %}
-        &nbsp;<span class="badge badge-warning">
-          Obligation{% if obligation_creditor %} — owes {{ obligation_creditor }}{% endif %}
-        </span>
       {% endif %}
     </div>
 
@@ -149,29 +133,14 @@
       <div class="card__actions">
         <button type="submit" class="btn btn-primary" id="feed-check-btn"
           {% if task.type == 'WEBHOOK' and not verified_emails %} disabled{% endif %}>Check</button>
-
-        {% if obligation_mode %}
-        </form>
-        <form method="post" action="{% url 'feed_switch' %}">
-          {% csrf_token %}
-          <input type="hidden" name="completion" value="{{ completion }}">
-          <input type="hidden" name="archive"    value="{{ archive }}">
-          <input type="hidden" name="task_types" value="{{ selected_task_types_csv }}">
-          <button type="submit" class="btn btn-secondary">Switch</button>
-        </form>
-        {% if obligation_task_count > 1 %}
-        <span class="obligation-task-counter">task {{ obligation_task_index }} of {{ obligation_task_count }}</span>
-        {% endif %}
-        {% else %}
-        </form>
-        <form method="post" action="{% url 'feed_done' task.id %}">
-          {% csrf_token %}
-          <input type="hidden" name="completion" value="{{ completion }}">
-          <input type="hidden" name="archive"    value="{{ archive }}">
-          <input type="hidden" name="task_types" value="{{ selected_task_types_csv }}">
-          <button type="submit" class="btn btn-secondary">Archive</button>
-        </form>
-        {% endif %}
+      </form>
+      <form method="post" action="{% url 'feed_done' task.id %}">
+        {% csrf_token %}
+        <input type="hidden" name="completion" value="{{ completion }}">
+        <input type="hidden" name="archive"    value="{{ archive }}">
+        <input type="hidden" name="task_types" value="{{ selected_task_types_csv }}">
+        <button type="submit" class="btn btn-secondary">Archive</button>
+      </form>
       </div>
 
     {% if request.user.is_authenticated and request.user.id == task.owner_id %}
@@ -203,7 +172,6 @@ FeedCheck.bindForm(
   "{% url 'feed_check_status' task.id %}"
 );
 {% if task.type == 'WEBHOOK' and verified_emails %}
-// Disable Check until a difficulty is selected.
 (function () {
   var btn = document.getElementById('feed-check-btn');
   var radios = document.querySelectorAll('.diff-radio-input');

@@ -1,12 +1,9 @@
 # tasks/services/core.py
-"""Core task operations: verification, obligations, rewards, deletion."""
+"""Core task operations: verification and deletion."""
 import logging
-from django.utils import timezone
-from django.db import transaction
 
-from tasks.models import Task, TaskCompletion, ReciprocityObligation
+from tasks.models import Task, TaskCompletion
 from tasks.check_feedback import msg
-
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +11,7 @@ logger = logging.getLogger(__name__)
 def verify_task_with_details(task, tester, google_email=''):
     """Verify a task completion. Dispatches by task type. Returns (ok, detail, result_code)."""
     from .verify import verify_github_with_details, verify_webhook_with_details
-    
+
     dispatch = {
         Task.Type.GITHUB_STAR: verify_github_with_details,
         Task.Type.GITHUB_FORK: verify_github_with_details,
@@ -37,37 +34,6 @@ def soft_delete_task(task):
         task=task,
         state=TaskCompletion.State.PENDING,
     ).update(state=TaskCompletion.State.FAILED, result_detail=msg('ARCHIVED_DURING_CHECK'))
-
-
-@transaction.atomic
-def settle_or_create_obligation(actor, counterparty, task_type, completed_task, completed_task_difficulty=None):
-    """Settle existing debt first; otherwise create reverse obligation."""
-    if actor.pk == counterparty.pk:
-        return None
-
-    debt = ReciprocityObligation.objects.select_for_update().filter(
-        debtor=actor,
-        creditor=counterparty,
-        task_type=task_type,
-        state=ReciprocityObligation.State.OPEN,
-    ).order_by('created_at').first()
-
-    if debt:
-        debt.state = ReciprocityObligation.State.FULFILLED
-        debt.fulfilled_by_task = completed_task
-        debt.fulfilled_at = timezone.now()
-        debt.save(update_fields=['state', 'fulfilled_by_task', 'fulfilled_at'])
-        return 'settled'
-
-    ReciprocityObligation.objects.create(
-        debtor=counterparty,
-        creditor=actor,
-        task_type=task_type,
-        state=ReciprocityObligation.State.OPEN,
-        source_task=completed_task,
-        source_difficulty=completed_task_difficulty,
-    )
-    return 'created'
 
 
 def on_task_unhidden(task):

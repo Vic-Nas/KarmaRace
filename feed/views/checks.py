@@ -3,15 +3,15 @@
 from datetime import timedelta
 
 from django.conf import settings
-from django.contrib import messages
 from django.http import JsonResponse
 from django.shortcuts import redirect, get_object_or_404
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
+from karma.services import get_balance
+from setup.platform_rules import karma_reward_for_task
 from tasks.check_feedback import msg
-from tasks.models import Task, TaskCompletion, ReciprocityObligation
-
+from tasks.models import Task, TaskCompletion
 from .filtering import DEFAULT_COMPLETION, DEFAULT_ARCHIVE, SESSION_FEED_PIN_KEY, normalize_task_types
 
 
@@ -19,12 +19,11 @@ def redirect_to_feed_with_filters(request, extra_params=None):
     """Redirect back to feed with current filter settings."""
     from django.urls import reverse
     from django.utils.http import urlencode
+    from .filtering import save_filter_preferences
 
     completion     = (request.POST.get('completion') or DEFAULT_COMPLETION).strip() or DEFAULT_COMPLETION
     archive        = (request.POST.get('archive') or DEFAULT_ARCHIVE).strip() or DEFAULT_ARCHIVE
     selected_types = normalize_task_types(request.POST.getlist('task_types'))
-
-    from .filtering import save_filter_preferences
     save_filter_preferences(request.user, completion, archive, selected_types)
     params = {k: v for k, v in (extra_params or {}).items() if v not in (None, '', [])}
     url = reverse('feed')
@@ -39,52 +38,11 @@ def precheck_linked_account(user, task):
     return None
 
 
-def _compute_completion_reward(user, task):
-    """
-    Snapshot the karma reward at check time.
-
-    If this completion settles an open obligation toward the task owner,
-    reward the tester as if they had completed the top free-feed task instead
-    (opportunity cost compensation). The owner still pays only their normal reward.
-    If no obligation applies, return the normal computed reward.
-    """
-    from karma.services import get_balance
-    from setup.platform_rules import karma_reward_for_task
-    from .queries import feed_queryset
-
-    normal_reward = karma_reward_for_task(get_balance(task.owner), task.type)
-
-    has_obligation = ReciprocityObligation.objects.filter(
-        debtor=user,
-        creditor=task.owner,
-        task_type=task.type,
-        state=ReciprocityObligation.State.OPEN,
-    ).exists()
-
-    if not has_obligation:
-        return normal_reward
-
-    # Find top task user would have gotten without obligations
-    top_free_task = feed_queryset(user, completion='not_completed', archive='not_archived').first()
-    if top_free_task is None:
-        return normal_reward
-
-    opportunity_reward = karma_reward_for_task(top_free_task.owner_balance, top_free_task.type)
-    return max(normal_reward, opportunity_reward)
-
-
 @require_POST
 def done(request, task_id):
     """Archive a task."""
     if not request.user.is_authenticated:
         return redirect('account_login')
-
-    from .queries import active_lock_obligations, open_obligations
-
-    obligations = active_lock_obligations(request.user, open_obligations(request.user))
-    if obligations:
-        messages.error(request, msg('ARCHIVE_DISABLED_OBLIGATIONS'))
-        return redirect_to_feed_with_filters(request)
     task = get_object_or_404(Task, pk=task_id, is_deleted=False, hidden=False)
     if task.owner_id != request.user.id:
         task.archived_by.add(request.user)
@@ -104,14 +62,7 @@ def check(request, task_id):
             if detail:       payload['detail'] = detail
             if extra_params: payload.update(extra_params)
             return JsonResponse(payload)
-        if state == TaskCompletion.State.CONFIRMED:
-            messages.success(request, detail or msg('CHECK_CONFIRMED'))
-            return redirect_to_feed_with_filters(request)
-        if state == TaskCompletion.State.FAILED:
-            messages.error(request, detail or msg('CHECK_FAILED_GENERIC'))
-            return redirect_to_feed_with_filters(request)
         if state == TaskCompletion.State.PENDING:
-            messages.info(request, detail or msg('CHECK_STARTED'))
             return redirect_to_feed_with_filters(request, extra_params={'checking_task': str(task.pk)})
         return redirect_to_feed_with_filters(request)
 
@@ -141,7 +92,7 @@ def check(request, task_id):
         UserPreference.objects.update_or_create(
             user=request.user, key=f'task_diff_pick_{task.pk}', defaults={'value': diff_raw})
 
-    reward = _compute_completion_reward(request.user, task)
+    reward = karma_reward_for_task(get_balance(task.owner), task.type)
 
     completion, created = TaskCompletion.objects.get_or_create(
         task=task, tester=request.user,
@@ -149,7 +100,6 @@ def check(request, task_id):
     )
 
     if completion.state == TaskCompletion.State.CONFIRMED:
-        from karma.services import get_balance
         return respond(TaskCompletion.State.CONFIRMED, msg('ALREADY_CONFIRMED'),
                        extra_params={'karma_delta': 0, 'karma_balance': get_balance(request.user)})
 
@@ -168,7 +118,6 @@ def check(request, task_id):
         completion.save(update_fields=['state', 'result_detail', 'reward', 'created_at'])
 
     process_task_check.defer(task_id=task.pk, tester_id=request.user.pk, google_email=google_email)
-
     return respond(TaskCompletion.State.PENDING, msg('CHECK_STARTED'))
 
 
@@ -190,42 +139,7 @@ def check_status(request, task_id):
                              'result_code': completion.result_code or '',
                              'detail': completion.result_detail or msg('CHECK_FAILED_GENERIC')})
     if completion.state == TaskCompletion.State.CONFIRMED:
-        from karma.services import get_balance
         return JsonResponse({'state': completion.state, 'detail': msg('CHECK_CONFIRMED'),
                              'karma_delta': completion.reward,
                              'karma_balance': get_balance(request.user)})
     return JsonResponse({'state': completion.state})
-
-
-@require_POST
-def switch(request):
-    """
-    Cycle to the next valid obligation task for the current creditor/type pair.
-    Session key: feed_obligation_switch_{creditor_id}_{task_type}
-    """
-    if not request.user.is_authenticated:
-        return redirect('account_login')
-
-    from .queries import open_obligations, active_lock_obligations, get_obligation_tasks
-    from .filtering import SESSION_FEED_PIN_KEY
-
-    obligations = active_lock_obligations(request.user, open_obligations(request.user))
-    if not obligations:
-        return redirect_to_feed_with_filters(request)
-
-    # Use the first (oldest) active obligation — same as feed_view priority
-    ob = obligations[0]
-    tasks = get_obligation_tasks(request.user, ob)
-    if not tasks:
-        return redirect_to_feed_with_filters(request)
-
-    session_key = f'feed_obligation_switch_{ob.creditor_id}_{ob.task_type}'
-    current_index = request.session.get(session_key, 0)
-    next_index = (current_index + 1) % len(tasks)
-    request.session[session_key] = next_index
-
-    # Pin the selected task
-    next_task = tasks[next_index]
-    request.session[SESSION_FEED_PIN_KEY] = next_task.pk
-
-    return redirect_to_feed_with_filters(request)
