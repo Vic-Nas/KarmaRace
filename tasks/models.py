@@ -25,8 +25,6 @@ class Task(models.Model):
     health_failure_streak       = models.PositiveSmallIntegerField(default=0)
     health_last_failure_reason  = models.TextField(blank=True, default='')
     health_last_checked_at      = models.DateTimeField(null=True, blank=True)
-    webhook_health_success_count = models.PositiveIntegerField(default=0)
-    webhook_health_failure_count = models.PositiveIntegerField(default=0)
     health_last_result  = models.CharField(max_length=64, blank=True, default='')
     difficulty_sum   = models.PositiveIntegerField(default=0)
     difficulty_count = models.PositiveIntegerField(default=0)

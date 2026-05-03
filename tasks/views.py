@@ -100,15 +100,12 @@ def task_publish(request, task_slug):
         if reason is None:
             task.owner_unpublished = False
             task.hidden = False
-            task.webhook_health_success_count = 0
-            task.webhook_health_failure_count = 0
             task.health_last_result = ''
             task.health_last_failure_reason = ''
             task.health_last_checked_at = None
             task.health_failure_streak = 0
             task.save(update_fields=[
                 'owner_unpublished', 'hidden',
-                'webhook_health_success_count', 'webhook_health_failure_count',
                 'health_last_result', 'health_last_failure_reason',
                 'health_last_checked_at', 'health_failure_streak',
             ])

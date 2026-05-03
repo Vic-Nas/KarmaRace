@@ -69,49 +69,43 @@ def can_run_manual_health_check(task):
 
 
 def _record_webhook_health_outcome(task, is_success, result, reason):
-    """Record webhook health check outcome and auto-unpublish if needed.
+    """Record webhook check outcome metadata and auto-unpublish if endpoint is genuinely broken.
 
-    Only request_error and invalid_json count as health failures —
-    not_verified just means the user hasn't completed the task yet.
+    Auto-unpublish uses TaskCompletion counts (the single source of truth), not separate counters.
+    Only request_error and invalid_json are endpoint failures — not_verified is a user issue.
     """
     if task.type != Task.Type.WEBHOOK:
         return
-
-    # not_verified is not an endpoint health signal — skip health accounting entirely.
     if result == 'not_verified':
         return
 
-    update_fields = ['health_last_checked_at', 'health_last_result', 'health_last_failure_reason']
     task.health_last_checked_at = timezone.now()
     task.health_last_result = (result or '')[:64]
     task.health_last_failure_reason = reason or ''
+    task.save(update_fields=['health_last_checked_at', 'health_last_result', 'health_last_failure_reason'])
 
-    if is_success:
-        task.webhook_health_success_count += 1
-        update_fields.append('webhook_health_success_count')
-    else:
-        task.webhook_health_failure_count += 1
-        update_fields.append('webhook_health_failure_count')
+    # Auto-unpublish only on genuine endpoint errors, using TaskCompletion as source of truth.
+    if result not in ('request_error', 'invalid_json', 'invalid_shape'):
+        return
 
-    total = task.webhook_health_success_count + task.webhook_health_failure_count
-    bad_ratio = (
-        float(task.webhook_health_failure_count) / float(total + WEBHOOK_FAILURE_RATE_EPSILON)
-    ) if total > 0 else 0.0
+    from tasks.models import TaskCompletion
+    cqs = TaskCompletion.objects.filter(task=task)
+    failed   = cqs.filter(state=TaskCompletion.State.FAILED).count()
+    completed = cqs.filter(state=TaskCompletion.State.CONFIRMED).count()
+    total = failed + completed
+    if total < int(WEBHOOK_BAD_CHECK_MIN_CALLS):
+        return
 
-    should_auto_unpublish = (
-        total >= int(WEBHOOK_BAD_CHECK_MIN_CALLS)
-        and bad_ratio >= float(WEBHOOK_BAD_CHECK_RATIO_THRESHOLD)
-    )
-    transitioned = should_auto_unpublish and not task.hidden
-    if should_auto_unpublish:
-        task.hidden = True
-        task.owner_unpublished = True
-        update_fields.extend(['hidden', 'owner_unpublished'])
+    bad_ratio = float(failed) / float(total + WEBHOOK_FAILURE_RATE_EPSILON)
+    if bad_ratio < float(WEBHOOK_BAD_CHECK_RATIO_THRESHOLD):
+        return
 
-    task.save(update_fields=list(dict.fromkeys(update_fields)))
-
-    if transitioned:
-        _notify_health_failed(task)
+    if task.hidden:
+        return
+    task.hidden = True
+    task.owner_unpublished = True
+    task.save(update_fields=['hidden', 'owner_unpublished'])
+    _notify_health_failed(task)
 
 
 def _notify_health_failed(task):
@@ -125,8 +119,6 @@ def _notify_health_failed(task):
             payload={
                 'task_id': task.pk, 'task_type': task.type, 'target_id': task.target_id,
                 'owner_id': task.owner_id,
-                'webhook_health_success_count': task.webhook_health_success_count,
-                'webhook_health_failure_count': task.webhook_health_failure_count,
                 'health_last_result': task.health_last_result,
                 'health_last_failure_reason': task.health_last_failure_reason,
             },
