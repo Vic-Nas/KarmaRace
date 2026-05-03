@@ -1,3 +1,4 @@
+# accounts/views/__init__.py
 """Accounts views package."""
 from .linked import linked_accounts, connect_account, discord_entry, discord_callback, unlink_account
 from .email import verify_email_start, verify_email_callback, remove_verified_email

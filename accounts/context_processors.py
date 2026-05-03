@@ -1,3 +1,4 @@
+# accounts/context_processors.py
 from karma.services import get_balance
 
 

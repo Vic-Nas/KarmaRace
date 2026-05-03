@@ -1,3 +1,4 @@
+# feed/views/queries.py
 """Feed query builders and data fetching."""
 from django.db.models import Sum, Value, Q
 from django.db.models.functions import Coalesce

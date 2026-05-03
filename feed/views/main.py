@@ -1,3 +1,4 @@
+# feed/views/main.py
 """Main feed view."""
 from django.contrib import messages
 from django.shortcuts import render, redirect

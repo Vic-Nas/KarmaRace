@@ -1,3 +1,4 @@
+# billing/admin.py
 from django.contrib import admin
 
 from billing.models import BillingProfile

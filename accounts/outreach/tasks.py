@@ -1,3 +1,4 @@
+# accounts/outreach/tasks.py
 """Periodic outreach tasks (harvest and send)."""
 import logging
 import random
@@ -7,7 +8,7 @@ from django.conf import settings
 from django.utils import timezone
 from procrastinate.contrib.django import app
 
-from .config import BATCH, GITHUB_API, SUBJECT, LANGUAGES, SEARCH_BASE, score_user, gh_get, resend_post
+from .config import BATCH, GITHUB_API, SUBJECT, LANGUAGES, SEARCH_BASE, score_user, gh_get, sendpulse_post
 from .email import build_html, build_plaintext
 
 logger = logging.getLogger(__name__)
@@ -82,10 +83,10 @@ def harvest_outreach_emails(timestamp=None):
 	)
 
 
-@app.periodic(cron="0 6 * * *")
+@app.periodic(cron="0 * * * *")
 @app.task
 def send_outreach_emails(timestamp=None):
-	"""Send top-scored pending records (up to DAILY_REACH) via Resend.
+	"""Send top-scored pending records (up to DAILY_REACH) via SendPulse.
 
 	After each attempt: delete OutreachRecord, log email in OutreachContactedEmail,
 	and upsert today's OutreachDailyStats row.
@@ -94,11 +95,15 @@ def send_outreach_emails(timestamp=None):
 		logger.info("send_outreach_emails: REACH is False, skipping.")
 		return
 
+	from accounts.models import monthly_sent_count, increment_monthly_sent
+	if monthly_sent_count() >= getattr(settings, 'MONTHLY_REACH', 12000):
+		logger.info('send_outreach_emails: monthly cap reached, skipping.')
+		return
+
 	from accounts.models import OutreachRecord, OutreachContactedEmail, OutreachDailyStats
 
-	daily_reach = getattr(settings, "DAILY_REACH", 100)
+	daily_reach = getattr(settings, "DAILY_REACH", 50)
 	domain      = settings.DOMAIN
-	from_addr   = "KarmaRace <outreach@" + domain + ">"
 	html        = build_html(domain)
 	plaintext   = build_plaintext(domain)
 
@@ -108,12 +113,14 @@ def send_outreach_emails(timestamp=None):
 
 	sent = failed = 0
 	for record in pending:
-		ok = resend_post({
-			"from":    from_addr,
-			"to":      [record.email],
-			"subject": SUBJECT,
-			"html":    html,
-			"text":    plaintext,
+		ok = sendpulse_post({
+			'email': {
+				'from':    {'name': 'KarmaRace', 'email': f'outreach@{domain}'},
+				'to':      [{'name': '', 'email': record.email}],
+				'subject': SUBJECT,
+				'html':    html,
+				'text':    plaintext,
+			}
 		})
 		OutreachContactedEmail.objects.get_or_create(email=record.email)
 		record.delete()
@@ -121,6 +128,9 @@ def send_outreach_emails(timestamp=None):
 			sent += 1
 		else:
 			failed += 1
+
+	if sent:
+		increment_monthly_sent(sent)
 
 	today = timezone.now().date()
 	pending_after = OutreachRecord.objects.count()

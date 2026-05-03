@@ -1,3 +1,4 @@
+# setup/settings.py
 """
 Django settings for project project.
 
@@ -168,14 +169,11 @@ from .settings_oauth import (
     SOCIALACCOUNT_PROVIDERS,
 )
 
-# Third-party services (Adsense, Stripe, Resend, GitHub API, Procrastinate)
+# Third-party services (Adsense, Stripe, SendPulse, GitHub API, Procrastinate)
 from .settings_services import (
     ADSENSE_CLIENT_ID, ADSENSE_SLOTS,
     STRIPE_SECRET_KEY, STRIPE_PRICE_ID, STRIPE_WEBHOOK_SECRET,
-    RESEND_API_KEY, RESEND_WEBHOOK_SECRET,
-    GITHUB_TOKEN, REACH, DAILY_REACH,
+    SENDPULSE_API_ID, SENDPULSE_API_SECRET,
+    GITHUB_TOKEN, REACH, DAILY_REACH, MONTHLY_REACH,
     PROCRASTINATE_CONNECTORS,
 )
-
-# Resend email sender (use DOMAIN if not configured in env)
-RESEND_FROM_EMAIL = f'noreply@{DOMAIN}'

@@ -1,17 +1,25 @@
+# accounts/outreach/config.py
 """Outreach configuration, scoring, and API helpers."""
+import json
 import logging
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
 
-import resend
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
 # Target candidates per harvest run. Stays well within GitHub's 5000/hr limit:
-# each candidate uses ~2 API calls (profile + repos), so 500 ≈ 1000 calls.
-BATCH       = 500
+# each candidate uses ~2 API calls (profile + repos), so 1200 ≈ 2400 calls.
+BATCH       = 1200
 
 GITHUB_API  = "https://api.github.com"
 SUBJECT     = "Your project deserves users — not a bigger budget"
+
+SENDPULSE_TOKEN_URL = 'https://api.sendpulse.com/oauth/access_token'
+SENDPULSE_SMTP_URL  = 'https://api.sendpulse.com/smtp/emails'
 
 # Web-focused languages. Targets JS/TS (frontend), Go (backend services).
 WEB_LANGUAGES   = ["javascript", "typescript", "go"]
@@ -20,6 +28,9 @@ OTHER_LANGUAGES = ["python", "rust", "c++"]
 LANGUAGES       = WEB_LANGUAGES + OTHER_LANGUAGES
 
 SEARCH_BASE = "type:user followers:0..500 repos:3..100"
+
+# Module-level token cache: {'token': str, 'expires_at': float}
+_sendpulse_token_cache: dict = {}
 
 
 def score_user(profile: dict, repos: list) -> int:
@@ -55,13 +66,52 @@ def gh_get(url: str):
 		return None
 
 
-def resend_post(payload: dict) -> bool:
-	"""Send email via Resend API."""
-	resend.api_key = settings.RESEND_API_KEY
+def get_sendpulse_token() -> str:
+	"""Return a valid SendPulse bearer token, fetching a new one if needed."""
+	now = time.time()
+	if _sendpulse_token_cache.get('token') and now < _sendpulse_token_cache.get('expires_at', 0):
+		return _sendpulse_token_cache['token']
+
+	payload = json.dumps({
+		'grant_type':    'client_credentials',
+		'client_id':     settings.SENDPULSE_API_ID,
+		'client_secret': settings.SENDPULSE_API_SECRET,
+	}).encode()
+
+	req = urllib.request.Request(
+		SENDPULSE_TOKEN_URL,
+		data=payload,
+		headers={'Content-Type': 'application/json'},
+		method='POST',
+	)
+	with urllib.request.urlopen(req, timeout=15) as resp:
+		data = json.loads(resp.read())
+
+	token = data['access_token']
+	expires_in = data.get('expires_in', 3600)
+	_sendpulse_token_cache['token'] = token
+	_sendpulse_token_cache['expires_at'] = now + expires_in - 60  # 60s buffer
+
+	return token
+
+
+def sendpulse_post(payload: dict) -> bool:
+	"""Send email via SendPulse SMTP API. Returns True when result:true in body."""
 	try:
-		resend.Emails.send(payload)
-		return True
+		token = get_sendpulse_token()
+		body = json.dumps(payload).encode()
+		req = urllib.request.Request(
+			SENDPULSE_SMTP_URL,
+			data=body,
+			headers={'Content-Type': 'application/json', 'Authorization': f'Bearer {token}'},
+			method='POST',
+		)
+		with urllib.request.urlopen(req, timeout=15) as resp:
+			data = json.loads(resp.read())
+		return bool(data.get('result'))
+	except urllib.error.HTTPError as exc:
+		logger.error("SendPulse HTTP %s: %s", exc.code, exc.read())
+		return False
 	except Exception as exc:
-		print(f"Resend error: {exc}")
-		logger.error("Resend error: %s", exc)
+		logger.error("SendPulse error: %s", exc)
 		return False

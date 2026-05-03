@@ -1,3 +1,4 @@
+# accounts/views/linked.py
 """Linked account management and Discord OAuth."""
 import logging
 import secrets

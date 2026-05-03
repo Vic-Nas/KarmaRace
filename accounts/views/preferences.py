@@ -1,3 +1,4 @@
+# accounts/views/preferences.py
 """User preferences view."""
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required

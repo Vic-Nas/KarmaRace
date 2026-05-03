@@ -1,3 +1,4 @@
+# accounts/middleware.py
 """Middleware to intercept users who haven't chosen a username yet."""
 from django.shortcuts import redirect
 from django.urls import reverse

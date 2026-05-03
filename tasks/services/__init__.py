@@ -1,3 +1,4 @@
+# tasks/services/__init__.py
 """Tasks services module. Verification, health checks, configuration, rewards."""
 # Core operations
 from .core import (

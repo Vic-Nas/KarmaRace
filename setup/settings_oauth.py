@@ -1,3 +1,4 @@
+# setup/settings_oauth.py
 """OAuth provider configurations."""
 import environ
 

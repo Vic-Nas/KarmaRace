@@ -1,3 +1,4 @@
+# accounts/views/username.py
 """Username selection after first social login."""
 import re
 

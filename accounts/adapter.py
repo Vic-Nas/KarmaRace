@@ -1,3 +1,4 @@
+# accounts/adapter.py
 from allauth.socialaccount.adapter import DefaultSocialAccountAdapter
 from allauth.exceptions import ImmediateHttpResponse
 from django.shortcuts import render

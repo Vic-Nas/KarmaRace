@@ -109,3 +109,37 @@ class OutreachDailyStats(models.Model):
     def __str__(self):
         return f'{self.date}: sent={self.sent_count} failed={self.failed_count}'
  
+
+class OutreachMonthlyStats(models.Model):
+    year       = models.IntegerField()
+    month      = models.IntegerField()  # 1-12
+    sent_count = models.IntegerField(default=0)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('year', 'month')
+        ordering = ['-year', '-month']
+
+    def __str__(self):
+        return f'{self.year}-{self.month:02d}: sent={self.sent_count}'
+
+
+def monthly_sent_count() -> int:
+    """Return total emails sent this calendar month."""
+    from django.utils import timezone
+    now = timezone.now()
+    obj = OutreachMonthlyStats.objects.filter(
+        year=now.year, month=now.month
+    ).first()
+    return obj.sent_count if obj else 0
+
+
+def increment_monthly_sent(count: int) -> None:
+    """Add count to this month's sent total (upsert)."""
+    from django.utils import timezone
+    now = timezone.now()
+    obj, _ = OutreachMonthlyStats.objects.get_or_create(
+        year=now.year, month=now.month
+    )
+    obj.sent_count = models.F('sent_count') + count
+    obj.save(update_fields=['sent_count', 'updated_at'])

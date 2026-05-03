@@ -1,3 +1,4 @@
+# accounts/views/email.py
 """Email verification via Google OAuth."""
 import logging
 import secrets

@@ -1,3 +1,4 @@
+# accounts/views/verify.py
 """Webhook endpoint for KarmaRace task verification."""
 import json
 import logging

@@ -1,3 +1,4 @@
+# tasks/services/core.py
 """Core task operations: verification, obligations, rewards, deletion."""
 import logging
 from django.utils import timezone

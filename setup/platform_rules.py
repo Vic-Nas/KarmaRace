@@ -1,3 +1,4 @@
+# setup/platform_rules.py
 """Centralized product constants for karma and webhook behavior."""
 import math
 

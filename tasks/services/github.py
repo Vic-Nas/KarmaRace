@@ -1,3 +1,4 @@
+# tasks/services/github.py
 """GitHub integration utilities: authentication, repo choices, API helpers."""
 import logging
 from django.conf import settings
