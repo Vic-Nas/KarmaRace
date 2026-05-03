@@ -138,9 +138,7 @@ def check(request, task_id):
             return respond(TaskCompletion.State.FAILED, 'Rate the task difficulty (1–5) before checking.')
         from accounts.models import UserPreference
         UserPreference.objects.update_or_create(
-            user=request.user, key=f'task_diff_pick_{task.pk}',
-            defaults={'value': diff_raw},
-        )
+            user=request.user, key=f'task_diff_pick_{task.pk}', defaults={'value': diff_raw})
 
     reward = _compute_completion_reward(request.user, task)
 

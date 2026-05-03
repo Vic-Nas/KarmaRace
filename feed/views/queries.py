@@ -19,44 +19,27 @@ def open_obligations(user):
 
 def get_obligation_tasks(user, obligation):
     """
-    Return all valid tasks for a given obligation (same creditor, same type),
-    filtered by difficulty: task.difficulty <= obligation.source_difficulty.
-    Falls back to the lowest-difficulty available task if none qualify.
-    Excludes already-confirmed completions.
+    All valid tasks for an obligation (creditor, type), difficulty-filtered.
+    Falls back to lowest available if none qualify.
     """
     base_qs = (
-        Task.objects.filter(
-            is_deleted=False,
-            hidden=False,
-            owner_id=obligation.creditor_id,
-            type=obligation.task_type,
-        )
+        Task.objects.filter(is_deleted=False, hidden=False, owner_id=obligation.creditor_id, type=obligation.task_type)
         .exclude(archived_by=user)
         .exclude(completions__tester=user, completions__state=TaskCompletion.State.CONFIRMED)
         .annotate(owner_balance=Coalesce(Sum('owner__karma_transactions__delta'), Value(0)))
-        .order_by('difficulty_sum', '-created_at')  # easier tasks first, newest tiebreak
+        .order_by('difficulty_sum', '-created_at')
     )
-
+    tasks = list(base_qs)
     if obligation.source_difficulty is not None:
-        filtered = [t for t in base_qs if t.difficulty <= obligation.source_difficulty]
+        filtered = [t for t in tasks if t.difficulty <= obligation.source_difficulty]
         if filtered:
             return filtered
-
-    # Fallback: all available tasks (sorted easiest first)
-    return list(base_qs)
+    return tasks
 
 
 def active_lock_obligations(user, obligations):
-    """Filter obligations to those with available tasks in the feed."""
-    if not obligations:
-        return []
-    # Use get_obligation_tasks to check availability respecting difficulty filter
-    active = [ob for ob in obligations if get_obligation_tasks(user, ob)]
-    if not active:
-        # Fall back to old behaviour — check if any task exists at all
-        candidate = get_feed_task(user, completion='not_completed', archive='not_archived', obligations=obligations)
-        return obligations if candidate else []
-    return active
+    """Filter obligations to those with at least one available task."""
+    return [ob for ob in obligations if get_obligation_tasks(user, ob)] if obligations else []
 
 
 def feed_queryset(user, completion='not_completed', archive='not_archived', task_types=None, obligations=None):

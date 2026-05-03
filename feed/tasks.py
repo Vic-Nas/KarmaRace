@@ -58,17 +58,13 @@ def process_task_check(task_id: int, tester_id: int, google_email: str = ''):
                         related_object_id=task.pk,
                     )
 
-                # Read and apply difficulty pick for webhook tasks.
+                # Read difficulty pick for webhook tasks and apply to task stats.
                 completed_difficulty = None
                 if task.type == Task.Type.WEBHOOK:
                     from accounts.models import UserPreference
-                    pref_key = f'task_diff_pick_{task.pk}'
-                    pref = UserPreference.objects.filter(
-                        user=completion.tester, key=pref_key,
-                    ).first()
+                    pref = UserPreference.objects.filter(user=completion.tester, key=f'task_diff_pick_{task.pk}').first()
                     if pref and pref.value.isdigit():
-                        completed_difficulty = int(pref.value)
-                        completed_difficulty = max(1, min(5, completed_difficulty))
+                        completed_difficulty = max(1, min(5, int(pref.value)))
                         task.difficulty_sum += completed_difficulty
                         task.difficulty_count += 1
                         pref.delete()
@@ -100,25 +96,15 @@ def process_task_check(task_id: int, tester_id: int, google_email: str = ''):
 
 
 def _maybe_cancel_obligation_on_broken_endpoint(debtor, creditor):
-    """
-    Increment error_strike_count on the open obligation where debtor owes creditor
-    a WEBHOOK task. Cancel it when the threshold is reached.
-    """
+    """Increment strike on the open WEBHOOK obligation debtor→creditor; cancel at threshold."""
     obligation = ReciprocityObligation.objects.select_for_update().filter(
-        debtor=debtor,
-        creditor=creditor,
-        task_type=Task.Type.WEBHOOK,
-        state=ReciprocityObligation.State.OPEN,
+        debtor=debtor, creditor=creditor,
+        task_type=Task.Type.WEBHOOK, state=ReciprocityObligation.State.OPEN,
     ).order_by('created_at').first()
-
     if obligation is None:
         return
-
     obligation.error_strike_count += 1
     if obligation.error_strike_count >= WEBHOOK_OBLIGATION_ERROR_STRIKE_THRESHOLD:
         obligation.state = ReciprocityObligation.State.CANCELLED
-        logger.info(
-            'process_task_check: obligation %s cancelled after %d broken-endpoint strikes',
-            obligation.pk, obligation.error_strike_count,
-        )
+        logger.info('obligation %s cancelled after %d broken-endpoint strikes', obligation.pk, obligation.error_strike_count)
     obligation.save(update_fields=['error_strike_count', 'state'])
