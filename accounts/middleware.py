@@ -4,10 +4,9 @@ from django.urls import reverse
 
 from accounts.views.username import username_needs_picking
 
-# Paths that must always be accessible regardless of username state.
-# Allauth paths, static, admin, and our own pick-username URLs.
-_PASSTHROUGH_PREFIXES = (
-    '/accounts/',       # allauth + our accounts URLs
+# Path segments that are always passthrough regardless of URL prefix.
+_PASSTHROUGH_SEGMENTS = (
+    '/accounts/',
     '/admin/',
     '/static/',
     '/favicon',
@@ -20,12 +19,15 @@ class RequireUsernameMiddleware:
         self._pick_url = None
 
     def __call__(self, request):
+        if self._pick_url is None:
+            self._pick_url = reverse('pick_username')
+
+        path = request.path
         if (
             request.user.is_authenticated
-            and not any(request.path.startswith(p) for p in _PASSTHROUGH_PREFIXES)
+            and path != self._pick_url
+            and not any(seg in path for seg in _PASSTHROUGH_SEGMENTS)
             and username_needs_picking(request.user)
         ):
-            if self._pick_url is None:
-                self._pick_url = reverse('pick_username')
             return redirect(self._pick_url)
         return self.get_response(request)

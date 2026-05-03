@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 @app.periodic(cron="0 2 * * *")
 @app.task
-def harvest_outreach_emails():
+def harvest_outreach_emails(timestamp=None):
 	"""Harvest scored GitHub user candidates into OutreachRecord queue.
 
 	Only includes users who:
@@ -84,7 +84,7 @@ def harvest_outreach_emails():
 
 @app.periodic(cron="0 6 * * *")
 @app.task
-def send_outreach_emails():
+def send_outreach_emails(timestamp=None):
 	"""Send top-scored pending records (up to DAILY_REACH) via Resend.
 
 	After each attempt: delete OutreachRecord, log email in OutreachContactedEmail,
