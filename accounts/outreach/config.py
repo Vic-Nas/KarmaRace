@@ -114,6 +114,7 @@ def sendpulse_post(payload: dict) -> bool:
 	try:
 		token = get_sendpulse_token()
 		email = payload.get('email', {})
+		logger.info("sendpulse_post: from=%r to=%r", email.get('from'), email.get('to'))
 		if 'html' in email:
 			email['html'] = base64.b64encode(email['html'].encode()).decode()
 		body = json.dumps(payload).encode()

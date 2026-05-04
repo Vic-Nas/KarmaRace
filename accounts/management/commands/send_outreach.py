@@ -100,7 +100,7 @@ class Command(BaseCommand):
                     sent += 1
                 else:
                     failed += 1
-                    self.stdout.write(self.style.ERROR(f'✗ Failed to send to {record.email}.'))
+                    self.stdout.write(self.style.ERROR(f'✗ Failed: from=outreach@{domain} to={record.email}'))
 
                 pbar.set_postfix({'sent': sent, 'failed': failed}, refresh=True)
 

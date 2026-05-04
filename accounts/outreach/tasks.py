@@ -86,9 +86,13 @@ def send_outreach_emails(timestamp=None):
 	from accounts.models import OutreachRecord, OutreachContactedEmail
 
 	daily_reach = getattr(settings, "DAILY_REACH", 50)
-	domain      = settings.DOMAIN
-	html        = build_html(domain)
-	plaintext   = build_plaintext(domain)
+	domain    = settings.DOMAIN
+	try:
+		html      = build_html(domain)
+		plaintext = build_plaintext(domain)
+	except Exception as exc:
+		logger.error('send_outreach_emails: failed to build email templates: %s', exc)
+		return
 
 	pending = list(
 		OutreachRecord.objects.order_by("-score", "created_at")[:daily_reach]
