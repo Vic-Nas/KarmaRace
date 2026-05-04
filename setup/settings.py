@@ -33,6 +33,7 @@ CSRF_TRUSTED_ORIGINS = [f'https://{host}' for host in HOSTS] + \
     [f'http://{host}' for host in HOSTS]
 
 INSTALLED_APPS = [
+    'setup',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -186,3 +187,23 @@ DJSTRIPE_API_KEY = STRIPE_SECRET_KEY
 DJSTRIPE_WEBHOOK_SECRET = STRIPE_WEBHOOK_SECRET
 DJSTRIPE_SUBSCRIBER_MODEL = AUTH_USER_MODEL
 DJSTRIPE_FOREIGN_KEY_TO_FIELD = 'id'
+
+GITHUB_ERROR_REPO = env('GITHUB_ERROR_REPO', default='Vic-Nas/KarmaRace')
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+        'github': {
+            'level': 'ERROR',
+            'class': 'setup.github_logging.GitHubIssueHandler',
+        },
+    },
+    'root': {
+        'handlers': ['console', 'github'],
+        'level': 'INFO',
+    },
+}

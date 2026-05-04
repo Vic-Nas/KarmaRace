@@ -107,3 +107,6 @@ def _check_webhook_endpoint_contract_detailed(task):
             f'Webhook endpoint contract check failed. Sent: POST {task.target_id} body={payload}; '
             f'Expected: {expected}; Got: request error={exc}.'
         )
+    except Exception:
+        logger.exception('_check_webhook_endpoint_contract_detailed: unexpected error for task %s', task.pk)
+        return 'Webhook contract check failed due to an unexpected error.'

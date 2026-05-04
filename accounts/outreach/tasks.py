@@ -119,6 +119,8 @@ def send_outreach_emails(timestamp=None):
 
 	if sent:
 		increment_monthly_sent(sent)
+	if failed:
+		logger.error('send_outreach_emails: %d send failures out of %d attempted', failed, len(pending))
 
 	update_daily_stats(
 		timezone.now().date(),

@@ -1,8 +1,12 @@
 # karma/services.py
+import logging
+
 from django.db.models import Sum
 
 from karma.models import KarmaTransaction
 from setup.platform_rules import KARMA_LOW_THRESHOLD
+
+logger = logging.getLogger(__name__)
 
 
 def get_balance(user) -> int:
@@ -142,6 +146,4 @@ def adjust_karma_by_staff(user, delta: int, reason: str = None):
         threshold = _karma_low_threshold(user)
         _maybe_notify_karma_threshold_transition(user=user, new_balance=new_balance, threshold=threshold)
     except Exception:
-        pass
-
-    return new_balance
+        logger.exception('adjust_karma_by_staff: notification failed for user %s', user.pk)

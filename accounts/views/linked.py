@@ -56,7 +56,9 @@ def _sync_discord_membership(request, linked):
             discord_api.sync_nickname(linked.platform_id, request.user.username)
             discord_api.ensure_role(linked.platform_id)
             return True
-    except requests.RequestException:
+    except requests.RequestException as exc:
+        logger.error('_sync_discord_membership: failed for user %s: %s',
+                     request.user.pk, exc, exc_info=True)
         messages.warning(request, 'Could not verify Discord membership right now. Please try again.')
         return None
     # User left the guild on their own — drop the DB record, no server kick.
@@ -160,12 +162,13 @@ def _swap_thread_member(thread_id, new_id, old_id):
         try:
             discord_api.add_thread_member(thread_id, new_id)
             discord_api.remove_thread_member(thread_id, old_id)
-        except requests.RequestException:
-            pass
+        except requests.RequestException as exc:
+            logger.error('_swap_thread_member: failed for thread %s old=%s new=%s: %s',
+                         thread_id, old_id, new_id, exc, exc_info=True)
     try:
         discord_api.kick_member(old_id)
-    except requests.RequestException:
-        pass
+    except requests.RequestException as exc:
+        logger.error('_swap_thread_member: kick failed for old_id=%s: %s', old_id, exc, exc_info=True)
 
 
 @login_required
