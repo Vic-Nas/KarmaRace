@@ -194,9 +194,17 @@ GITHUB_ERROR_REPO = env('GITHUB_ERROR_REPO', default='Vic-Nas/KarmaRace')
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
+    'filters': {
+        # Suppress duplicate log records with identical (logger, level, message).
+        # Useful for warnings that fire once per worker process on startup.
+        'dedup': {
+            '()': 'setup.log_filters.DedupFilter',
+        },
+    },
     'handlers': {
         'console': {
             'class': 'logging.StreamHandler',
+            'filters': ['dedup'],
         },
         'github': {
             'level': 'ERROR',
@@ -219,6 +227,21 @@ LOGGING = {
         'setup.honeypot': {
             'handlers': ['console'],
             'level': 'DEBUG',
+            'propagate': False,
+        },
+        # Gunicorn worker boot lines (Started server process, Waiting for
+        # application startup, etc.) are too verbose with 8 workers — one
+        # summary line per boot is enough. ERROR still surfaces real crashes.
+        'gunicorn.error': {
+            'handlers': ['console'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        # py.warnings captures Python warnings module output (e.g.
+        # StreamingHttpResponse sync iterator warning). Dedup filter on the
+        # console handler above already collapses per-worker repeats.
+        'py.warnings': {
+            'handlers': ['console'],
             'propagate': False,
         },
     },
