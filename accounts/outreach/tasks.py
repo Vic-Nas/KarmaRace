@@ -66,7 +66,7 @@ def harvest_outreach_emails(timestamp=None):
 	)
 
 
-@app.periodic(cron="0 * * * *")
+@app.periodic(cron="0 */2 * * *")
 @app.task
 def send_outreach_emails(timestamp=None):
 	"""Send top-scored pending records (up to DAILY_REACH) via SendPulse.
