@@ -9,16 +9,18 @@ Strategy:
      our own pages) still get a real 404 with a WARNING log so we notice
      broken buttons / links in the app.
 
-Under ASGI (uvicorn workers), Django detects async_capable=True and calls
-__acall__ directly, so asyncio.sleep is used and tarpitted bots cost nothing.
-Under WSGI, the sync __call__ fallback runs with time.sleep instead.
+ASGI-only: sync_capable=False ensures Django raises at startup if deployed
+under WSGI, rather than silently falling back to blocking time.sleep behaviour
+that would let 8 concurrent bots stall all 8 uvicorn workers.
+
+Under ASGI (uvicorn), asyncio.sleep suspends the coroutine between chunks so
+the event loop remains free to serve real users throughout the tarpit.
 """
 
 import asyncio
 import hashlib
 import logging
 import re
-import time
 
 from django.http import StreamingHttpResponse
 
@@ -335,25 +337,14 @@ def _build_payload(path: str) -> bytes:
     return b"".join(chunks)
 
 
-def _sync_streaming_response(path: str) -> StreamingHttpResponse:
-    """Sync fallback — used under WSGI."""
-    payload = _build_payload(path)
-
-    def _gen():
-        for i in range(0, len(payload), STREAM_CHUNK):
-            yield payload[i : i + STREAM_CHUNK]
-            time.sleep(STREAM_DELAY)
-
-    resp = StreamingHttpResponse(_gen(), status=200, content_type="text/html; charset=utf-8")
-    resp["X-Content-Type-Options"] = "nosniff"
-    return resp
-
-
-def _async_streaming_response(path: str) -> StreamingHttpResponse:
+def _make_async_response(path: str) -> StreamingHttpResponse:
     """
-    Async generator inside a sync function — Django gets a real response
-    object immediately, but the generator uses asyncio.sleep so each chunk
-    suspends the coroutine instead of blocking a thread.
+    Async streaming tarpit response.
+
+    Uses an async generator so each asyncio.sleep() suspends the coroutine
+    and yields control back to the event loop — zero threads blocked, zero
+    impact on real users no matter how many bots are being tarpitted
+    simultaneously.
     """
     payload = _build_payload(path)
 
@@ -373,8 +364,16 @@ def _async_streaming_response(path: str) -> StreamingHttpResponse:
 
 class HoneypotMiddleware:
     """
-    Dual sync/async middleware. Under ASGI Django calls __acall__ directly
-    (free asyncio.sleep tarpit). Under WSGI falls back to sync time.sleep.
+    Async-only tarpit middleware.
+
+    sync_capable = False ensures Django raises ImproperlyConfigured at startup
+    if this middleware is ever placed in a WSGI deployment, rather than
+    silently falling back to blocking behaviour that would let concurrent bots
+    stall every worker.
+
+    Under ASGI (uvicorn), Django calls __acall__ directly. The async generator
+    in _make_async_response uses asyncio.sleep between chunks, so tarpitted
+    bots cost nothing while the event loop serves real users.
 
     Position in settings.py MIDDLEWARE list:
         'django.middleware.security.SecurityMiddleware',
@@ -385,22 +384,16 @@ class HoneypotMiddleware:
     """
 
     async_capable = True
-    sync_capable = True
+    sync_capable = False  # hard block — no silent fallback to time.sleep
 
     def __init__(self, get_response):
+        if not asyncio.iscoroutinefunction(get_response):
+            raise RuntimeError(
+                "HoneypotMiddleware requires an ASGI server (uvicorn/daphne). "
+                "sync_capable=False — do not deploy under WSGI."
+            )
         self.get_response = get_response
-        if asyncio.iscoroutinefunction(self.get_response):
-            self._is_coroutine = asyncio.coroutines._is_coroutine
-
-    def __call__(self, request):
-        path = request.path
-        if _is_legitimate_path(path):
-            return self.get_response(request)
-        if _is_scanner_path(path):
-            logger.debug("honeypot: path=%s ua=%s", path,
-                request.META.get("HTTP_USER_AGENT", "")[:120])
-            return _sync_streaming_response(path)
-        return self.get_response(request)
+        self._is_coroutine = asyncio.coroutines._is_coroutine
 
     async def __acall__(self, request):
         path = request.path
@@ -409,5 +402,5 @@ class HoneypotMiddleware:
         if _is_scanner_path(path):
             logger.debug("honeypot: path=%s ua=%s", path,
                 request.META.get("HTTP_USER_AGENT", "")[:120])
-            return _async_streaming_response(path)
+            return _make_async_response(path)
         return await self.get_response(request)
