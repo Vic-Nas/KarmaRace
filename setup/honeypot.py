@@ -4,19 +4,21 @@ Honeypot + tarpit middleware for KarmaRace.
 
 Strategy:
   1. Any path that is not a known KarmaRace URL and matches known scanner
-     patterns → async slow-drip 200 honeypot response (always max size).
-     Running under ASGI (uvicorn workers), each tarpitted connection is a
-     suspended coroutine — effectively free — so we always serve the largest
-     payload without any per-IP accounting.
+     patterns → slow-drip 200 honeypot response (always max size).
   2. Paths that look like real app routes (wrong slug, typo, broken link from
      our own pages) still get a real 404 with a WARNING log so we notice
      broken buttons / links in the app.
+
+Under ASGI (uvicorn workers), Django detects async_capable=True and calls
+__acall__ directly, so asyncio.sleep is used and tarpitted bots cost nothing.
+Under WSGI, the sync __call__ fallback runs with time.sleep instead.
 """
 
 import asyncio
 import hashlib
 import logging
 import re
+import time
 
 from django.http import StreamingHttpResponse
 
@@ -26,43 +28,34 @@ logger = logging.getLogger(__name__)
 # Tuning knobs
 # ---------------------------------------------------------------------------
 
-# Size of every honeypot response in bytes.  Under ASGI each tarpitted
-# connection is a free suspended coroutine, so we always send the max.
 MAX_PAYLOAD_BYTES = 600_000
-# Chunk size for the streaming tarpit response.
 STREAM_CHUNK = 1_024
-# Delay between chunks in seconds (50ms × ~600 chunks ≈ 30s per connection).
 STREAM_DELAY = 0.05
 
 # ---------------------------------------------------------------------------
 # Known-good KarmaRace path prefixes / exact paths.
-# Everything outside this set that doesn't match a Django URL is either a
-# scanner probe or a broken link from our own app.
 # ---------------------------------------------------------------------------
 
-# These are the exact URL namespaces / prefixes registered in setup/urls.py
-# plus allauth internals and Stripe webhook.
 _LEGITIMATE_PREFIXES = (
     "/admin/",
-    "/accounts/",           # allauth + our app/accounts/
+    "/accounts/",
     "/app/accounts/",
-    "/u/",                  # public profile redirect
+    "/u/",
     "/billing/",
     "/help/",
     "/legal/",
-    "/tasks/",              # tasks app
+    "/tasks/",
     "/notifications/",
     "/balance/",
     "/leaderboard/",
-    "/check/",              # feed views
+    "/check/",
     "/check-status/",
     "/done/",
-    "/static/",             # served by WhiteNoise, but just in case
+    "/static/",
     "/favicon.ico",
     "/robots.txt",
 )
 
-# A path is "ours" if it starts with a legit prefix or is exactly "/".
 def _is_legitimate_path(path: str) -> bool:
     if path == "/":
         return True
@@ -70,9 +63,7 @@ def _is_legitimate_path(path: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# Scanner fingerprints — paths/patterns that are NEVER served by our app and
-# are exclusively used by automated scanners, exploit kits, and WordPress/CMS
-# hunters.  Compiled once at import time.
+# Scanner fingerprints
 # ---------------------------------------------------------------------------
 
 _SCANNER_PATTERNS = re.compile(
@@ -206,8 +197,6 @@ def _is_scanner_path(path: str) -> bool:
 # Response generators
 # ---------------------------------------------------------------------------
 
-# A pool of plausible-looking fake page templates.  We rotate through them
-# so that scanners that cache responses by fingerprint get variety.
 _FAKE_TEMPLATES = [
     # Fake WordPress login
     b"""<!DOCTYPE html>
@@ -331,7 +320,6 @@ AWS_BUCKET=
 </body></html>""",
 ]
 
-# Padding block reused to inflate responses cheaply.
 _PADDING_COMMENT = b"<!-- " + b"x" * 76 + b" -->\n"  # 84 bytes
 
 
@@ -339,25 +327,37 @@ def _build_payload(path: str) -> bytes:
     """Build a max-size honeypot payload, template chosen by path hash."""
     idx = int(hashlib.md5(path.encode()).hexdigest(), 16) % len(_FAKE_TEMPLATES)
     base = _FAKE_TEMPLATES[idx]
-
     chunks = [base]
     size = len(base)
     while size < MAX_PAYLOAD_BYTES:
         chunks.append(_PADDING_COMMENT)
         size += len(_PADDING_COMMENT)
-
     return b"".join(chunks)
 
 
-def _streaming_response(path: str) -> StreamingHttpResponse:
+def _sync_streaming_response(path: str) -> StreamingHttpResponse:
+    """Sync fallback — used under WSGI."""
+    payload = _build_payload(path)
+
+    def _gen():
+        for i in range(0, len(payload), STREAM_CHUNK):
+            yield payload[i : i + STREAM_CHUNK]
+            time.sleep(STREAM_DELAY)
+
+    resp = StreamingHttpResponse(_gen(), status=200, content_type="text/html; charset=utf-8")
+    resp["X-Content-Type-Options"] = "nosniff"
+    return resp
+
+
+def _async_streaming_response(path: str) -> StreamingHttpResponse:
     """
-    Returns a StreamingHttpResponse immediately (sync) but streams the payload
-    via an async generator so asyncio.sleep suspends the coroutine between
-    chunks — costs virtually nothing under ASGI.
-    600 KB / 1 KB chunks × 50 ms ≈ 30 s of connection time per bot.
+    Async generator inside a sync function — Django gets a real response
+    object immediately, but the generator uses asyncio.sleep so each chunk
+    suspends the coroutine instead of blocking a thread.
     """
+    payload = _build_payload(path)
+
     async def _gen():
-        payload = _build_payload(path)
         for i in range(0, len(payload), STREAM_CHUNK):
             yield payload[i : i + STREAM_CHUNK]
             await asyncio.sleep(STREAM_DELAY)
@@ -373,41 +373,41 @@ def _streaming_response(path: str) -> StreamingHttpResponse:
 
 class HoneypotMiddleware:
     """
-    Must be placed BEFORE CommonMiddleware and after SecurityMiddleware /
-    WhiteNoiseMiddleware in MIDDLEWARE so it intercepts 404-bound requests
-    before Django's URL resolver raises a 404.
-
-    Requires ASGI (uvicorn workers) — the async tarpit uses asyncio.sleep
-    so each held bot connection costs virtually nothing server-side.
+    Dual sync/async middleware. Under ASGI Django calls __acall__ directly
+    (free asyncio.sleep tarpit). Under WSGI falls back to sync time.sleep.
 
     Position in settings.py MIDDLEWARE list:
         'django.middleware.security.SecurityMiddleware',
         'whitenoise.middleware.WhiteNoiseMiddleware',
-        'setup.honeypot.HoneypotMiddleware',      ← here
+        'setup.honeypot.HoneypotMiddleware',      <- here
         'django.contrib.sessions.middleware.SessionMiddleware',
         ...
     """
 
+    async_capable = True
+    sync_capable = True
+
     def __init__(self, get_response):
         self.get_response = get_response
+        if asyncio.iscoroutinefunction(self.get_response):
+            self._is_coroutine = asyncio.coroutines._is_coroutine
 
-    async def __call__(self, request):
+    def __call__(self, request):
         path = request.path
+        if _is_legitimate_path(path):
+            return self.get_response(request)
+        if _is_scanner_path(path):
+            logger.debug("honeypot: path=%s ua=%s", path,
+                request.META.get("HTTP_USER_AGENT", "")[:120])
+            return _sync_streaming_response(path)
+        return self.get_response(request)
 
-        # Fast-path: path belongs to our app → pass through immediately.
+    async def __acall__(self, request):
+        path = request.path
         if _is_legitimate_path(path):
             return await self.get_response(request)
-
-        # Known scanner pattern → async tarpit, always max payload.
         if _is_scanner_path(path):
-            logger.debug(
-                "honeypot: path=%s ua=%s",
-                path,
-                request.META.get("HTTP_USER_AGENT", "")[:120],
-            )
-            return _streaming_response(path)
-
-        # Unknown path that looks like a real app route (broken link, typo).
-        # Let Django handle it normally so handler404 fires and we get a
-        # WARNING log to catch our own broken links.
+            logger.debug("honeypot: path=%s ua=%s", path,
+                request.META.get("HTTP_USER_AGENT", "")[:120])
+            return _async_streaming_response(path)
         return await self.get_response(request)
