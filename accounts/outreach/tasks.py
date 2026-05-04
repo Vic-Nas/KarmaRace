@@ -90,6 +90,7 @@ def send_outreach_emails(timestamp=None):
 	try:
 		html      = build_html(domain)
 		plaintext = build_plaintext(domain)
+		logger.info('send_outreach_emails: html=%d chars plaintext=%d chars', len(html), len(plaintext))
 	except Exception as exc:
 		logger.error('send_outreach_emails: failed to build email templates: %s', exc)
 		return
