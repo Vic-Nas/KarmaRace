@@ -43,7 +43,7 @@ class Command(BaseCommand):
         self.stdout.write(f'Starting harvest (limit={limit}, lang={lang})...')
 
         with tqdm(total=limit, desc='Harvesting candidates', unit='candidate', dynamic_ncols=True) as pbar:
-            for profile, repos in iter_candidates(query, max_candidates=limit * 5, max_repos=30):
+            for profile, repos in iter_candidates(query, max_candidates=limit * 20, max_repos=30):
                 if len(new_records) >= limit:
                     break
                 email = (profile.get('email') or '').strip().lower()

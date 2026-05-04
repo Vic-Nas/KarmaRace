@@ -41,7 +41,7 @@ def harvest_outreach_emails(timestamp=None):
 	new_records = []
 	lang = random.choice(LANGUAGES)
 	query = SEARCH_BASE + " language:" + lang
-	max_candidates = BATCH * 5
+	max_candidates = BATCH * 20
 
 	for profile, repos in iter_candidates(query, max_candidates, max_repos=60):
 		if len(new_records) >= BATCH:
