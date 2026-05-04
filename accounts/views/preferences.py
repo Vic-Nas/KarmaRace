@@ -34,7 +34,7 @@ def preferences(request):
 		if request.user.is_pro:
 			webhook_url    = (request.POST.get('webhook_url')    or '').strip()
 			webhook_secret = (request.POST.get('webhook_secret') or '').strip()
-			for event, _ in Notification.Event.choices:
+			for event, _ in Notification.USER_CONFIGURABLE_EVENTS:
 				webhook_on = request.POST.get(f'webhook_{event}') == '1'
 				discord_on = request.POST.get(f'discord_{event}') == '1'
 				defaults   = {
@@ -68,7 +68,7 @@ def preferences(request):
 		'prefs':         prefs,
 		'webhook_url':   webhook_url,
 		'webhook_secret': webhook_secret,
-		'all_events':    Notification.Event.choices,
+		'all_events':    Notification.USER_CONFIGURABLE_EVENTS,
 		'low_threshold':  low_pref.value  if low_pref  else str(KARMA_LOW_THRESHOLD),
 		'high_threshold': high_pref.value if high_pref else str(KARMA_HIGH_THRESHOLD),
 		'has_discord':   has_discord,

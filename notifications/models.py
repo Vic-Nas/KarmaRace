@@ -15,6 +15,12 @@ class Notification(models.Model):
         APPRECIATION          = 'APPRECIATION'
         FLAG_UP_RECEIVED      = 'FLAG_UP_RECEIVED'
         FLAG_UP_SENT          = 'FLAG_UP_SENT'
+        NEW_USER              = 'NEW_USER'
+
+    # Events shown in the user-facing preferences UI (excludes admin-only events).
+    USER_CONFIGURABLE_EVENTS = [
+        e for e in Event.choices if e[0] != 'NEW_USER'
+    ]
 
     user       = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='notifications')
     event      = models.CharField(max_length=30, choices=Event.choices)

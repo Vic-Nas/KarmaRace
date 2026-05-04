@@ -7,6 +7,18 @@ import requests
 from accounts import discord as discord_api
 from accounts.models import LinkedAccount, User, VerifiedEmail
 
+# 1–50: notify on every signup.
+# Beyond 50: only notify at these milestones.
+_MILESTONES = {100, 250, 500, 1_000, 2_000, 5_000, 10_000, 25_000, 50_000, 100_000}
+
+
+def _should_notify_new_user(total: int) -> bool:
+    return total <= 50 or total in _MILESTONES
+
+
+def _milestone_label(total: int) -> int | None:
+    return total if total in _MILESTONES else None
+
 
 def _seed_verified_email_from_social(social_account):
     if social_account.provider != 'google':
@@ -49,6 +61,18 @@ def _capture_old_username(sender, instance: User, **kwargs):
 @receiver(post_save, sender=User)
 def _sync_discord_nickname_on_username_change(sender, instance: User, created: bool, **kwargs):
     if created:
+        if discord_api.is_configured():
+            try:
+                total = User.objects.count()
+                if _should_notify_new_user(total):
+                    discord_api.notify_superusers_new_user(
+                        new_username=instance.username,
+                        total_users=total,
+                        milestone=_milestone_label(total),
+                    )
+            except Exception as exc:
+                import logging
+                logging.getLogger(__name__).warning('new user discord notify failed: %s', exc)
         return
 
     old_username = getattr(instance, '_old_username', None)

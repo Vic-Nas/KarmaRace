@@ -25,6 +25,11 @@ SUMMARY_TEMPLATES = {
     Notification.Event.WEBHOOK_CHECK: "Webhook {phase} for Task #{task_id} => {status}",
     Notification.Event.KARMA_LOW: "Your karma balance is low.",
     Notification.Event.KARMA_RESTORED: "Your karma balance is restored.",
+    Notification.Event.PROJECT_STATE: "Project #{task_id} status changed to {status}.",
+    Notification.Event.APPRECIATION: "You received appreciation.",
+    Notification.Event.FLAG_UP_RECEIVED: "You received a flag-up from {from_username}.",
+    Notification.Event.FLAG_UP_SENT: "You sent a flag-up to {to_username}.",
+    Notification.Event.NEW_USER: "New user signed up: {username} (total: {total_users})",
 }
 
 
@@ -40,15 +45,16 @@ def _notif_summary(notif):
         bal_str = f' \u2192 {new_bal}' if new_bal is not None else ''
         return f'{sign}{delta} karma{bal_str} \u2014 {reason}'
 
-    if event == Notification.Event.APPRECIATION:
-        return p.get('message', 'You received appreciation.')
-
     template = SUMMARY_TEMPLATES.get(event)
     if template:
         return template.format(
             task_id=p.get('task_id', '?'),
             phase=p.get('phase', 'check'),
             status=p.get('status', 'unknown'),
+            username=p.get('username', '?'),
+            total_users=p.get('total_users', '?'),
+            from_username=p.get('from_username', '?'),
+            to_username=p.get('to_username', '?'),
         )
     return str(p)[:80]
 
@@ -155,7 +161,7 @@ def inbox(request):
         'notifications': notifications,
         'summaries': {n.pk: _notif_summary(n) for n in notifications},
         'payload_pretty': {n.pk: _pretty_payload(n.payload) for n in notifications},
-        'events': Notification.Event.choices,
+        'events': Notification.USER_CONFIGURABLE_EVENTS,
         'selected_event': selected_event,
         'selected_task_id': selected_task_id,
         'task_ids': task_ids,
@@ -172,9 +178,9 @@ def save_preferences(request):
 
     webhook_url    = (request.POST.get('webhook_url', '') or '').strip()
     webhook_secret = (request.POST.get('webhook_secret', '') or '').strip()
+    webhook_enabled = bool(webhook_url)
 
-    for event, _ in Notification.Event.choices:
-        webhook_enabled = request.POST.get(f'webhook_{event}') == '1'
+    for event, _ in Notification.USER_CONFIGURABLE_EVENTS:
         discord_enabled = request.POST.get(f'discord_{event}') == '1'
 
         defaults = {

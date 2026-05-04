@@ -21,6 +21,7 @@ EVENT_META = {
     'APPRECIATION':       ('❤️ Appreciation', 0xe06060),
     'FLAG_UP_RECEIVED':   ('🚩 Flag Received', 0xe06060),
     'FLAG_UP_SENT':       ('🚩 Flag Sent', 0x4aaac8),
+    'NEW_USER':           ('🎉 New User', 0x7289da),
 }
 
 
@@ -55,6 +56,12 @@ def _build_embed(event, payload):
     elif event in ('KARMA_LOW', 'KARMA_RESTORED'):
         _add_field(embed, 'Balance', f'`{payload.get("balance", "?")}`')
         _add_field(embed, 'Threshold', f'`{payload.get("threshold", "?")}`')
+
+    elif event == 'NEW_USER':
+        _add_field(embed, 'Username', payload.get('username', '—'))
+        _add_field(embed, 'Total Users', f'`{payload.get("total_users", "?")}`')
+        if payload.get('milestone'):
+            _add_field(embed, '🏆 Milestone', f'**{payload["milestone"]} users!**', inline=False)
 
     else:
         if payload.get('task_id'):

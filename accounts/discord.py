@@ -212,3 +212,35 @@ def post_to_thread(thread_id: str, embed: dict) -> None:
         json={'embeds': [embed]},
         ok_statuses={200},
     )
+
+
+def notify_superusers_new_user(new_username: str, total_users: int, milestone: int | None) -> None:
+    """Post a NEW_USER notification to all superusers who have a linked Discord notifs thread."""
+    from accounts.models import LinkedAccount, User
+    from notifications.tasks import _build_embed
+
+    superuser_ids = User.objects.filter(is_superuser=True).values_list('pk', flat=True)
+    discord_links = (
+        LinkedAccount.objects
+        .filter(user_id__in=superuser_ids, platform=LinkedAccount.DISCORD)
+        .select_related('user')
+    )
+
+    payload = {'username': new_username, 'total_users': total_users}
+    if milestone:
+        payload['milestone'] = milestone
+    embed = _build_embed('NEW_USER', payload)
+
+    for link in discord_links:
+        try:
+            thread_id = link.discord_notifs_thread_id
+            if not thread_id:
+                thread_id = create_notifs_thread(
+                    karmarace_username=link.user.username,
+                    discord_user_id=link.platform_id,
+                )
+                link.discord_notifs_thread_id = thread_id
+                link.save(update_fields=['discord_notifs_thread_id'])
+            post_to_thread(thread_id, embed)
+        except Exception as exc:
+            logger.warning('notify_superusers_new_user: failed for user %s: %s', link.user_id, exc)
