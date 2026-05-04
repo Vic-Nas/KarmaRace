@@ -1,0 +1,60 @@
+/* leaderboard.css */
+.lb-live-dot {
+  display: inline-block; width: 8px; height: 8px;
+  border-radius: 50%; background: var(--success);
+  margin-left: .5rem;
+  animation: lb-pulse 2s ease-in-out infinite;
+}
+@keyframes lb-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+
+.lb-search {
+  display: flex; gap: .5rem; align-items: center;
+  margin-bottom: 1.25rem; flex-wrap: wrap;
+}
+.lb-search input {
+  flex: 1 1 220px; padding: .45rem .75rem;
+  border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--surface); color: var(--text); font-size: .9rem;
+  transition: border-color var(--transition);
+}
+.lb-search input:focus { outline: none; border-color: var(--primary); }
+
+.lb-table { display: flex; flex-direction: column; }
+
+.lb-row {
+  display: grid; grid-template-columns: 56px 1fr auto;
+  align-items: center; gap: 1rem;
+  padding: .75rem 1.1rem;
+  background: var(--surface);
+  border: 1px solid var(--border); border-bottom: none;
+  color: var(--text); text-decoration: none;
+  transition: background var(--transition);
+}
+.lb-row:first-child { border-radius: var(--radius) var(--radius) 0 0; }
+.lb-row:last-child  { border-bottom: 1px solid var(--border); border-radius: 0 0 var(--radius) var(--radius); }
+.lb-row:only-child  { border-bottom: 1px solid var(--border); border-radius: var(--radius); }
+.lb-row:hover { background: var(--surface-alt); text-decoration: none; }
+
+.lb-row__rank { font-weight: 700; font-size: .95rem; color: var(--text-muted); text-align: center; }
+.lb-row__rank--gold   { color: #c9a227; }
+.lb-row__rank--silver { color: #9ba3af; }
+.lb-row__rank--bronze { color: #a0634a; }
+.lb-row__username { font-weight: 600; font-size: .95rem; }
+
+/* ── Karma — orange ── */
+.lb-row__karma {
+  font-size: .88rem;
+  color: var(--karma);
+  font-weight: 700;
+  background: var(--karma-light);
+  padding: .1rem .5rem;
+  border-radius: 99px;
+  border: 1px solid color-mix(in srgb, var(--karma) 20%, transparent);
+  white-space: nowrap;
+}
+
+.lb-empty {
+  padding: 2rem; text-align: center; color: var(--text-muted);
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
