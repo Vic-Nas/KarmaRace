@@ -2,15 +2,17 @@
 """Email verification via Google OAuth."""
 import logging
 import secrets
-from urllib.parse import urlencode
 
-import requests
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect, get_object_or_404
 from django.urls import reverse
 from django.views.decorators.http import require_POST
+from google.auth.exceptions import GoogleAuthError
+from google.auth.transport import requests as google_requests
+from google.oauth2 import id_token
+from google_auth_oauthlib.flow import Flow
 
 from accounts.models import VerifiedEmail
 
@@ -19,32 +21,45 @@ logger = logging.getLogger(__name__)
 
 def _google_client_id():
 	"""Get Google OAuth client ID from settings."""
-	from django.conf import settings
 	return settings.SOCIALACCOUNT_PROVIDERS['google']['APP']['client_id']
+
+
+def _google_client_config():
+	google_cfg = settings.SOCIALACCOUNT_PROVIDERS['google']['APP']
+	return {
+		'web': {
+			'client_id': google_cfg['client_id'],
+			'client_secret': google_cfg['secret'],
+			'auth_uri': 'https://accounts.google.com/o/oauth2/auth',
+			'token_uri': 'https://oauth2.googleapis.com/token',
+		},
+	}
+
+
+def _build_flow(redirect_uri: str) -> Flow:
+	flow = Flow.from_client_config(
+		_google_client_config(),
+		scopes=['openid', 'email'],
+	)
+	flow.redirect_uri = redirect_uri
+	return flow
 
 
 def _exchange_google_code_for_email(code, redirect_uri):
 	"""Exchange Google OAuth code for user's email address."""
-	from django.conf import settings
-	google_cfg = settings.SOCIALACCOUNT_PROVIDERS['google']['APP']
-	token_resp = requests.post('https://oauth2.googleapis.com/token', data={
-		'code': code,
-		'client_id': google_cfg['client_id'],
-		'client_secret': google_cfg['secret'],
-		'redirect_uri': redirect_uri,
-		'grant_type': 'authorization_code',
-	}, timeout=10)
-	token_resp.raise_for_status()
-	access_token = token_resp.json().get('access_token', '')
-	if not access_token:
-		raise ValueError('No access token returned by Google.')
-	info_resp = requests.get(
-		'https://www.googleapis.com/oauth2/v3/userinfo',
-		headers={'Authorization': f'Bearer {access_token}'},
-		timeout=10,
+	flow = _build_flow(redirect_uri)
+	flow.fetch_token(code=code)
+
+	token_value = getattr(flow.credentials, 'id_token', None)
+	if not token_value:
+		raise ValueError('No ID token returned by Google.')
+
+	info = id_token.verify_oauth2_token(
+		token_value,
+		google_requests.Request(),
+		_google_client_id(),
 	)
-	info_resp.raise_for_status()
-	return (info_resp.json().get('email') or '').strip().lower()
+	return (info.get('email') or '').strip().lower()
 
 
 @login_required
@@ -53,16 +68,13 @@ def verify_email_start(request):
 	state = secrets.token_urlsafe(24)
 	request.session['email_verify_state'] = state
 	redirect_uri = request.build_absolute_uri(reverse('verify_email_callback'))
-	params = urlencode({
-		'client_id': _google_client_id(),
-		'redirect_uri': redirect_uri,
-		'response_type': 'code',
-		'scope': 'email',
-		'state': state,
-		'access_type': 'online',
-		'prompt': 'select_account',
-	})
-	return redirect(f'https://accounts.google.com/o/oauth2/v2/auth?{params}')
+	flow = _build_flow(redirect_uri)
+	auth_url, _ = flow.authorization_url(
+		access_type='online',
+		prompt='select_account',
+		state=state,
+	)
+	return redirect(auth_url)
 
 
 @login_required
@@ -73,18 +85,8 @@ def verify_email_callback(request):
 	if not code or state != request.session.pop('email_verify_state', ''):
 		messages.error(request, 'Email verification failed: invalid state or missing code.')
 		return redirect('linked_accounts')
-	try:
-		redirect_uri = request.build_absolute_uri(reverse('verify_email_callback'))
-		email = _exchange_google_code_for_email(code, redirect_uri)
-	except requests.RequestException:
-		messages.error(request, 'Could not reach Google right now. Please try again.')
-		return redirect('linked_accounts')
-	except Exception as exc:
-		logger.exception('verify_email_callback: unexpected error for user %s', request.user.pk)
-		if settings.DEBUG:
-			messages.error(request, f'Email verification failed: {exc}')
-		else:
-			messages.error(request, 'Something went wrong during email verification. Please try again.')
+	email = _try_exchange_email(request, code)
+	if email is None:
 		return redirect('linked_accounts')
 	if not email:
 		messages.error(request, 'Could not retrieve email from Google.')
@@ -93,6 +95,22 @@ def verify_email_callback(request):
 	if existing:
 		messages.error(request, f'{email} is already linked to another account.')
 		return redirect('linked_accounts')
+
+
+	def _try_exchange_email(request, code):
+		try:
+			redirect_uri = request.build_absolute_uri(reverse('verify_email_callback'))
+			return _exchange_google_code_for_email(code, redirect_uri)
+		except (GoogleAuthError, ValueError):
+			messages.error(request, 'Could not reach Google right now. Please try again.')
+			return None
+		except Exception as exc:
+			logger.exception('verify_email_callback: unexpected error for user %s', request.user.pk)
+			if settings.DEBUG:
+				messages.error(request, f'Email verification failed: {exc}')
+			else:
+				messages.error(request, 'Something went wrong during email verification. Please try again.')
+			return None
 	_, created = VerifiedEmail.objects.get_or_create(user=request.user, email=email)
 	if created:
 		messages.success(request, f'{email} verified and added.')

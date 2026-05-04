@@ -89,42 +89,33 @@ class TaskForm(forms.ModelForm):
             return f'Fork GitHub repo {target_id}'
         return ''
 
-    def clean_description(self):
-        task_type = self.cleaned_data.get('type') or self._selected_task_type()
-        target_id = self.cleaned_data.get('target_id') or getattr(self.instance, 'target_id', '')
-        description = (self.cleaned_data.get('description') or '').strip()
+    def clean(self):
+        cleaned = super().clean()
+        task_type = cleaned.get('type') or self._selected_task_type()
+        target_id = (cleaned.get('target_id') or '').strip()
+        description = (cleaned.get('description') or '').strip()
+        slug = (cleaned.get('slug') or '').strip()
 
         if task_type == Task.Type.WEBHOOK:
             if not description:
-                raise forms.ValidationError('Description is required for webhook tasks.')
-            return description
-
-        return self._auto_description(task_type, target_id)
-
-    def clean_target_id(self):
-        task_type = self.cleaned_data.get('type') or self._selected_task_type()
-        target_id = (self.cleaned_data.get('target_id') or '').strip()
+                self.add_error('description', 'Description is required for webhook tasks.')
+        else:
+            cleaned['description'] = self._auto_description(task_type, target_id)
 
         if task_type in (Task.Type.GITHUB_STAR, Task.Type.GITHUB_FORK):
             allowed_targets = {value for value, _ in self.github_repo_choices}
             if not allowed_targets:
-                raise forms.ValidationError('No eligible GitHub repositories were discovered for your account. Reload repos after reconnecting GitHub.')
-            if not target_id or target_id not in allowed_targets:
-                raise forms.ValidationError('Select a GitHub repository from your linked-account list.')
+                self.add_error('target_id', 'No eligible GitHub repositories were discovered for your account. Reload repos after reconnecting GitHub.')
+            elif not target_id or target_id not in allowed_targets:
+                self.add_error('target_id', 'Select a GitHub repository from your linked-account list.')
 
-        return target_id
+        if slug and self.user is not None:
+            qs = Task.objects.filter(owner=self.user, slug=slug)
+            if self.instance and self.instance.pk:
+                qs = qs.exclude(pk=self.instance.pk)
+            if qs.exists():
+                self.add_error('slug', 'This slug is already used by one of your tasks.')
 
-    def clean_slug(self):
-        slug = (self.cleaned_data.get('slug') or '').strip()
-        if not slug:
-            return slug
-
-        if self.user is None:
-            return slug
-
-        qs = Task.objects.filter(owner=self.user, slug=slug)
-        if self.instance and self.instance.pk:
-            qs = qs.exclude(pk=self.instance.pk)
-        if qs.exists():
-            raise forms.ValidationError('This slug is already used by one of your tasks.')
-        return slug
+        cleaned['target_id'] = target_id
+        cleaned['slug'] = slug
+        return cleaned

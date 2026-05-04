@@ -82,10 +82,10 @@
   }
 
   document.addEventListener('DOMContentLoaded', function () {
-    var cfg    = window.KR_ADS || {};
-    var client = cfg.client || '';
-    var slots  = (cfg.slots || []).filter(Boolean);
-    var isPro  = !!cfg.isPro;
+    var data = document.body ? document.body.dataset : {};
+    var client = data.adsClient || '';
+    var slots = (data.adsSlots || '').split(',').filter(Boolean);
+    var isPro = data.adsIsPro === 'true';
 
     if (isPro) return;
 

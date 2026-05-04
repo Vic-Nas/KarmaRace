@@ -1,0 +1,28 @@
+☯ KarmaRace — Task exchange for developers
+-------------------------------------------
+
+Your project deserves users. Not a marketing budget.
+
+Big products win feeds because they outspend you — not because they're better.
+KarmaRace levels that. It's a free task-exchange community where builders
+publish clear task requests and other users complete them for karma.
+
+No ads. No algorithms for sale. Karma tracks contributions and ranks the feed.
+
+WHAT KARMARACE IS FOR
+  - Turning growth goals into clear tasks users can complete
+  - Running GitHub and webhook verification tasks with real outcomes
+  - Getting traction without buying ads
+
+HOW IT WORKS
+  1. Connect account(s) needed for the tasks you want to run
+  2. Publish tasks so users know exactly what your platform needs
+  3. Complete tasks for others to earn karma
+  4. Karma lifts your visibility — no wallet required
+
+Join free: {{ root }}
+
+---
+You're receiving this because you build things worth discovering.
+No tracking pixels. No follow-up drip. Just this one email.
+KarmaRace — {{ root }}/legal/privacy

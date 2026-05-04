@@ -13,6 +13,9 @@ from setup.platform_rules import karma_reward_for_task
 from tasks.check_feedback import msg
 from tasks.models import Task, TaskCompletion
 from .filtering import DEFAULT_COMPLETION, DEFAULT_ARCHIVE, SESSION_FEED_PIN_KEY, normalize_task_types
+from .forms import WebhookCheckForm
+
+CHECK_TIMEOUT_SECONDS = 45
 
 
 def redirect_to_feed_with_filters(request, extra_params=None):
@@ -36,6 +39,10 @@ def precheck_linked_account(user, task):
         if not user.linked_accounts.filter(platform='github').exists():
             return msg('GITHUB_LINK_REQUIRED')
     return None
+
+
+def _is_timed_out(completion):
+    return completion.created_at <= timezone.now() - timedelta(seconds=CHECK_TIMEOUT_SECONDS)
 
 
 @require_POST
@@ -82,15 +89,15 @@ def check(request, task_id):
 
     google_email = ''
     if task.type == Task.Type.WEBHOOK:
-        google_email = (request.POST.get('google_email') or '').strip()
-        if not google_email:
-            return respond(TaskCompletion.State.FAILED, 'Select a verified email before checking a webhook task.')
-        diff_raw = (request.POST.get('difficulty') or '').strip()
-        if not diff_raw or not diff_raw.isdigit() or not (1 <= int(diff_raw) <= 5):
-            return respond(TaskCompletion.State.FAILED, 'Rate the task difficulty (1–5) before checking.')
+        form = WebhookCheckForm(request.POST)
+        if not form.is_valid():
+            return respond(TaskCompletion.State.FAILED, 'Select a verified email and rate difficulty (1–5).')
+        google_email = form.cleaned_data['google_email']
         from accounts.models import UserPreference
         UserPreference.objects.update_or_create(
-            user=request.user, key=f'task_diff_pick_{task.pk}', defaults={'value': diff_raw})
+            user=request.user, key=f'task_diff_pick_{task.pk}',
+            defaults={'value': str(form.cleaned_data["difficulty"])}
+        )
 
     reward = karma_reward_for_task(get_balance(task.owner), task.type)
 
@@ -104,7 +111,7 @@ def check(request, task_id):
                        extra_params={'karma_delta': 0, 'karma_balance': get_balance(request.user)})
 
     if completion.state == TaskCompletion.State.PENDING and not created:
-        if completion.created_at <= timezone.now() - timedelta(seconds=45):
+        if _is_timed_out(completion):
             completion.state = TaskCompletion.State.FAILED
             completion.save(update_fields=['state'])
         else:
@@ -128,8 +135,7 @@ def check_status(request, task_id):
     completion = TaskCompletion.objects.filter(task_id=task_id, tester=request.user).first()
     if completion is None:
         return JsonResponse({'state': 'NOT_STARTED'})
-    if (completion.state == TaskCompletion.State.PENDING
-            and completion.created_at <= timezone.now() - timedelta(seconds=45)):
+    if completion.state == TaskCompletion.State.PENDING and _is_timed_out(completion):
         completion.state         = TaskCompletion.State.FAILED
         completion.result_detail = msg('CHECK_TIMEOUT_WORKER_HINT') if settings.DEBUG else msg('CHECK_TIMEOUT')
         completion.save(update_fields=['state', 'result_detail'])

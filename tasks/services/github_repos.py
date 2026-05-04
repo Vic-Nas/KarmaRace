@@ -1,12 +1,15 @@
 # tasks/services/github_repos.py
 """GitHub repo collection logic (internal, complex query)."""
 import logging
-import requests
+
 from django.core.cache import cache
+from github import Github, GithubException, UnknownObjectException
 
 logger = logging.getLogger(__name__)
 
 GITHUB_REPO_CHOICES_CACHE_SECONDS = 900
+MAX_REPOS_PER_SOURCE = 500
+MAX_PUSH_EVENT_REPOS = 40
 
 
 def get_user_github_repo_choices_cached(user, user_token, username, force_reload=False):
@@ -19,169 +22,78 @@ def get_user_github_repo_choices_cached(user, user_token, username, force_reload
 
     repos = []
     seen = set()
-    observed_scopes = ''
-    from .github import _github_headers
 
     def add_if_eligible(repo):
-        full_name = (repo.get('full_name') or '').strip()
+        full_name = (getattr(repo, 'full_name', '') or '').strip()
         if not full_name or full_name in seen:
             return
-        if repo.get('private'):
+        if getattr(repo, 'private', True):
             return
-        if not (repo.get('permissions') or {}).get('push'):
+        permissions = getattr(repo, 'permissions', None) or {}
+        if permissions and not permissions.get('push'):
             return
         seen.add(full_name)
         repos.append((full_name, full_name))
 
-    def collect_user_repos(extra_params):
-        nonlocal observed_scopes
-        page = 1
-        while page <= 5:
-            params = {'sort': 'updated', 'direction': 'desc', 'per_page': 100, 'page': page}
-            params.update(extra_params or {})
-            response = requests.get(
-                'https://api.github.com/user/repos',
-                headers=_github_headers(token_override=user_token),
-                params=params, timeout=10,
-            )
-            observed_scopes = observed_scopes or (response.headers.get('X-OAuth-Scopes') or '')
-            if response.status_code in (401, 403):
-                return response, 'auth'
-            if response.status_code == 422:
-                return response, 'unprocessable'
-            response.raise_for_status()
-            data = response.json()
-            if not data:
+    def collect_repos(paginated, limit=MAX_REPOS_PER_SOURCE):
+        count = 0
+        for repo in paginated:
+            add_if_eligible(repo)
+            count += 1
+            if count >= limit:
                 break
-            for repo in data:
-                add_if_eligible(repo)
-            if len(data) < 100:
-                break
-            page += 1
-        return None, 'ok'
-
-    def collect_org_repos(org_login):
-        page = 1
-        while page <= 5:
-            response = requests.get(
-                f'https://api.github.com/orgs/{org_login}/repos',
-                headers=_github_headers(token_override=user_token),
-                params={'type': 'all', 'sort': 'updated', 'direction': 'desc', 'per_page': 100, 'page': page},
-                timeout=10,
-            )
-            if response.status_code in (401, 403, 404, 422):
-                return
-            response.raise_for_status()
-            data = response.json()
-            if not data:
-                break
-            for repo in data:
-                add_if_eligible(repo)
-            if len(data) < 100:
-                break
-            page += 1
-
-    def collect_orgs_from(url, extract_login):
-        page = 1
-        found = set()
-        while page <= 5:
-            response = requests.get(
-                url, headers=_github_headers(token_override=user_token),
-                params={'per_page': 100, 'page': page}, timeout=10,
-            )
-            if response.status_code in (401, 403, 404, 422):
-                return found
-            response.raise_for_status()
-            data = response.json()
-            if not isinstance(data, list) or not data:
-                break
-            for item in data:
-                login = (extract_login(item) or '').strip()
-                if login:
-                    found.add(login)
-            if len(data) < 100:
-                break
-            page += 1
-        return found
-
-    def collect_recent_push_event_repos(max_candidates=40):
-        if not username:
-            return []
-        found = []
-        seen_candidates = set()
-        page = 1
-        while page <= 5 and len(found) < max_candidates:
-            response = requests.get(
-                f'https://api.github.com/users/{username}/events/public',
-                headers=_github_headers(token_override=user_token),
-                params={'per_page': 100, 'page': page}, timeout=10,
-            )
-            if response.status_code in (401, 403, 404, 422):
-                return found
-            response.raise_for_status()
-            events = response.json()
-            if not isinstance(events, list) or not events:
-                break
-            for event in events:
-                if event.get('type') != 'PushEvent':
-                    continue
-                repo_name = ((event.get('repo') or {}).get('name') or '').strip()
-                if not repo_name or repo_name in seen_candidates:
-                    continue
-                seen_candidates.add(repo_name)
-                found.append(repo_name)
-                if len(found) >= max_candidates:
-                    break
-            if len(events) < 100:
-                break
-            page += 1
-        return found
-
-    def collect_repo_details(repo_full_name):
-        response = requests.get(
-            f'https://api.github.com/repos/{repo_full_name}',
-            headers=_github_headers(token_override=user_token), timeout=10,
-        )
-        if response.status_code in (401, 403, 404, 422):
-            return
-        response.raise_for_status()
-        add_if_eligible(response.json())
 
     try:
-        for params in ({'type': 'all'}, {'type': 'member'}, {'affiliation': 'owner,collaborator,organization_member'}):
-            resp, mode = collect_user_repos(params)
-            if mode == 'auth':
-                return [], 'Cannot load GitHub repositories. Reconnect your GitHub account in Accounts.'
-            if mode == 'unprocessable':
-                logger.warning('get_user_github_repo_choices: query returned 422 for user %s', user.pk)
-
-        org_logins = set()
-        org_logins.update(collect_orgs_from('https://api.github.com/user/orgs', lambda i: i.get('login')))
-        org_logins.update(collect_orgs_from(
-            'https://api.github.com/user/memberships/orgs',
-            lambda i: (i.get('organization') or {}).get('login'),
-        ))
-        if username:
-            org_logins.update(collect_orgs_from(
-                f'https://api.github.com/users/{username}/orgs', lambda i: i.get('login'),
-            ))
-
-        for org_login in sorted(org_logins):
-            collect_org_repos(org_login)
-
-        try:
-            for repo_full_name in collect_recent_push_event_repos():
-                collect_repo_details(repo_full_name)
-        except requests.RequestException as exc:
-            logger.warning('get_user_github_repo_choices: push enrichment failed for user %s: %s', user.pk, exc)
-
-        scopes = {s.strip() for s in (observed_scopes or '').split(',') if s.strip()}
-        if 'read:org' not in scopes and 'repo' not in scopes:
-            logger.warning('get_user_github_repo_choices: limited org visibility for user %s (scopes=%s)',
-                           user.pk, observed_scopes)
-    except requests.RequestException as exc:
-        logger.warning('get_user_github_repo_choices: failed for user %s: %s', user.pk, exc)
+        gh = Github(user_token)
+        gh_user = gh.get_user()
+    except GithubException as exc:
+        if exc.status in (401, 403):
+            return [], 'Cannot load GitHub repositories. Reconnect your GitHub account in Accounts.'
+        logger.warning('get_user_github_repo_choices: auth error for user %s: %s', user.pk, exc)
         return [], 'Could not load GitHub repositories right now. Click Reload repos to retry.'
+    except Exception as exc:
+        logger.warning('get_user_github_repo_choices: github init failed for user %s: %s', user.pk, exc)
+        return [], 'Could not load GitHub repositories right now. Click Reload repos to retry.'
+
+    try:
+        collect_repos(gh_user.get_repos(type='all', sort='updated', direction='desc'))
+        collect_repos(gh_user.get_repos(type='member', sort='updated', direction='desc'))
+        collect_repos(gh_user.get_repos(affiliation='owner,collaborator,organization_member',
+                                        sort='updated', direction='desc'))
+        for org in gh_user.get_orgs():
+            collect_repos(org.get_repos(type='all', sort='updated', direction='desc'))
+    except GithubException as exc:
+        if exc.status in (401, 403):
+            return [], 'Cannot load GitHub repositories. Reconnect your GitHub account in Accounts.'
+        logger.warning('get_user_github_repo_choices: repo list failed for user %s: %s', user.pk, exc)
+
+    try:
+        if username:
+            push_candidates = []
+            seen_candidates = set()
+            for event in gh.get_user(username).get_events():
+                if len(push_candidates) >= MAX_PUSH_EVENT_REPOS:
+                    break
+                if getattr(event, 'type', '') != 'PushEvent':
+                    continue
+                repo_data = getattr(event, 'repo', None)
+                if isinstance(repo_data, dict):
+                    repo_name = (repo_data.get('name') or '').strip()
+                else:
+                    repo_name = (getattr(repo_data, 'name', '') or '').strip()
+                if repo_name and repo_name not in seen_candidates:
+                    seen_candidates.add(repo_name)
+                    push_candidates.append(repo_name)
+
+            for repo_full_name in push_candidates:
+                try:
+                    add_if_eligible(gh.get_repo(repo_full_name))
+                except UnknownObjectException:
+                    continue
+    except GithubException as exc:
+        logger.warning('get_user_github_repo_choices: push enrichment failed for user %s: %s', user.pk, exc)
+    except Exception as exc:
+        logger.warning('get_user_github_repo_choices: push enrichment unexpected for user %s: %s', user.pk, exc)
 
     repos.sort(key=lambda item: item[0].lower())
     if not repos:

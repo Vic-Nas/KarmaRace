@@ -38,27 +38,31 @@ class Command(BaseCommand):
             self.stdout.write(self.style.WARNING('Monthly send cap reached.'))
             return
 
-        from accounts.outreach.config import SUBJECT, sendpulse_post
+        from accounts.outreach.config import SUBJECT, sendpulse_post, update_daily_stats
         from accounts.outreach.email import build_html, build_plaintext
 
         domain = settings.DOMAIN
         html = build_html(domain)
         plaintext = build_plaintext(domain)
 
+        def send_one(email: str) -> bool:
+            payload = {
+                'email': {
+                    'from': {'name': 'KarmaRace', 'email': f'outreach@{domain}'},
+                    'to': [{'name': '', 'email': email}],
+                    'subject': SUBJECT,
+                    'html': html,
+                    'text': plaintext,
+                }
+            }
+            return sendpulse_post(payload)
+
         target_email = options.get('email')
 
         # --- Single-address mode ---
         if target_email:
             self.stdout.write(f'Sending to {target_email}...')
-            ok = sendpulse_post({
-                'email': {
-                    'from':    {'name': 'KarmaRace', 'email': f'outreach@{domain}'},
-                    'to':      [{'name': '', 'email': target_email}],
-                    'subject': SUBJECT,
-                    'html':    html,
-                    'text':    plaintext,
-                }
-            })
+            ok = send_one(target_email)
             if ok:
                 increment_monthly_sent(1)
                 self.stdout.write(self.style.SUCCESS(f'✓ Sent to {target_email}.'))
@@ -88,15 +92,7 @@ class Command(BaseCommand):
         sent = failed = 0
         with tqdm(pending, desc='Sending emails', unit='email', dynamic_ncols=True) as pbar:
             for record in pbar:
-                ok = sendpulse_post({
-                    'email': {
-                        'from':    {'name': 'KarmaRace', 'email': f'outreach@{domain}'},
-                        'to':      [{'name': '', 'email': record.email}],
-                        'subject': SUBJECT,
-                        'html':    html,
-                        'text':    plaintext,
-                    }
-                })
+                ok = send_one(record.email)
                 OutreachContactedEmail.objects.get_or_create(email=record.email)
                 record.delete()
 
@@ -111,17 +107,13 @@ class Command(BaseCommand):
         if sent:
             increment_monthly_sent(sent)
 
-        # Update daily stats
-        today = timezone.now().date()
-        pending_after = OutreachRecord.objects.count()
-        stats, _ = OutreachDailyStats.objects.get_or_create(date=today)
-        stats.queued_count = len(pending)
-        stats.sent_count = sent
-        stats.failed_count = failed
-        stats.pending_after = pending_after
-        stats.save(update_fields=[
-            'queued_count', 'sent_count', 'failed_count', 'pending_after', 'updated_at'
-        ])
+        update_daily_stats(
+            timezone.now().date(),
+            queued_count=len(pending),
+            sent_count=sent,
+            failed_count=failed,
+            pending_after=OutreachRecord.objects.count(),
+        )
 
         self.stdout.write(self.style.SUCCESS(
             f'✓ Sent {sent} emails, {failed} failed. {pending_after} pending remaining.'

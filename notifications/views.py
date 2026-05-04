@@ -1,24 +1,37 @@
 # notifications/views.py
 import json
 
+import django_filters
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.shortcuts import render, get_object_or_404
-from django.views.decorators.http import require_POST
 from django.utils import timezone
+from django.views.decorators.http import require_POST
 
 from notifications.models import Notification, NotificationPreference
+
+
+class NotificationFilter(django_filters.FilterSet):
+    task_id = django_filters.NumberFilter(field_name='payload__task_id')
+
+    class Meta:
+        model = Notification
+        fields = ['event', 'task_id']
+
+
+SUMMARY_TEMPLATES = {
+    Notification.Event.TASK_CONFIRMED: "Task #{task_id} confirmed.",
+    Notification.Event.TASK_HEALTH_FAILED: "Task #{task_id} failed health check.",
+    Notification.Event.WEBHOOK_CHECK: "Webhook {phase} for Task #{task_id} => {status}",
+    Notification.Event.KARMA_LOW: "Your karma balance is low.",
+    Notification.Event.KARMA_RESTORED: "Your karma balance is restored.",
+}
 
 
 def _notif_summary(notif):
     p = notif.payload or {}
     event = notif.event
-    if event == Notification.Event.TASK_CONFIRMED:
-        return f"Task #{p.get('task_id', '?')} confirmed."
-    if event == Notification.Event.TASK_HEALTH_FAILED:
-        return f"Task #{p.get('task_id', '?')} failed health check."
-    if event == Notification.Event.WEBHOOK_CHECK:
-        return f"Webhook {p.get('phase', 'check')} for Task #{p.get('task_id', '?')} => {p.get('status', 'unknown')}"
+
     if event == Notification.Event.KARMA_ADJUSTED:
         delta = p.get('delta', 0)
         sign = '+' if delta >= 0 else ''
@@ -26,26 +39,29 @@ def _notif_summary(notif):
         new_bal = p.get('new_balance')
         bal_str = f' \u2192 {new_bal}' if new_bal is not None else ''
         return f'{sign}{delta} karma{bal_str} \u2014 {reason}'
-    if event == Notification.Event.KARMA_LOW:
-        return 'Your karma balance is low.'
-    if event == Notification.Event.KARMA_RESTORED:
-        return 'Your karma balance is restored.'
+
     if event == Notification.Event.APPRECIATION:
         return p.get('message', 'You received appreciation.')
+
+    template = SUMMARY_TEMPLATES.get(event)
+    if template:
+        return template.format(
+            task_id=p.get('task_id', '?'),
+            phase=p.get('phase', 'check'),
+            status=p.get('status', 'unknown'),
+        )
     return str(p)[:80]
 
 
-def _karma_delta(notif):
-    delta = (notif.payload or {}).get('delta')
-    return int(delta) if isinstance(delta, (int, float)) else 0
-
-
 def _serialize(notif):
+    payload = notif.payload or {}
+    delta = payload.get('delta')
+    karma_delta = int(delta) if isinstance(delta, (int, float)) else 0
     return {
         'id': notif.pk,
         'event': notif.event,
         'summary': _notif_summary(notif),
-        'karma_delta': _karma_delta(notif),
+        'karma_delta': karma_delta,
         'read_at': notif.read_at.isoformat() if notif.read_at else None,
         'created_at': notif.created_at.isoformat(),
     }
@@ -60,30 +76,31 @@ def _pretty_payload(payload):
         return str(payload)
 
 
-def _safe_int(value):
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return None
+def _poll_notifications(qs, order_by, limit, unread_count=None):
+    notifications = list(qs.order_by(order_by)[:limit])
+    payload = {'notifications': [_serialize(n) for n in notifications]}
+    if unread_count is not None:
+        payload['unread_count'] = unread_count
+    return JsonResponse(payload)
 
 
 @login_required
 def unread_poll(request):
-    since_id = _safe_int(request.GET.get('since', 0)) or 0
-    qs = Notification.objects.filter(user=request.user, read_at__isnull=True)
+    try:
+        since_id = int(request.GET.get('since', 0))
+    except (TypeError, ValueError):
+        since_id = 0
+    base_qs = Notification.objects.filter(user=request.user, read_at__isnull=True)
+    qs = base_qs
     if since_id:
         qs = qs.filter(pk__gt=since_id)
-    notifications = list(qs.order_by('pk')[:20])
-    return JsonResponse({
-        'unread_count': Notification.objects.filter(user=request.user, read_at__isnull=True).count(),
-        'notifications': [_serialize(n) for n in notifications],
-    })
+    return _poll_notifications(qs, 'pk', 20, unread_count=base_qs.count())
 
 
 @login_required
 def recent_poll(request):
-    qs = Notification.objects.filter(user=request.user).order_by('-created_at')[:10]
-    return JsonResponse({'notifications': [_serialize(n) for n in qs]})
+    qs = Notification.objects.filter(user=request.user)
+    return _poll_notifications(qs, '-created_at', 10)
 
 
 @login_required
@@ -107,14 +124,12 @@ def mark_all_read(request):
 def inbox(request):
     qs = Notification.objects.filter(user=request.user)
 
-    selected_event = (request.GET.get('event') or '').strip()
-    selected_task_id = _safe_int(request.GET.get('task_id'))
-    query = (request.GET.get('q') or '').strip().lower()
+    filterset = NotificationFilter(request.GET, queryset=qs)
+    qs = filterset.qs
 
-    if selected_event:
-        qs = qs.filter(event=selected_event)
-    if selected_task_id:
-        qs = qs.filter(payload__task_id=selected_task_id)
+    selected_event = (filterset.form.cleaned_data.get('event') or '').strip() if filterset.is_valid() else ''
+    selected_task_id = filterset.form.cleaned_data.get('task_id') if filterset.is_valid() else None
+    query = (request.GET.get('q') or '').strip().lower()
 
     notifications = list(qs.order_by('-created_at')[:200])
 
@@ -130,10 +145,10 @@ def inbox(request):
 
     Notification.objects.filter(user=request.user, read_at__isnull=True).update(read_at=timezone.now())
 
-    all_recent = Notification.objects.filter(user=request.user).order_by('-created_at')[:300]
     task_ids = sorted({
-        p.get('task_id') for p in [n.payload or {} for n in all_recent]
-        if isinstance(p.get('task_id'), int)
+        tid for tid in Notification.objects.filter(user=request.user, payload__task_id__isnull=False)
+        .order_by('-created_at')[:300].values_list('payload__task_id', flat=True)
+        if isinstance(tid, int)
     })
 
     return render(request, 'notifications/inbox.html', {

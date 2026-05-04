@@ -1,7 +1,6 @@
 # tasks/services/health.py
 """Task health checks and webhook health outcome tracking."""
 import logging
-import requests
 from django.utils import timezone
 
 from tasks.models import Task
@@ -26,6 +25,22 @@ def run_health_check(task) -> bool:
             task.save(update_fields=['health_last_failure_reason'])
         return healthy
 
+    return _finalize_repo_health(task, healthy, reason)
+
+
+def can_run_manual_health_check(task):
+    """Check if manual health check is allowed (rate-limited)."""
+    if task.health_last_checked_at is None:
+        return True, 0
+    delta = timezone.now() - task.health_last_checked_at
+    seconds = int(delta.total_seconds())
+    wait = int(WEBHOOK_HEALTH_CHECK_RATE_LIMIT_SECONDS) - seconds
+    if wait > 0:
+        return False, wait
+    return True, 0
+
+
+def _finalize_repo_health(task, healthy, reason):
     update_fields = ['health_last_checked_at']
     task.health_last_checked_at = timezone.now()
 
@@ -43,8 +58,7 @@ def run_health_check(task) -> bool:
     task.health_last_failure_reason = reason or 'Health check failed.'
     update_fields.extend(['health_failure_streak', 'health_last_failure_reason'])
 
-    should_hide = task.health_failure_streak >= GITHUB_HEALTH_HIDE_STREAK_THRESHOLD
-    transitioned_to_hidden = should_hide and not task.hidden
+    transitioned_to_hidden = task.health_failure_streak >= GITHUB_HEALTH_HIDE_STREAK_THRESHOLD and not task.hidden
     if transitioned_to_hidden:
         task.hidden = True
         update_fields.append('hidden')
@@ -55,18 +69,6 @@ def run_health_check(task) -> bool:
         _notify_health_failed(task)
 
     return False
-
-
-def can_run_manual_health_check(task):
-    """Check if manual health check is allowed (rate-limited)."""
-    if task.health_last_checked_at is None:
-        return True, 0
-    delta = timezone.now() - task.health_last_checked_at
-    seconds = int(delta.total_seconds())
-    wait = int(WEBHOOK_HEALTH_CHECK_RATE_LIMIT_SECONDS) - seconds
-    if wait > 0:
-        return False, wait
-    return True, 0
 
 
 def _record_webhook_health_outcome(task, is_success, result, reason):
@@ -149,16 +151,14 @@ def _check_task_health_with_reason(task):
     """Check task health and return status + reason."""
     try:
         if task.type in (Task.Type.GITHUB_STAR, Task.Type.GITHUB_FORK):
-            from .github import _github_headers
-            response = requests.get(
-                f'https://api.github.com/repos/{task.target_id}',
-                headers=_github_headers(),
-                timeout=10,
-            )
-            if response.status_code != 200:
-                return False, f'GitHub health check returned status {response.status_code}.'
-            if response.json().get('private', True):
+            from .github import get_public_repo
+            _, error = get_public_repo(task.target_id)
+            if error == 'not_found':
+                return False, 'GitHub repo not found.'
+            if error == 'private':
                 return False, 'GitHub repo is private.'
+            if error:
+                return False, f'GitHub request failed: {error}'
             return True, ''
 
         elif task.type == Task.Type.WEBHOOK:
@@ -173,7 +173,7 @@ def _check_task_health_with_reason(task):
                 return True, ''
             return False, webhook_reason
 
-    except requests.RequestException as exc:
+    except Exception as exc:
         logger.error('_check_task_health: request failed for task %s: %s', task.pk, exc)
         return False, f'External request failed: {exc}'
 

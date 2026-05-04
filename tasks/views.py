@@ -43,33 +43,30 @@ def slug_available(request):
 
 
 @login_required
-def task_create(request):
+def _task_form_response(request, task=None, is_create=False):
     force_repo_reload = request.method == 'GET' and request.GET.get('reload_repos') == '1'
-    form = TaskForm(request.POST or None, user=request.user, force_repo_reload=force_repo_reload)
+    form = TaskForm(request.POST or None, instance=task, user=request.user, force_repo_reload=force_repo_reload)
     if request.method == 'POST' and form.is_valid():
         task = form.save(commit=False)
-        task.owner = request.user
-        task.hidden = True
-        task.owner_unpublished = True
+        if is_create:
+            task.owner = request.user
+            task.hidden = True
+            task.owner_unpublished = True
         if task.type != Task.Type.WEBHOOK:
             task.webhook_secret = ''
         task.save()
         return redirect('my_tasks')
-    return render(request, 'tasks/edit.html', {'task': None, 'form': form, 'is_create': True})
+    return render(request, 'tasks/edit.html', {'task': task, 'form': form, 'is_create': is_create})
+
+
+def task_create(request):
+    return _task_form_response(request, task=None, is_create=True)
 
 
 @login_required
 def task_edit(request, task_slug):
     task = get_object_or_404(Task, slug=task_slug, owner=request.user, is_deleted=False)
-    force_repo_reload = request.method == 'GET' and request.GET.get('reload_repos') == '1'
-    form = TaskForm(request.POST or None, instance=task, user=request.user, force_repo_reload=force_repo_reload)
-    if request.method == 'POST' and form.is_valid():
-        task = form.save(commit=False)
-        if task.type != Task.Type.WEBHOOK:
-            task.webhook_secret = ''
-        task.save()
-        return redirect('my_tasks')
-    return render(request, 'tasks/edit.html', {'task': task, 'form': form, 'is_create': False})
+    return _task_form_response(request, task=task, is_create=False)
 
 
 @login_required

@@ -10,6 +10,7 @@ urlpatterns = [
     path('app/accounts/', include('accounts.urls')),
     path('u/<str:username>/', views.public_profile_redirect, name='public_profile'),
     path('billing/', include('billing.urls')),
+    path('billing/', include('djstripe.urls', namespace='djstripe')),
     path('help/', views.help_index, name='help_index'),
     path('legal/privacy/', views.legal_privacy, name='legal_privacy'),
     path('legal/terms/', views.legal_terms, name='legal_terms'),

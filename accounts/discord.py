@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 import requests
+from discord_oauth2 import DiscordAuth
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
@@ -31,6 +32,11 @@ def is_configured() -> bool:
     )
 
 
+def _oauth_client(redirect_uri: str | None = None) -> DiscordAuth:
+    callback = redirect_uri or f"https://{settings.DOMAIN}/app/accounts/discord/callback/"
+    return DiscordAuth(settings.DISCORD_CLIENT_ID, settings.DISCORD_CLIENT_SECRET, callback)
+
+
 def authorize_url(redirect_uri: str, state: str) -> str:
     params = {
         'client_id': settings.DISCORD_CLIENT_ID,
@@ -44,20 +50,7 @@ def authorize_url(redirect_uri: str, state: str) -> str:
 
 
 def exchange_code_for_token(code: str, redirect_uri: str) -> str:
-    resp = requests.post(
-        'https://discord.com/api/oauth2/token',
-        data={
-            'client_id': settings.DISCORD_CLIENT_ID,
-            'client_secret': settings.DISCORD_CLIENT_SECRET,
-            'grant_type': 'authorization_code',
-            'code': code,
-            'redirect_uri': redirect_uri,
-        },
-        headers={'Content-Type': 'application/x-www-form-urlencoded'},
-        timeout=15,
-    )
-    resp.raise_for_status()
-    token_data = resp.json()
+    token_data = _oauth_client(redirect_uri).get_tokens(code)
     access_token = token_data.get('access_token', '').strip()
     if not access_token:
         raise ValueError('Discord token response missing access_token.')
@@ -65,13 +58,7 @@ def exchange_code_for_token(code: str, redirect_uri: str) -> str:
 
 
 def fetch_identity(access_token: str) -> DiscordIdentity:
-    resp = requests.get(
-        f'{DISCORD_API_BASE}/users/@me',
-        headers={'Authorization': f'Bearer {access_token}'},
-        timeout=15,
-    )
-    resp.raise_for_status()
-    data = resp.json()
+    data = _oauth_client().get_user_data_from_token(access_token) or {}
     user_id = str(data.get('id') or '').strip()
     username = (data.get('username') or '').strip()
     if not user_id:
@@ -79,104 +66,78 @@ def fetch_identity(access_token: str) -> DiscordIdentity:
     return DiscordIdentity(user_id=user_id, username=username)
 
 
-def _bot_headers() -> dict:
-    return {
+def _bot_request(method: str, path: str, **kwargs):
+    url = f"{DISCORD_API_BASE}{path}"
+    headers = {
         'Authorization': f'Bot {settings.DISCORD_BOT_TOKEN}',
         'Content-Type': 'application/json',
     }
+    return requests.request(method, url, headers=headers, timeout=15, **kwargs)
 
 
-def _member_url(discord_user_id: str) -> str:
-    return f"{DISCORD_API_BASE}/guilds/{settings.DISCORD_GUILD_ID}/members/{discord_user_id}"
+def _request_ok(method: str, path: str, ok_statuses: set, **kwargs):
+    resp = _bot_request(method, path, **kwargs)
+    if resp.status_code not in ok_statuses:
+        resp.raise_for_status()
+    return resp
 
 
 def is_member(discord_user_id: str) -> bool:
-    resp = requests.get(_member_url(discord_user_id), headers=_bot_headers(), timeout=15)
-    if resp.status_code == 404:
-        return False
-    resp.raise_for_status()
-    return True
+    resp = _request_ok(
+        'GET', f"/guilds/{settings.DISCORD_GUILD_ID}/members/{discord_user_id}",
+        ok_statuses={200, 404},
+    )
+    return resp.status_code == 200
 
 
 def ensure_guild_membership(discord_user_id: str, user_access_token: str, nickname: str) -> None:
-    resp = requests.put(
-        _member_url(discord_user_id),
-        headers=_bot_headers(),
-        json={
-            'access_token': user_access_token,
-            'nick': nickname,
-        },
-        timeout=15,
+    _request_ok(
+        'PUT', f"/guilds/{settings.DISCORD_GUILD_ID}/members/{discord_user_id}",
+        json={'access_token': user_access_token, 'nick': nickname},
+        ok_statuses={201, 204},
     )
-    # Discord returns 201 (joined) or 204 (already in guild).
-    if resp.status_code not in {201, 204}:
-        resp.raise_for_status()
 
 
-def ensure_role(discord_user_id: str, local_user: Optional[object] = None) -> None:
-    """
-    Ensure the appropriate role is assigned to the guild member.
-
-    Role selection order:
-    - If `local_user` provided or a `LinkedAccount` exists for this platform_id,
-      prefer per-category role IDs (`DISCORD_SUPERUSER_ROLE_ID`,
-      `DISCORD_STAFF_ROLE_ID`, `DISCORD_USER_ROLE_ID`) based on
-      `user.is_superuser` / `user.is_staff`.
-    - Fall back to `DISCORD_USER_ROLE_ID` if present.
-    - Finally fall back to legacy `DISCORD_ROLE_ID` if set.
-
-    If no role id is determined, this is a no-op.
-    """
-    role_id = ''
-    user = None
-    if local_user is not None:
-        user = local_user
-    else:
+def _resolve_role_id(discord_user_id: str, local_user: Optional[object]) -> str:
+    user = local_user
+    if user is None:
         try:
             from accounts.models import LinkedAccount
-
             la = (
                 LinkedAccount.objects.filter(platform=LinkedAccount.DISCORD, platform_id=discord_user_id)
                 .select_related('user')
                 .first()
             )
-            if la:
-                user = la.user
+            user = la.user if la else None
         except Exception:
             user = None
 
-    if user:
-        if getattr(user, 'is_superuser', False) and getattr(settings, 'DISCORD_SUPERUSER_ROLE_ID', ''):
-            role_id = settings.DISCORD_SUPERUSER_ROLE_ID
-        elif getattr(user, 'is_staff', False) and getattr(settings, 'DISCORD_STAFF_ROLE_ID', ''):
-            role_id = settings.DISCORD_STAFF_ROLE_ID
-        elif getattr(settings, 'DISCORD_USER_ROLE_ID', ''):
-            role_id = settings.DISCORD_USER_ROLE_ID
+    if user and getattr(user, 'is_superuser', False) and getattr(settings, 'DISCORD_SUPERUSER_ROLE_ID', ''):
+        return settings.DISCORD_SUPERUSER_ROLE_ID
+    if user and getattr(user, 'is_staff', False) and getattr(settings, 'DISCORD_STAFF_ROLE_ID', ''):
+        return settings.DISCORD_STAFF_ROLE_ID
+    if getattr(settings, 'DISCORD_USER_ROLE_ID', ''):
+        return settings.DISCORD_USER_ROLE_ID
+    return getattr(settings, 'DISCORD_ROLE_ID', '') or ''
 
-    if not role_id:
-        role_id = getattr(settings, 'DISCORD_ROLE_ID', '') or ''
 
+def ensure_role(discord_user_id: str, local_user: Optional[object] = None) -> None:
+    """Ensure the appropriate role is assigned to the guild member."""
+    role_id = _resolve_role_id(discord_user_id, local_user)
     if not role_id:
         return
-
-    resp = requests.put(
-        f"{_member_url(discord_user_id)}/roles/{role_id}",
-        headers=_bot_headers(),
-        timeout=15,
+    _request_ok(
+        'PUT', f"/guilds/{settings.DISCORD_GUILD_ID}/members/{discord_user_id}/roles/{role_id}",
+        ok_statuses={204},
     )
-    if resp.status_code != 204:
-        resp.raise_for_status()
 
 
 def sync_nickname(discord_user_id: str, nickname: str) -> None:
-    resp = requests.patch(
-        _member_url(discord_user_id),
-        headers=_bot_headers(),
+    _request_ok(
+        'PATCH', f"/guilds/{settings.DISCORD_GUILD_ID}/members/{discord_user_id}",
         json={'nick': nickname},
-        timeout=15,
+        ok_statuses={200},
     )
-    if resp.status_code != 200:
-        resp.raise_for_status()
 
 
 def guild_jump_url() -> str:
@@ -184,51 +145,31 @@ def guild_jump_url() -> str:
 
 
 def kick_member(discord_user_id: str) -> None:
-    """
-    Remove a member from the guild.
-    Used only when a user replaces their linked Discord account with a new one.
-    404 is treated as success (already not a member).
-    """
-    resp = requests.delete(_member_url(discord_user_id), headers=_bot_headers(), timeout=15)
-    if resp.status_code not in {204, 404}:
-        resp.raise_for_status()
+    """Remove a member from the guild (404 treated as success)."""
+    _request_ok(
+        'DELETE', f"/guilds/{settings.DISCORD_GUILD_ID}/members/{discord_user_id}",
+        ok_statuses={204, 404},
+    )
 
 
 def _delete_stale_notifs_threads(channel_id: str, thread_name: str) -> None:
-    """
-    Delete any existing private threads in the notifs channel with the given name.
-    Called before creating a new thread to avoid duplicates from lost thread IDs.
-    """
+    """Delete private threads in the notifs channel with the given name."""
     for endpoint in ('threads/active', 'threads/private/archived'):
         try:
-            resp = requests.get(
-                f'{DISCORD_API_BASE}/channels/{channel_id}/{endpoint}',
-                headers=_bot_headers(),
-                timeout=15,
-            )
+            resp = _bot_request('GET', f"/channels/{channel_id}/{endpoint}")
             if resp.status_code != 200:
                 continue
             data = resp.json()
             threads = data if isinstance(data, list) else data.get('threads', [])
             for thread in threads:
                 if thread.get('name') == thread_name:
-                    requests.delete(
-                        f'{DISCORD_API_BASE}/channels/{thread["id"]}',
-                        headers=_bot_headers(),
-                        timeout=15,
-                    )
+                    _bot_request('DELETE', f"/channels/{thread['id']}")
         except Exception as exc:
             logger.warning('_delete_stale_notifs_threads: %s', exc)
 
 
 def create_notifs_thread(karmarace_username: str, discord_user_id: str) -> str:
-    """
-    Create a private thread in DISCORD_NOTIFS_CHANNEL_ID named after the
-    KarmaRace username, add the user as a member, and return the thread ID.
-
-    The #notifs channel must be a text channel with View Channel denied for
-    @everyone. The bot needs CREATE_PRIVATE_THREADS and SEND_MESSAGES_IN_THREADS.
-    """
+    """Create a private notifs thread, add the user, and return the thread ID."""
     channel_id = settings.DISCORD_NOTIFS_CHANNEL_ID
     thread_name = f'notifs-{karmarace_username}'
 
@@ -236,15 +177,9 @@ def create_notifs_thread(karmarace_username: str, discord_user_id: str) -> str:
     _delete_stale_notifs_threads(channel_id, thread_name)
 
     # Type 12 = GUILD_PRIVATE_THREAD
-    resp = requests.post(
-        f'{DISCORD_API_BASE}/channels/{channel_id}/threads',
-        headers=_bot_headers(),
-        json={
-            'name': thread_name,
-            'type': 12,
-            'invitable': False,  # only the bot (and admins) can add members
-        },
-        timeout=15,
+    resp = _bot_request(
+        'POST', f"/channels/{channel_id}/threads",
+        json={'name': thread_name, 'type': 12, 'invitable': False},
     )
     resp.raise_for_status()
     thread_id = resp.json()['id']
@@ -256,35 +191,24 @@ def create_notifs_thread(karmarace_username: str, discord_user_id: str) -> str:
 
 def add_thread_member(thread_id: str, discord_user_id: str) -> None:
     """Add a Discord user to an existing thread."""
-    resp = requests.put(
-        f'{DISCORD_API_BASE}/channels/{thread_id}/thread-members/{discord_user_id}',
-        headers=_bot_headers(),
-        timeout=15,
+    _request_ok(
+        'PUT', f"/channels/{thread_id}/thread-members/{discord_user_id}",
+        ok_statuses={200, 201, 204},
     )
-    if resp.status_code not in {200, 201, 204}:
-        resp.raise_for_status()
 
 
 def remove_thread_member(thread_id: str, discord_user_id: str) -> None:
-    """
-    Remove a Discord user from a thread.
-    404 is treated as success (already not a member).
-    """
-    resp = requests.delete(
-        f'{DISCORD_API_BASE}/channels/{thread_id}/thread-members/{discord_user_id}',
-        headers=_bot_headers(),
-        timeout=15,
+    """Remove a Discord user from a thread (404 treated as success)."""
+    _request_ok(
+        'DELETE', f"/channels/{thread_id}/thread-members/{discord_user_id}",
+        ok_statuses={200, 204, 404},
     )
-    if resp.status_code not in {200, 204, 404}:
-        resp.raise_for_status()
 
 
 def post_to_thread(thread_id: str, embed: dict) -> None:
     """Post an embed message to a thread."""
-    resp = requests.post(
-        f'{DISCORD_API_BASE}/channels/{thread_id}/messages',
-        headers=_bot_headers(),
+    _request_ok(
+        'POST', f"/channels/{thread_id}/messages",
         json={'embeds': [embed]},
-        timeout=10,
+        ok_statuses={200},
     )
-    resp.raise_for_status()

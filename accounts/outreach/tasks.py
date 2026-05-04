@@ -2,13 +2,16 @@
 """Periodic outreach tasks (harvest and send)."""
 import logging
 import random
-import urllib.parse
 
 from django.conf import settings
 from django.utils import timezone
 from procrastinate.contrib.django import app
 
-from .config import BATCH, GITHUB_API, SUBJECT, LANGUAGES, SEARCH_BASE, score_user, gh_get, sendpulse_post
+from .config import (
+	BATCH, SUBJECT, LANGUAGES, SEARCH_BASE,
+	score_user, iter_candidates,
+	sendpulse_post, update_daily_stats,
+)
 from .email import build_html, build_plaintext
 
 logger = logging.getLogger(__name__)
@@ -36,47 +39,27 @@ def harvest_outreach_emails(timestamp=None):
 	skip      = queued | contacted
 
 	new_records = []
-	page = 1
 	lang = random.choice(LANGUAGES)
-	query = urllib.parse.quote(SEARCH_BASE + " language:" + lang)
+	query = SEARCH_BASE + " language:" + lang
+	max_candidates = BATCH * 5
 
-	while len(new_records) < BATCH:
-		url = f"{GITHUB_API}/search/users?q={query}&per_page=30&page={page}"
-		data = gh_get(url)
-		if not data or not data.get("items"):
+	for profile, repos in iter_candidates(query, max_candidates, max_repos=60):
+		if len(new_records) >= BATCH:
 			break
-
-		for item in data["items"]:
-			if len(new_records) >= BATCH:
-				break
-
-			profile = gh_get(f"{GITHUB_API}/users/{item['login']}")
-			if not profile:
-				continue
-
-			email = (profile.get("email") or "").strip().lower()
-			if not email or email in skip:
-				continue
-
-			repos = gh_get(f"{GITHUB_API}/users/{item['login']}/repos?per_page=30")
-			if not repos or not any(r.get("homepage") for r in repos):
-				continue
-
-			score = score_user(profile, repos)
-			skip.add(email)
-			new_records.append(OutreachRecord(email=email, score=score))
-
-		page += 1
+		email = (profile.get("email") or "").strip().lower()
+		if not email or email in skip:
+			continue
+		if not repos or not any(getattr(r, 'homepage', '') for r in repos):
+			continue
+		score = score_user(profile, repos)
+		skip.add(email)
+		new_records.append(OutreachRecord(email=email, score=score))
 
 	if new_records:
 		OutreachRecord.objects.bulk_create(new_records, ignore_conflicts=True)
 
 	# Stats: track harvest count for today's row
-	today = timezone.now().date()
-	from accounts.models import OutreachDailyStats
-	stats, _ = OutreachDailyStats.objects.get_or_create(date=today)
-	stats.harvested = len(new_records)
-	stats.save(update_fields=["harvested", "updated_at"])
+	update_daily_stats(timezone.now().date(), harvested=len(new_records))
 
 	logger.info(
 		"harvest_outreach_emails: harvested=%d (lang=%s)", len(new_records), lang
@@ -132,16 +115,13 @@ def send_outreach_emails(timestamp=None):
 	if sent:
 		increment_monthly_sent(sent)
 
-	today = timezone.now().date()
-	pending_after = OutreachRecord.objects.count()
-	stats, _ = OutreachDailyStats.objects.get_or_create(date=today)
-	stats.queued_count  = len(pending)
-	stats.sent_count    = sent
-	stats.failed_count  = failed
-	stats.pending_after = pending_after
-	stats.save(update_fields=[
-		"queued_count", "sent_count", "failed_count", "pending_after", "updated_at"
-	])
+	update_daily_stats(
+		timezone.now().date(),
+		queued_count=len(pending),
+		sent_count=sent,
+		failed_count=failed,
+		pending_after=OutreachRecord.objects.count(),
+	)
 
 	logger.info(
 		"send_outreach_emails: sent=%d failed=%d pending_after=%d",

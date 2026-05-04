@@ -23,27 +23,29 @@ def _karma_low_threshold(user) -> int:
     return int(KARMA_LOW_THRESHOLD)
 
 
-def credit_karma(user, delta: int, reason: str, related_object_id: int = None):
+def _apply_karma_delta(user, delta: int, reason: str, related_object_id: int = None, enforce_balance: bool = False):
     balance = get_balance(user)
-    credit = abs(delta)
+    if enforce_balance and balance < abs(delta):
+        return None, balance
 
     KarmaTransaction.objects.create(
         user=user,
-        delta=credit,
+        delta=delta,
         reason=reason,
         related_object_id=related_object_id,
     )
+    return balance + delta, balance
 
+
+def credit_karma(user, delta: int, reason: str, related_object_id: int = None):
+    new_balance, _ = _apply_karma_delta(user, abs(delta), reason, related_object_id)
+    if new_balance is None:
+        return
     try:
         threshold = _karma_low_threshold(user)
     except Exception:
         return
-
-    _maybe_notify_karma_threshold_transition(
-        user=user,
-        new_balance=balance + credit,
-        threshold=threshold,
-    )
+    _maybe_notify_karma_threshold_transition(user=user, new_balance=new_balance, threshold=threshold)
 
 
 def debit_karma(user, delta: int, reason: str, related_object_id: int = None):
@@ -56,28 +58,14 @@ def debit_karma(user, delta: int, reason: str, related_object_id: int = None):
         - After a successful debit: fires threshold transition notification
             if balance moved into/out of the low-karma zone.
     """
-    balance = get_balance(user)
-    if balance < delta:
+    new_balance, _ = _apply_karma_delta(user, -abs(delta), reason, related_object_id, enforce_balance=True)
+    if new_balance is None:
         return
-
-    KarmaTransaction.objects.create(
-        user=user,
-        delta=-delta,
-        reason=reason,
-        related_object_id=related_object_id,
-    )
-
-    new_balance = balance - delta
     try:
         threshold = _karma_low_threshold(user)
     except Exception:
         return  # Invalid per-user threshold — skip notification rather than crash
-
-    _maybe_notify_karma_threshold_transition(
-        user=user,
-        new_balance=new_balance,
-        threshold=threshold,
-    )
+    _maybe_notify_karma_threshold_transition(user=user, new_balance=new_balance, threshold=threshold)
 
 
 def _maybe_notify_karma_threshold_transition(user, new_balance: int, threshold: int):
@@ -130,16 +118,14 @@ def adjust_karma_by_staff(user, delta: int, reason: str = None):
     Returns:
         New balance
     """
-    balance = get_balance(user)
-    
-    KarmaTransaction.objects.create(
-        user=user,
-        delta=delta,
-        reason=KarmaTransaction.Reason.STAFF_ADJUSTMENT,
+    new_balance, _ = _apply_karma_delta(
+        user,
+        delta,
+        KarmaTransaction.Reason.STAFF_ADJUSTMENT,
         related_object_id=None,
     )
-    
-    new_balance = balance + delta
+    if new_balance is None:
+        return get_balance(user)
     
     try:
         from notifications.models import Notification

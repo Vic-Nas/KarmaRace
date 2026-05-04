@@ -40,8 +40,8 @@
     </form>
   {% endif %}
 
-  {% if profile.subscription_status %}
-  <p class="billing-status">Stripe status: {{ profile.subscription_status }}</p>
+  {% if subscription_status %}
+  <p class="billing-status">Stripe status: {{ subscription_status }}</p>
   {% endif %}
 </div>
 {% endblock %}

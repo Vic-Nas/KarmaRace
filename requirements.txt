@@ -1,9 +1,16 @@
 cryptography
 django-allauth
 dj_database_url
+dj-stripe
 django
 django-environ
 environ
+django-filter
+discord.py
+discord-oauth2
+django-formtools
+google-auth
+google-auth-oauthlib
 gunicorn
 PyGithub
 PyJWT>=2.0.0

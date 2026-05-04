@@ -1,11 +1,10 @@
 # tasks/services/validate.py
 """Task configuration validation (GitHub and Webhook checks)."""
 import logging
-import requests
+from .github import get_public_repo
 from urllib.parse import urlparse
 
 from tasks.models import Task
-from .github import _github_headers
 from .health import _record_webhook_health_outcome, _notify_webhook_attempt
 
 logger = logging.getLogger(__name__)
@@ -36,22 +35,15 @@ def _check_github_repo_public_detailed(task):
     """Verify GitHub repo exists and is public."""
     if not _is_valid_github_repo_target(task.target_id):
         return 'GitHub target must be owner/repo format.'
-    try:
-        response = requests.get(
-            f'https://api.github.com/repos/{task.target_id}',
-            headers=_github_headers(),
-            timeout=10,
-        )
-        if response.status_code == 200:
-            if response.json().get('private', True):
-                return 'GitHub repo is private. Feed tasks require a public repo.'
-            return None
-        elif response.status_code == 404:
-            return 'GitHub repo not found. Check owner/repo spelling.'
-        return f'GitHub API returned status {response.status_code} while checking repo.'
-    except requests.RequestException as exc:
-        logger.error('_check_github_repo_public: failed for task %s: %s', task.pk, exc)
-        return f'GitHub repo check failed: {exc}'
+    repo, error = get_public_repo(task.target_id)
+    if error == 'not_found':
+        return 'GitHub repo not found. Check owner/repo spelling.'
+    if error == 'private':
+        return 'GitHub repo is private. Feed tasks require a public repo.'
+    if error:
+        logger.error('_check_github_repo_public: failed for task %s: %s', task.pk, error)
+        return f'GitHub repo check failed: {error}'
+    return None
 
 
 def _check_webhook_target_format(task):

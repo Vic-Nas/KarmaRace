@@ -1,7 +1,9 @@
 # tasks/services/github.py
 """GitHub integration utilities: authentication, repo choices, API helpers."""
 import logging
+
 from django.conf import settings
+from github import Github, GithubException, UnknownObjectException
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +42,22 @@ def _github_headers(token_override=None) -> dict:
     if token:
         headers['Authorization'] = f'Bearer {token}'
     return headers
+
+
+def get_public_repo(target_id: str):
+    """Return (repo, error) where error is 'not_found', 'private', or exception str."""
+    try:
+        gh = Github(getattr(settings, 'GITHUB_TOKEN', None))
+        repo = gh.get_repo(target_id)
+    except UnknownObjectException:
+        return None, 'not_found'
+    except GithubException as exc:
+        logger.error('get_public_repo: GitHub error for %s: %s', target_id, exc)
+        return None, str(exc)
+
+    if repo.private:
+        return None, 'private'
+    return repo, ''
 
 
 def get_user_github_repo_choices(user):

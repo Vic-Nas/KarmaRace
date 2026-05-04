@@ -3,11 +3,9 @@
 import json
 import logging
 import time
-import urllib.error
-import urllib.parse
-import urllib.request
 
 from django.conf import settings
+from github import Github, GithubException
 
 logger = logging.getLogger(__name__)
 
@@ -33,11 +31,17 @@ SEARCH_BASE = "type:user followers:0..500 repos:3..100"
 _sendpulse_token_cache: dict = {}
 
 
+def _repo_attr(repo, name, default=None):
+	if isinstance(repo, dict):
+		return repo.get(name, default)
+	return getattr(repo, name, default)
+
+
 def score_user(profile: dict, repos: list) -> int:
 	"""Score a candidate. Higher = better target (small/active builders)."""
-	promoted   = sum(1 for r in repos if r.get("homepage"))
-	followers  = profile.get("followers", 0) or 0
-	total_stars = sum(r.get("stargazers_count", 0) or 0 for r in repos)
+	promoted = sum(1 for r in repos if _repo_attr(r, "homepage"))
+	followers = profile.get("followers", 0) or 0
+	total_stars = sum(_repo_attr(r, "stargazers_count", 0) or 0 for r in repos)
 
 	# Weighted: more promoted projects = higher; small projects favored
 	score  = promoted * 20
@@ -46,24 +50,31 @@ def score_user(profile: dict, repos: list) -> int:
 	return score
 
 
-def gh_headers() -> dict:
-	"""Build GitHub API headers."""
-	return {
-		"Authorization":        f"Bearer {settings.GITHUB_TOKEN}",
-		"Accept":               "application/vnd.github+json",
-		"X-GitHub-Api-Version": "2022-11-28",
-	}
-
-
-def gh_get(url: str):
-	"""Fetch JSON from GitHub API."""
-	req = urllib.request.Request(url, headers=gh_headers())
+def iter_candidates(query: str, max_candidates: int, max_repos: int = 100):
+	"""Yield (profile, repos) for GitHub users matching the query."""
 	try:
-		with urllib.request.urlopen(req, timeout=15) as resp:
-			return json.loads(resp.read())
-	except urllib.error.URLError as exc:
-		logger.error("GitHub API error %s: %s", url, exc)
-		return None
+		gh = Github(settings.GITHUB_TOKEN)
+		for idx, user in enumerate(gh.search_users(query)):
+			if idx >= max_candidates:
+				break
+			username = (getattr(user, 'login', '') or '').strip()
+			if not username:
+				continue
+			try:
+				full_user = gh.get_user(username)
+				profile = full_user.raw_data or {}
+				repos = []
+				for r_idx, repo in enumerate(full_user.get_repos()):
+					if r_idx >= max_repos:
+						break
+					repos.append(repo)
+				yield profile, repos
+			except GithubException as exc:
+				logger.error("GitHub user error %s: %s", username, exc)
+				continue
+	except GithubException as exc:
+		logger.error("GitHub search error %s: %s", query, exc)
+		return
 
 
 def get_sendpulse_token() -> str:
@@ -115,3 +126,28 @@ def sendpulse_post(payload: dict) -> bool:
 	except Exception as exc:
 		logger.error("SendPulse error: %s", exc)
 		return False
+
+
+def update_daily_stats(date, harvested=None, queued_count=None, sent_count=None,
+				   failed_count=None, pending_after=None):
+	from accounts.models import OutreachDailyStats
+	stats, _ = OutreachDailyStats.objects.get_or_create(date=date)
+	update_fields = []
+	if harvested is not None:
+		stats.harvested = harvested
+		update_fields.append("harvested")
+	if queued_count is not None:
+		stats.queued_count = queued_count
+		update_fields.append("queued_count")
+	if sent_count is not None:
+		stats.sent_count = sent_count
+		update_fields.append("sent_count")
+	if failed_count is not None:
+		stats.failed_count = failed_count
+		update_fields.append("failed_count")
+	if pending_after is not None:
+		stats.pending_after = pending_after
+		update_fields.append("pending_after")
+	if update_fields:
+		update_fields.append("updated_at")
+		stats.save(update_fields=update_fields)

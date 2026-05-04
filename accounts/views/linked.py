@@ -2,7 +2,6 @@
 """Linked account management and Discord OAuth."""
 import logging
 import secrets
-from urllib.parse import urlencode
 
 import requests
 from allauth.socialaccount.models import SocialAccount, SocialToken
@@ -10,8 +9,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import IntegrityError
-from django.shortcuts import redirect, render, get_object_or_404
-from django.urls import reverse
+from django.shortcuts import redirect, render
 from django.views.decorators.http import require_POST
 
 from accounts import discord as discord_api
@@ -23,22 +21,7 @@ logger = logging.getLogger(__name__)
 @login_required
 def linked_accounts(request):
     """Show linked accounts (GitHub, Discord) and verified emails."""
-    github_social = SocialAccount.objects.filter(user=request.user, provider='github').first()
-    if github_social:
-        github_token = SocialToken.objects.filter(account=github_social).order_by('-pk').first()
-        LinkedAccount.objects.update_or_create(
-            user=request.user,
-            platform=LinkedAccount.GITHUB,
-            defaults={
-                'platform_id': github_social.uid,
-                'platform_username': (
-                    github_social.extra_data.get('login')
-                    or github_social.extra_data.get('username')
-                    or request.user.username
-                ),
-                'access_token': github_token.token if github_token else '',
-            },
-        )
+    _sync_github_link(request.user)
     github  = LinkedAccount.objects.filter(user=request.user, platform=LinkedAccount.GITHUB).first()
     discord = LinkedAccount.objects.filter(user=request.user, platform=LinkedAccount.DISCORD).first()
     google_social = SocialAccount.objects.filter(user=request.user, provider='google').first()
@@ -61,18 +44,9 @@ def connect_account(request, platform):
         if not discord_api.is_configured():
             messages.error(request, 'Discord integration is not configured.')
             return redirect('linked_accounts')
-        state = secrets.token_urlsafe(24)
-        request.session['discord_oauth_state'] = state
-        redirect_uri = request.build_absolute_uri('/app/accounts/discord/callback/')
-        return redirect(discord_api.authorize_url(redirect_uri=redirect_uri, state=state))
+        return redirect(_discord_auth_url(request))
     messages.error(request, 'Unknown platform.')
     return redirect('linked_accounts')
-
-
-def _redirect_login_with_next(request):
-    """Redirect to Google login with return path."""
-    params = urlencode({'process': 'login', 'next': request.get_full_path()})
-    return redirect(f"{reverse('google_login')}?{params}")
 
 
 def _sync_discord_membership(request, linked):
@@ -89,6 +63,33 @@ def _sync_discord_membership(request, linked):
     linked.delete()
     messages.info(request, 'Discord link expired. Please reconnect.')
     return False
+
+
+def _sync_github_link(user):
+    github_social = SocialAccount.objects.filter(user=user, provider='github').first()
+    if not github_social:
+        return
+    github_token = SocialToken.objects.filter(account=github_social).order_by('-pk').first()
+    LinkedAccount.objects.update_or_create(
+        user=user,
+        platform=LinkedAccount.GITHUB,
+        defaults={
+            'platform_id': github_social.uid,
+            'platform_username': (
+                github_social.extra_data.get('login')
+                or github_social.extra_data.get('username')
+                or user.username
+            ),
+            'access_token': github_token.token if github_token else '',
+        },
+    )
+
+
+def _discord_auth_url(request):
+    state = secrets.token_urlsafe(24)
+    request.session['discord_oauth_state'] = state
+    redirect_uri = request.build_absolute_uri('/app/accounts/discord/callback/')
+    return discord_api.authorize_url(redirect_uri=redirect_uri, state=state)
 
 
 @login_required
@@ -118,13 +119,11 @@ def discord_callback(request):
         access_token = discord_api.exchange_code_for_token(code, redirect_uri)
         identity     = discord_api.fetch_identity(access_token)
 
-        # Check if there's an existing linked Discord account being replaced.
         existing = LinkedAccount.objects.filter(
             user=request.user, platform=LinkedAccount.DISCORD,
         ).first()
-
-        old_discord_id    = existing.platform_id if existing else None
-        inherited_thread  = (existing.discord_notifs_thread_id if existing else None) or ''
+        old_discord_id = existing.platform_id if existing else None
+        inherited_thread = (existing.discord_notifs_thread_id if existing else None) or ''
 
         # Add new account to guild first (must happen before thread membership swap).
         discord_api.ensure_guild_membership(identity.user_id, access_token, request.user.username)
@@ -132,17 +131,7 @@ def discord_callback(request):
 
         # If replacing an old account: swap thread membership then kick old account.
         if old_discord_id and old_discord_id != identity.user_id:
-            if inherited_thread:
-                try:
-                    discord_api.add_thread_member(inherited_thread, identity.user_id)
-                    discord_api.remove_thread_member(inherited_thread, old_discord_id)
-                except requests.RequestException:
-                    # Non-fatal: thread swap failed but the link will still update.
-                    pass
-            try:
-                discord_api.kick_member(old_discord_id)
-            except requests.RequestException:
-                pass
+            _swap_thread_member(inherited_thread, identity.user_id, old_discord_id)
 
         LinkedAccount.objects.update_or_create(
             user=request.user, platform=LinkedAccount.DISCORD,
@@ -164,6 +153,19 @@ def discord_callback(request):
         else:
             messages.error(request, 'Something went wrong linking your Discord account. Please try again.')
     return redirect('linked_accounts')
+
+
+def _swap_thread_member(thread_id, new_id, old_id):
+    if thread_id:
+        try:
+            discord_api.add_thread_member(thread_id, new_id)
+            discord_api.remove_thread_member(thread_id, old_id)
+        except requests.RequestException:
+            pass
+    try:
+        discord_api.kick_member(old_id)
+    except requests.RequestException:
+        pass
 
 
 @login_required

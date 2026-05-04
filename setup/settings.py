@@ -41,8 +41,12 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'django.contrib.sites',
 
+    'django_filters',
+    'formtools',
+
     'accounts',
     'billing',
+    'djstripe',
 
     'allauth',
     'allauth.account',
@@ -177,3 +181,8 @@ from .settings_services import (
     GITHUB_TOKEN, REACH, DAILY_REACH, MONTHLY_REACH,
     PROCRASTINATE_CONNECTORS,
 )
+
+DJSTRIPE_API_KEY = STRIPE_SECRET_KEY
+DJSTRIPE_WEBHOOK_SECRET = STRIPE_WEBHOOK_SECRET
+DJSTRIPE_SUBSCRIBER_MODEL = AUTH_USER_MODEL
+DJSTRIPE_FOREIGN_KEY_TO_FIELD = 'id'
