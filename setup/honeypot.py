@@ -22,6 +22,10 @@ import hashlib
 import logging
 import re
 
+import inspect
+
+from asgiref.sync import markcoroutinefunction
+
 from django.http import StreamingHttpResponse
 
 logger = logging.getLogger(__name__)
@@ -387,15 +391,15 @@ class HoneypotMiddleware:
     sync_capable = False  # hard block — no silent fallback to time.sleep
 
     def __init__(self, get_response):
-        if not asyncio.iscoroutinefunction(get_response):
+        if not inspect.iscoroutinefunction(get_response):
             raise RuntimeError(
                 "HoneypotMiddleware requires an ASGI server (uvicorn/daphne). "
                 "sync_capable=False — do not deploy under WSGI."
             )
         self.get_response = get_response
-        self._is_coroutine = asyncio.coroutines._is_coroutine
+        markcoroutinefunction(self)
 
-    async def __acall__(self, request):
+    async def __call__(self, request):
         path = request.path
         if _is_legitimate_path(path):
             return await self.get_response(request)

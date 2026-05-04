@@ -85,8 +85,8 @@ ACCOUNT_DEFAULT_HTTP_PROTOCOL = 'https'
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'setup.honeypot.HoneypotMiddleware',          # before WhiteNoise — stays in async chain
     'whitenoise.middleware.WhiteNoiseMiddleware',
-    'setup.honeypot.HoneypotMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
