@@ -86,7 +86,7 @@ ACCOUNT_DEFAULT_HTTP_PROTOCOL = 'https'
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'setup.honeypot.HoneypotMiddleware',          # before WhiteNoise — stays in async chain
-    'whitenoise.middleware.WhiteNoiseMiddleware',
+    'servestatic.middleware.ServeStaticMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -164,7 +164,7 @@ STATIC_URL = 'static/'
 
 STATICFILES_DIRS = [BASE_DIR / 'setup' / 'static' / 'manual']
 STATIC_ROOT = BASE_DIR / 'setup' / 'static' / 'cache'
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+STATICFILES_STORAGE = 'servestatic.storage.CompressedManifestStaticFilesStorage'
 
 # OAuth providers (Google, GitHub, Discord)
 from .settings_oauth import (

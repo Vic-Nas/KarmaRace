@@ -16,7 +16,7 @@ PyGithub
 PyJWT>=2.0.0
 procrastinate
 psycopg[binary]>=3.1
-whitenoise
+servestatic
 stripe
 tqdm
 uvicorn[standard]
