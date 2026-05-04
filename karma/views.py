@@ -48,7 +48,7 @@ def leaderboard(request):
 
 
 async def leaderboard_stream(request):
-    """SSE — pushes fresh top-10 JSON every STREAM_INTERVAL_SECONDS."""
+    """SSE; pushes fresh top-10 JSON every STREAM_INTERVAL_SECONDS."""
     _leaderboard_rows_async = sync_to_async(_leaderboard_rows)
 
     async def event_stream():

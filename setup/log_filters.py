@@ -9,7 +9,7 @@ class DedupFilter(logging.Filter):
     A record is considered a duplicate when its (name, levelno, getMessage())
     triple matches the previous record that passed through this filter.
     Each handler gets its own filter instance, so the dedup state is
-    per-handler, which is fine — we only attach it to 'console'.
+    per-handler, which is fine since we only attach it to 'console'.
 
     This collapses the N-per-worker repetition of startup warnings like
     the StreamingHttpResponse sync-iterator notice without hiding genuinely

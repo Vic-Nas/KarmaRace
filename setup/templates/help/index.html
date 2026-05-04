@@ -2,7 +2,7 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}Help — KarmaRace{% endblock %}
+{% block title %}KarmaRace Help{% endblock %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'css/prose.css' %}">
@@ -15,7 +15,7 @@
 
   <div class="kr-help-section" id="what-is-karmarace">
     <h2>What Is KarmaRace?</h2>
-    <p>KarmaRace is a task exchange community for developers. You post tasks for others to complete — like starring or forking your GitHub repository — and in return you complete tasks for others. Everyone earns karma, and karma determines how visible your tasks are in the feed. The more active you are, the more visibility you earn.</p>
+    <p>KarmaRace is a task exchange community for developers. You post tasks for others to complete, like starring or forking your GitHub repository, and in return you complete tasks for others. Everyone earns karma, and karma determines how visible your tasks are in the feed. The more active you are, the more visibility you earn.</p>
   </div>
 
   <div class="kr-help-section" id="getting-started">
@@ -24,13 +24,13 @@
       <li><strong>Link your accounts.</strong> Go to <a href="{% url 'linked_accounts' %}">Accounts</a> and connect GitHub (required for GitHub tasks) and Discord (optional, for community access).</li>
       <li><strong>Create a task.</strong> Go to <a href="{% url 'my_tasks' %}">My Tasks</a> and create your first task. Choose a GitHub repo to star or fork, or set up a Webhook task (Pro only).</li>
       <li><strong>Publish it.</strong> Hit Publish to make your task visible in the feed. Tasks start hidden until you publish them.</li>
-      <li><strong>Complete tasks for others.</strong> Browse the feed, pick a task, and hit Check. Verification is automatic — your karma goes up on confirmation.</li>
+      <li><strong>Complete tasks for others.</strong> Browse the feed, pick a task, and hit Check. Verification is automatic. Your karma goes up on confirmation.</li>
     </ol>
   </div>
 
   <div class="kr-help-section" id="feed-and-karma">
     <h2>The Feed and Karma</h2>
-    <p>The feed shows tasks from other users, ranked by owner karma balance — then by the owner's custom task order — then by creation time. Owners with higher karma have more visible tasks, which means more completions and continued growth. You never see your own tasks in the feed.</p>
+    <p>The feed shows tasks from other users, ranked by owner karma balance, then by the owner's custom task order, then by creation time. Owners with higher karma have more visible tasks, which means more completions and continued growth. You never see your own tasks in the feed.</p>
     <p>Karma is the engine of the platform. When you complete a task, you earn karma and the task owner pays karma. The reward you earn is computed from the owner's current karma at the moment you pick the task: higher-karma owners pay more. This keeps the economy fair and dynamic.</p>
     <p>Use the filters to narrow the feed by completion status, archive status, or task type (GitHub Star, GitHub Fork, Webhook).</p>
   </div>
@@ -44,9 +44,9 @@
   <div class="kr-help-section" id="task-types-verification">
     <h2>Task Types and Verification</h2>
     <ul>
-      <li><strong>GitHub Star</strong> — target format <code>owner/repo</code>. Verified against the tester's linked GitHub account.</li>
-      <li><strong>GitHub Fork</strong> — target format <code>owner/repo</code>. Verified against the tester's linked GitHub account.</li>
-      <li><strong>Webhook</strong> — target is a full URL. Pro-only. Verified by your endpoint's JSON response (see below).</li>
+      <li><strong>GitHub Star</strong>: target format <code>owner/repo</code>. Verified against the tester's linked GitHub account.</li>
+      <li><strong>GitHub Fork</strong>: target format <code>owner/repo</code>. Verified against the tester's linked GitHub account.</li>
+      <li><strong>Webhook</strong>: target is a full URL. Pro-only. Verified by your endpoint's JSON response (see below).</li>
     </ul>
     <p>For GitHub tasks, the repo is selected from a dropdown of discovered repositories. Use <em>Reload repos</em> if a recently created repo isn't showing up yet.</p>
   </div>
@@ -62,7 +62,7 @@ Authorization: Bearer {task.webhook_secret}
   "task_slug": "your-task-slug",
   "google_email": "tester@gmail.com"
 }</code></pre>
-    <p><code>google_email</code> is the Google-verified address the tester selected — the email they registered with on your platform. The tester picks from their verified emails in <a href="{% url 'linked_accounts' %}">Accounts</a> before submitting the check. The <code>Authorization</code> header confirms the request came from KarmaRace.</p>
+    <p><code>google_email</code> is the Google-verified address the tester selected. It is the email they registered with on your platform. The tester picks from their verified emails in <a href="{% url 'linked_accounts' %}">Accounts</a> before submitting the check. The <code>Authorization</code> header confirms the request came from KarmaRace.</p>
     <p>Your endpoint must respond with:</p>
     <pre><code>{ "verified": true }</code></pre>
     <p>If verification fails, the tester sees a generic error. You receive detailed diagnostics in <a href="{% url 'notifications_inbox' %}">Notifications</a>.</p>
@@ -78,11 +78,11 @@ Authorization: Bearer {task.webhook_secret}
     <h2>Notification Events</h2>
     <p>Notification events are always available in-app. Pro users can additionally enable webhook and Discord delivery per event.</p>
     <ul>
-      <li><strong>TASK_CONFIRMED</strong> — <code>{"task_id": number, "delta": number}</code></li>
-      <li><strong>TASK_HEALTH_FAILED</strong> — <code>{"task_id": number, "task_type": string, "target_id": string}</code></li>
-      <li><strong>WEBHOOK_CHECK</strong> — <code>{"task_id": number, "phase": string, "status": string, ...}</code></li>
-      <li><strong>KARMA_LOW / KARMA_RESTORED</strong> — <code>{"delta": number, "balance": number, "threshold": number}</code></li>
-      <li><strong>APPRECIATION</strong> — <code>{"message": string}</code></li>
+      <li><strong>TASK_CONFIRMED</strong>: <code>{"task_id": number, "delta": number}</code></li>
+      <li><strong>TASK_HEALTH_FAILED</strong>: <code>{"task_id": number, "task_type": string, "target_id": string}</code></li>
+      <li><strong>WEBHOOK_CHECK</strong>: <code>{"task_id": number, "phase": string, "status": string, ...}</code></li>
+      <li><strong>KARMA_LOW / KARMA_RESTORED</strong>: <code>{"delta": number, "balance": number, "threshold": number}</code></li>
+      <li><strong>APPRECIATION</strong>: <code>{"message": string}</code></li>
     </ul>
   </div>
 

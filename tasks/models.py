@@ -65,7 +65,7 @@ class Task(models.Model):
         return summaries.get(result, 'Webhook health check failed. See Notifications for details.')
 
     def __str__(self):
-        return f'{self.owner.username} — {self.type}'
+        return f'{self.owner.username}: {self.type}'
 
 
 class TaskCompletion(models.Model):

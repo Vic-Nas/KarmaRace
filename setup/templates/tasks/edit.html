@@ -2,7 +2,7 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}{% if is_create %}New Task{% else %}Edit Task{% endif %} — KarmaRace{% endblock %}
+{% block title %}KarmaRace {% if is_create %}New Task{% else %}Edit Task{% endif %}{% endblock %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'css/tasks.css' %}">

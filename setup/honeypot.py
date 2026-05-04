@@ -72,15 +72,15 @@ def _normalize_path(path: str) -> str:
       - URL encoding:              /%2fxmlrpc.php      -> /xmlrpc.php
       - Double URL encoding:       /%252fxmlrpc.php    -> /xmlrpc.php
       - Dot segments:              /./wp/../xmlrpc.php -> /xmlrpc.php
-      - Mixed case: NOT touched    — regex uses re.IGNORECASE
+    - Mixed case: NOT touched since the regex uses re.IGNORECASE
     """
     # Two passes of unquote handles double-encoded payloads (%25 -> % -> char)
     decoded = urllib.parse.unquote(urllib.parse.unquote(path))
-    # Collapse runs of slashes BEFORE normpath — POSIX treats leading // as special
+    # Collapse runs of slashes BEFORE normpath because POSIX treats leading // as special
     decoded = re.sub(r'/+', '/', decoded)
     # Resolve dot segments
     normalized = posixpath.normpath(decoded)
-    # normpath strips trailing slash — restore for prefix matching on dirs
+    # normpath strips trailing slash; restore for prefix matching on dirs
     if path.endswith('/') and not normalized.endswith('/'):
         normalized += '/'
     return normalized
@@ -212,7 +212,7 @@ _SCANNER_PATTERNS = re.compile(
     | ^/api/v\d+/(?:login|users|admin)
     | ^/v\d+/(?:login|users|admin)
 
-    # Cloud metadata — exfiltration attempt
+    # Cloud metadata (exfiltration attempt)
     | ^/latest/meta-data
     | ^/metadata/
     """,
@@ -372,7 +372,7 @@ def _make_async_response(path: str) -> StreamingHttpResponse:
     Async streaming tarpit response.
 
     Uses an async generator so each asyncio.sleep() suspends the coroutine
-    and yields control back to the event loop — zero threads blocked, zero
+    and yields control back to the event loop so zero threads are blocked, with zero
     impact on real users no matter how many bots are being tarpitted
     simultaneously.
     """
@@ -414,13 +414,13 @@ class HoneypotMiddleware:
     """
 
     async_capable = True
-    sync_capable = False  # hard block — no silent fallback to time.sleep
+    sync_capable = False  # hard block; no silent fallback to time.sleep
 
     def __init__(self, get_response):
         if not inspect.iscoroutinefunction(get_response):
             raise RuntimeError(
                 "HoneypotMiddleware requires an ASGI server (uvicorn/daphne). "
-                "sync_capable=False — do not deploy under WSGI."
+                "sync_capable=False. Do not deploy under WSGI."
             )
         self.get_response = get_response
         markcoroutinefunction(self)

@@ -1,4 +1,4 @@
-/* tokens.css — Design tokens */
+/* tokens.css: Design tokens */
 :root {
   --font-body: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
@@ -9,7 +9,7 @@
   --shadow:    0 4px 12px rgba(0,0,0,.08), 0 2px 4px rgba(0,0,0,.04);
   --shadow-lg: 0 8px 24px rgba(0,0,0,.10), 0 4px 8px rgba(0,0,0,.06);
   --transition: .16s ease;
-  /* Footer height — used to pad body so content never hides behind it */
+  /* Footer height; used to pad body so content never hides behind it */
   --footer-h: 48px;
 }
 
@@ -25,7 +25,7 @@
   --text-muted:    #6b6b60;
   --text-inv:      #ffffff;
 
-  /* Green accent — used sparingly for brand moments only */
+  /* Green accent; used sparingly for brand moments only */
   --accent:        #d97230;
   --accent-hover:  #b85e20;
   --accent-light:  #fdf3ec;

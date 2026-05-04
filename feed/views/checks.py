@@ -91,7 +91,7 @@ def check(request, task_id):
     if task.type == Task.Type.WEBHOOK:
         form = WebhookCheckForm(request.POST)
         if not form.is_valid():
-            return respond(TaskCompletion.State.FAILED, 'Select a verified email and rate difficulty (1–5).')
+            return respond(TaskCompletion.State.FAILED, 'Select a verified email and rate difficulty (1 to 5).')
         google_email = form.cleaned_data['google_email']
         from accounts.models import UserPreference
         UserPreference.objects.update_or_create(

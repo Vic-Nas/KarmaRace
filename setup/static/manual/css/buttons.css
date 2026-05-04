@@ -1,4 +1,4 @@
-/* buttons.css — Button variants and badges */
+/* buttons.css: Button variants and badges */
 .btn {
   display: inline-flex; align-items: center; gap: .3rem;
   font-family: var(--font-body); font-size: .84rem; font-weight: 500;
@@ -26,7 +26,7 @@
 .btn-outline-primary       { background: transparent; color: var(--primary); border-color: var(--primary); }
 .btn-outline-primary:hover { background: var(--primary-light); }
 
-/* Nav context — sits on dark bg */
+/* Nav context; sits on dark bg */
 .btn-outline-secondary {
   background: transparent; color: rgba(255,255,255,.75);
   border-color: rgba(255,255,255,.15); font-size: .75rem; padding: .24rem .65rem;

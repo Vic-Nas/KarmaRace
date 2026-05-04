@@ -48,8 +48,8 @@ def _build_embed(event, payload):
 
     elif event == 'WEBHOOK_CHECK':
         _add_field(embed, 'Task', f'#{payload.get("task_id", "?")}')
-        _add_field(embed, 'Phase', payload.get('phase', '—'))
-        _add_field(embed, 'Status', f'`{payload.get("status", "—")}`')
+        _add_field(embed, 'Phase', payload.get('phase', 'unknown'))
+        _add_field(embed, 'Status', f'`{payload.get("status", "unknown")}`')
         _add_field(embed, 'Tester', payload.get('tester_username'))
         _add_field(embed, 'Detail', payload.get('detail'), inline=False)
 
@@ -58,7 +58,7 @@ def _build_embed(event, payload):
         _add_field(embed, 'Threshold', f'`{payload.get("threshold", "?")}`')
 
     elif event == 'NEW_USER':
-        _add_field(embed, 'Username', payload.get('username', '—'))
+        _add_field(embed, 'Username', payload.get('username', 'unknown'))
         _add_field(embed, 'Total Users', f'`{payload.get("total_users", "?")}`')
         if payload.get('milestone'):
             _add_field(embed, '🏆 Milestone', f'**{payload["milestone"]} users!**', inline=False)

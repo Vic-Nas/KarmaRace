@@ -1,4 +1,4 @@
-/* cards.css — Card component */
+/* cards.css: Card component */
 .card {
   background: var(--surface);
   border: 1px solid var(--border);

@@ -1,4 +1,4 @@
-/* layout.css — 3-column grid, fixed footer, sticky ads */
+/* layout.css: 3-column grid, fixed footer, sticky ads */
 .kr-page {
   display: grid;
   grid-template-columns: 180px 1fr 180px;

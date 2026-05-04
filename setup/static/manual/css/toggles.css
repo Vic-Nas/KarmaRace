@@ -1,4 +1,4 @@
-/* toggles.css — Toggle switch component */
+/* toggles.css: Toggle switch component */
 .toggle { display: inline-flex; align-items: center; cursor: pointer; position: relative; }
 .toggle input[type="checkbox"] { position: absolute; opacity: 0; width: 0; height: 0; }
 .toggle__track {

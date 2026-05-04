@@ -1,4 +1,4 @@
-/* accounts.css — Linked accounts page, signup, logout */
+/* accounts.css: Linked accounts page, signup, logout */
 .linked-accounts-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));

@@ -25,7 +25,7 @@ REACH = env.bool('REACH', default=False)
 DAILY_REACH = env.int('DAILY_REACH', default=50)
 MONTHLY_REACH = env.int('MONTHLY_REACH', default=12000)
 
-# Procrastinate (background jobs — uses the same Postgres DATABASE_URL)
+# Procrastinate (background jobs; uses the same Postgres DATABASE_URL)
 PROCRASTINATE_CONNECTORS = {
 	'default': {
 		'CONNECTOR': 'procrastinate.contrib.django.DjangoSyncConnector',

@@ -1,4 +1,4 @@
-/* billing.css — Plan page */
+/* billing.css: Plan page */
 .billing-card { max-width: 460px; margin: 0 auto; }
 .billing-card__header {
   display: flex; align-items: center; justify-content: space-between;

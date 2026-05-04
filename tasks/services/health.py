@@ -75,7 +75,7 @@ def _record_webhook_health_outcome(task, is_success, result, reason):
     """Record webhook check outcome metadata and auto-unpublish if endpoint is genuinely broken.
 
     Auto-unpublish uses TaskCompletion counts (the single source of truth), not separate counters.
-    Only request_error and invalid_json are endpoint failures — not_verified is a user issue.
+    Only request_error and invalid_json are endpoint failures; not_verified is a user issue.
     """
     if task.type != Task.Type.WEBHOOK:
         return

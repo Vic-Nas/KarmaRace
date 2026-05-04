@@ -10,11 +10,11 @@
 
 ## How it works
 
-**1. Publish a task** &nbsp;—&nbsp; Star/fork a GitHub repo, or verify via webhook. Takes under a minute to set up.
+**1. Publish a task**: Star/fork a GitHub repo, or verify via webhook. Takes under a minute to set up.
 
-**2. Other founders complete your tasks** &nbsp;—&nbsp; Every action is server-side verified. No fake clicks, no gaming the system.
+**2. Other founders complete your tasks**: Every action is server-side verified. No fake clicks, no gaming the system.
 
-**3. Karma drives your visibility** &nbsp;—&nbsp; High-karma contributors get prioritized in the feed. No ad budget needed.
+**3. Karma drives your visibility**: High-karma contributors get prioritized in the feed. No ad budget needed.
 
 ---
 

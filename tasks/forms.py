@@ -20,7 +20,7 @@ class TaskForm(forms.ModelForm):
             }),
             'target_id': forms.TextInput(attrs={
                 'class': 'form-control',
-                'placeholder': 'owner/repo  — or https://your-webhook.com/verify',
+                'placeholder': 'owner/repo or https://your-webhook.com/verify',
             }),
             'webhook_secret': forms.TextInput(attrs={
                 'class': 'form-control',

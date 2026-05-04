@@ -2,7 +2,7 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}{{ profile_user.username }} — KarmaRace{% endblock %}
+{% block title %}KarmaRace Profile: {{ profile_user.username }}{% endblock %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'css/profile.css' %}">

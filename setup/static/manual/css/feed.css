@@ -1,4 +1,4 @@
-/* feed.css — Feed filters, type chips, karma animations */
+/* feed.css: Feed filters, type chips, karma animations */
 .feed-filters {
   background: var(--surface); border: 1.5px solid var(--border);
   border-radius: var(--radius); padding: .9rem 1.1rem;
@@ -51,7 +51,7 @@
 .feed-empty { padding: 3rem 0; text-align: center; color: var(--text-muted); }
 .feed-empty p { font-size: 1rem; }
 
-/* Card actions — Check and Archive on the same row */
+/* Card actions: Check and Archive on the same row */
 .card__actions {
   display: flex;
   align-items: flex-start;

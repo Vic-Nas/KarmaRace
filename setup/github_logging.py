@@ -37,7 +37,7 @@ def _sanitise(text: str) -> str:
 
 
 def _signature(sanitised_tb: str) -> str:
-    """8-char hex digest — short enough for a title, unique enough for dedup."""
+    """8-char hex digest, short enough for a title and unique enough for dedup."""
     return hashlib.sha256(sanitised_tb.encode()).hexdigest()[:8]
 
 
@@ -47,8 +47,8 @@ class GitHubIssueHandler(logging.Handler):
     records that include a traceback.
 
     Configuration (all read from Django settings):
-        GITHUB_TOKEN       — personal access token with repo:issues write scope
-        GITHUB_ERROR_REPO  — 'owner/repo' string, e.g. 'acme/karmarace'
+        GITHUB_TOKEN: personal access token with repo:issues write scope
+        GITHUB_ERROR_REPO: 'owner/repo' string, e.g. 'acme/karmarace'
     """
 
     def __init__(self, *args, **kwargs):

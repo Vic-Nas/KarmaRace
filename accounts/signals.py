@@ -7,7 +7,7 @@ import requests
 from accounts import discord as discord_api
 from accounts.models import LinkedAccount, User, VerifiedEmail
 
-# 1–50: notify on every signup.
+# 1 to 50: notify on every signup.
 # Beyond 50: only notify at these milestones.
 _MILESTONES = {100, 250, 500, 1_000, 2_000, 5_000, 10_000, 25_000, 50_000, 100_000}
 

@@ -2,7 +2,7 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}Pick a Username — KarmaRace{% endblock %}
+{% block title %}KarmaRace Pick a Username{% endblock %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'css/accounts.css' %}">
@@ -63,7 +63,7 @@
             btn.disabled = false;
           } else {
             feedback.textContent = data.reason === 'invalid'
-              ? '3–30 characters, letters/numbers/underscores only'
+              ? '3 to 30 characters, letters/numbers/underscores only'
               : '✗ Already taken';
             feedback.className = 'username-feedback username-feedback--err';
             btn.disabled = true;

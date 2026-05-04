@@ -16,11 +16,11 @@ def robots_txt(request):
         "Disallow: /app/accounts/",
         "Disallow: /billing/",
         "Disallow: /notifications/",
-        # Feed interaction endpoints — not useful to index
+        # Feed interaction endpoints; not useful to index
         "Disallow: /check/",
         "Disallow: /check-status/",
         "Disallow: /done/",
-        # Task management (private) — but public task slugs are fine
+        # Task management (private); public task slugs are fine
         "Disallow: /tasks/mine/",
         "Disallow: /tasks/new/",
         "Disallow: /tasks/reorder/",
@@ -51,15 +51,15 @@ def public_profile_redirect(request, username):
 
 # Error handlers
 def handler404(request, exception=None):
-    """Handle 404 — page not found."""
+    """Handle 404: page not found."""
     return render(request, '404.html', status=404)
 
 
 def handler403(request, exception=None):
-    """Handle 403 — access denied."""
+    """Handle 403: access denied."""
     return render(request, '403.html', status=403)
 
 
 def handler500(request):
-    """Handle 500 — server error."""
+    """Handle 500: server error."""
     return render(request, '500.html', status=500)

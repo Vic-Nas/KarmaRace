@@ -47,7 +47,7 @@ class UserProfile(models.Model):
     last_name     = models.CharField(max_length=100, blank=True)
     contact_email = models.EmailField(blank=True)
 
-    # Visibility flags — True means the field is shown publicly.
+    # Visibility flags: True means the field is shown publicly.
     show_first_name    = models.BooleanField(default=True)
     show_last_name     = models.BooleanField(default=False)
     show_contact_email = models.BooleanField(default=False)
@@ -65,11 +65,11 @@ class VerifiedEmail(models.Model):
     verified_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f'{self.user_id} — {self.email}'
+        return f'{self.user_id}: {self.email}'
 
 
 class OutreachRecord(models.Model):
-    """Pending outreach queue. Ephemeral — deleted after send attempt."""
+    """Pending outreach queue. Ephemeral; deleted after send attempt."""
 
     email      = models.EmailField(unique=True)
     score      = models.IntegerField(default=0)

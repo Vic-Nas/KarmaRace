@@ -1,4 +1,4 @@
-/* prose.css — Help, legal, long-form content */
+/* prose.css: Help, legal, long-form content */
 .kr-prose { max-width: 780px; margin: 0 auto; }
 .kr-prose h1 {
   font-size: 2rem; color: var(--primary);

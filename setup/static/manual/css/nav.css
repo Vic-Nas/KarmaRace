@@ -1,4 +1,4 @@
-/* nav.css — Top navigation bar */
+/* nav.css: Top navigation bar */
 .kr-nav {
   background: var(--nav-bg);
   border-bottom: 1px solid rgba(255,255,255,.06);
@@ -23,7 +23,7 @@
 .kr-nav__logo { height: 32px; width: 32px; object-fit: contain; display: block; border-radius: 6px; }
 .kr-nav__links { display: flex; align-items: center; gap: .35rem; flex-wrap: nowrap; margin-left: auto; overflow: hidden; }
 
-/* ── Karma pill — orange ── */
+/* Karma pill: orange */
 .kr-nav__karma {
   display: inline-flex;
   align-items: center;

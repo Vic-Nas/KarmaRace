@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 BATCH       = 1200
 
 GITHUB_API  = "https://api.github.com"
-SUBJECT     = "Your project deserves users — not a bigger budget"
+SUBJECT     = "Your project deserves users, not a bigger budget"
 
 SENDPULSE_TOKEN_URL = 'https://api.sendpulse.com/oauth/access_token'
 SENDPULSE_SMTP_URL  = 'https://api.sendpulse.com/smtp/emails'

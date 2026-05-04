@@ -68,7 +68,7 @@ def debit_karma(user, delta: int, reason: str, related_object_id: int = None):
     try:
         threshold = _karma_low_threshold(user)
     except Exception:
-        return  # Invalid per-user threshold — skip notification rather than crash
+        return  # Invalid per-user threshold; skip notification rather than crash
     _maybe_notify_karma_threshold_transition(user=user, new_balance=new_balance, threshold=threshold)
 
 

@@ -51,7 +51,7 @@ def pick_username(request):
 
 @require_GET
 def username_check(request):
-    """AJAX endpoint — returns {"available": true/false}."""
+    """AJAX endpoint; returns {"available": true/false}."""
     username = request.GET.get('username', '').strip()
     if not USERNAME_RE.match(username):
         return JsonResponse({'available': False, 'reason': 'invalid'})
@@ -63,7 +63,7 @@ def username_check(request):
 
 def _validate(username, user):
     if not USERNAME_RE.match(username or ''):
-        return 'Username must be 3–30 characters: letters, numbers, underscores only.'
+        return 'Username must be 3 to 30 characters: letters, numbers, underscores only.'
     if User.objects.filter(username__iexact=username).exclude(pk=user.pk).exists():
         return 'That username is already taken.'
     return None

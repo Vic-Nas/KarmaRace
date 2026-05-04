@@ -1,4 +1,4 @@
-/* forms.css — Inputs, selects, labels, alerts */
+/* forms.css: Inputs, selects, labels, alerts */
 input[type="text"], input[type="email"], input[type="url"],
 input[type="number"], input[type="password"],
 select, textarea, .form-control, .form-select {

@@ -85,7 +85,7 @@ ACCOUNT_DEFAULT_HTTP_PROTOCOL = 'https'
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'setup.honeypot.HoneypotMiddleware',          # before WhiteNoise — stays in async chain
+    'setup.honeypot.HoneypotMiddleware',          # before WhiteNoise; stays in async chain
     'servestatic.middleware.ServeStaticMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -216,21 +216,21 @@ LOGGING = {
         'level': 'INFO',
     },
     'loggers': {
-        # Procrastinate registers tasks at INFO on every worker boot — noise.
+        # Procrastinate registers tasks at INFO on every worker boot; mostly noise.
         # WARNING still surfaces real problems (failed jobs, connector errors).
         'procrastinate': {
             'handlers': ['console'],
             'level': 'WARNING',
             'propagate': False,
         },
-        # Honeypot scanner hits are DEBUG-only — don't pollute WARNING stream.
+        # Honeypot scanner hits are DEBUG-only; don't pollute WARNING stream.
         'setup.honeypot': {
             'handlers': ['console'],
             'level': 'DEBUG',
             'propagate': False,
         },
         # Gunicorn worker boot lines (Started server process, Waiting for
-        # application startup, etc.) are too verbose with 8 workers — one
+        # application startup, etc.) are too verbose with 8 workers; one
         # summary line per boot is enough. ERROR still surfaces real crashes.
         'gunicorn.error': {
             'handlers': ['console'],
