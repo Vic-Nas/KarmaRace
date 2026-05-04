@@ -26,7 +26,7 @@ def robots_txt(request):
         "Disallow: /tasks/reorder/",
         "Disallow: /tasks/slug-available/",
         "",
-        "Sitemap: https://karmarace.io/sitemap.xml",
+        "Sitemap: https://karmarace.com/sitemap.xml",
     ]
     return HttpResponse("\n".join(lines), content_type="text/plain")
 
