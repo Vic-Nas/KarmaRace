@@ -29,8 +29,8 @@ def get_user_github_repo_choices_cached(user, user_token, username, force_reload
             return
         if getattr(repo, 'private', True):
             return
-        permissions = getattr(repo, 'permissions', None) or {}
-        if permissions and not permissions.get('push'):
+        permissions = getattr(repo, 'permissions', None)
+        if permissions and not getattr(permissions, 'push', None):
             return
         seen.add(full_name)
         repos.append((full_name, full_name))
