@@ -13,7 +13,7 @@ from setup.platform_rules import karma_reward_for_task
 from tasks.check_feedback import msg
 from tasks.models import Task, TaskCompletion
 from .filtering import DEFAULT_COMPLETION, DEFAULT_ARCHIVE, SESSION_FEED_PIN_KEY, normalize_task_types
-from .forms import WebhookCheckForm
+from feed.forms import WebhookCheckForm
 
 CHECK_TIMEOUT_SECONDS = 45
 
