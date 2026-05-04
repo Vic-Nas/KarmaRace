@@ -26,7 +26,8 @@ class AccountsConfig(AppConfig):
     name = 'accounts'
 
     def ready(self):
-        import accounts.signals  # noqa: F401
+        import accounts.signals          # noqa: F401
+        import accounts.outreach.tasks   # noqa: F401  registers @app.periodic tasks with Procrastinate
 
         post_migrate.connect(
             ensure_site_config,
