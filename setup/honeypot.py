@@ -20,7 +20,9 @@ the event loop remains free to serve real users throughout the tarpit.
 import asyncio
 import hashlib
 import logging
+import posixpath
 import re
+import urllib.parse
 
 import inspect
 
@@ -62,10 +64,33 @@ _LEGITIMATE_PREFIXES = (
     "/robots.txt",
 )
 
+def _normalize_path(path: str) -> str:
+    """
+    Canonicalize a request path before matching, covering all common
+    scanner evasion techniques:
+      - Multiple leading slashes:  //xmlrpc.php       -> /xmlrpc.php
+      - URL encoding:              /%2fxmlrpc.php      -> /xmlrpc.php
+      - Double URL encoding:       /%252fxmlrpc.php    -> /xmlrpc.php
+      - Dot segments:              /./wp/../xmlrpc.php -> /xmlrpc.php
+      - Mixed case: NOT touched    — regex uses re.IGNORECASE
+    """
+    # Two passes of unquote handles double-encoded payloads (%25 -> % -> char)
+    decoded = urllib.parse.unquote(urllib.parse.unquote(path))
+    # Collapse runs of slashes BEFORE normpath — POSIX treats leading // as special
+    decoded = re.sub(r'/+', '/', decoded)
+    # Resolve dot segments
+    normalized = posixpath.normpath(decoded)
+    # normpath strips trailing slash — restore for prefix matching on dirs
+    if path.endswith('/') and not normalized.endswith('/'):
+        normalized += '/'
+    return normalized
+
+
 def _is_legitimate_path(path: str) -> bool:
     if path == "/":
         return True
-    return any(path.startswith(p) for p in _LEGITIMATE_PREFIXES)
+    normalized = _normalize_path(path)
+    return any(normalized.startswith(p) for p in _LEGITIMATE_PREFIXES)
 
 
 # ---------------------------------------------------------------------------
@@ -196,7 +221,8 @@ _SCANNER_PATTERNS = re.compile(
 
 
 def _is_scanner_path(path: str) -> bool:
-    return bool(_SCANNER_PATTERNS.match(path))
+    normalized = _normalize_path(path)
+    return bool(_SCANNER_PATTERNS.match(normalized))
 
 
 # ---------------------------------------------------------------------------
