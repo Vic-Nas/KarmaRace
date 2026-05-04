@@ -4,32 +4,21 @@ Honeypot + tarpit middleware for KarmaRace.
 
 Strategy:
   1. Any path that is not a known KarmaRace URL and matches known scanner
-     patterns → 200 honeypot response.
-  2. Repeat offenders from the same IP (≥ TARPIT_THRESHOLD hits within
-     TARPIT_WINDOW seconds) get a large, slowly-streamed response to tie up
-     their connection (tarpit).  The payload size grows with each subsequent
-     hit so persistent scanners pay an increasing bandwidth tax.
-  3. Paths that look like real app routes (wrong slug, typo, broken link from
+     patterns → async slow-drip 200 honeypot response (always max size).
+     Running under ASGI (uvicorn workers), each tarpitted connection is a
+     suspended coroutine — effectively free — so we always serve the largest
+     payload without any per-IP accounting.
+  2. Paths that look like real app routes (wrong slug, typo, broken link from
      our own pages) still get a real 404 with a WARNING log so we notice
      broken buttons / links in the app.
-
-IP extraction:
-  We trust REMOTE_ADDR only (same as the rest of the app — no
-  X-Forwarded-For trust to avoid spoofing the tarpit counter).
-
-Cache backend:
-  Uses Django's default cache (LocMemCache per process is fine; we don't
-  need cross-process consistency for a soft rate-limit).
 """
 
+import asyncio
 import hashlib
 import logging
-import os
 import re
-import time
 
-from django.core.cache import cache
-from django.http import HttpResponse, StreamingHttpResponse
+from django.http import StreamingHttpResponse
 
 logger = logging.getLogger(__name__)
 
@@ -37,18 +26,13 @@ logger = logging.getLogger(__name__)
 # Tuning knobs
 # ---------------------------------------------------------------------------
 
-# How many scanner hits from one IP within the window before we tarpit them.
-TARPIT_THRESHOLD = 3
-# Window in seconds for the hit counter.
-TARPIT_WINDOW = 120
-# Base size of the honeypot response in bytes (one page worth of junk HTML).
-BASE_PAYLOAD_BYTES = 8_000
-# How many extra bytes we add per additional hit beyond the threshold.
-BYTES_PER_EXTRA_HIT = 40_000
-# Hard cap so we don't stream gigabytes.
+# Size of every honeypot response in bytes.  Under ASGI each tarpitted
+# connection is a free suspended coroutine, so we always send the max.
 MAX_PAYLOAD_BYTES = 600_000
 # Chunk size for the streaming tarpit response.
 STREAM_CHUNK = 1_024
+# Delay between chunks in seconds (50ms × ~600 chunks ≈ 30s per connection).
+STREAM_DELAY = 0.05
 
 # ---------------------------------------------------------------------------
 # Known-good KarmaRace path prefixes / exact paths.
@@ -219,31 +203,6 @@ def _is_scanner_path(path: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# Per-IP hit tracking (via cache)
-# ---------------------------------------------------------------------------
-
-def _cache_key(ip: str) -> str:
-    # Hash the IP so it's safe as a cache key and we don't store raw IPs.
-    h = hashlib.sha256(ip.encode()).hexdigest()[:16]
-    return f"honeypot:hits:{h}"
-
-
-def _record_hit(ip: str) -> int:
-    """Increment and return the hit counter for this IP."""
-    key = _cache_key(ip)
-    try:
-        hits = cache.get(key, 0) + 1
-        cache.set(key, hits, timeout=TARPIT_WINDOW)
-        return hits
-    except Exception:
-        return 1
-
-
-def _get_ip(request) -> str:
-    return request.META.get("REMOTE_ADDR", "0.0.0.0")
-
-
-# ---------------------------------------------------------------------------
 # Response generators
 # ---------------------------------------------------------------------------
 
@@ -376,36 +335,34 @@ AWS_BUCKET=
 _PADDING_COMMENT = b"<!-- " + b"x" * 76 + b" -->\n"  # 84 bytes
 
 
-def _build_payload(hits: int, path: str) -> bytes:
-    """
-    Build a honeypot payload.  Size grows with repeat hits so persistent
-    scanners get increasingly expensive responses.
-    """
-    extra = max(0, hits - TARPIT_THRESHOLD)
-    target = min(BASE_PAYLOAD_BYTES + extra * BYTES_PER_EXTRA_HIT, MAX_PAYLOAD_BYTES)
-
-    # Pick template by rotating through options keyed on path hash.
+def _build_payload(path: str) -> bytes:
+    """Build a max-size honeypot payload, template chosen by path hash."""
     idx = int(hashlib.md5(path.encode()).hexdigest(), 16) % len(_FAKE_TEMPLATES)
     base = _FAKE_TEMPLATES[idx]
 
-    # Pad with HTML comments to reach target size.
     chunks = [base]
     size = len(base)
-    while size < target:
+    while size < MAX_PAYLOAD_BYTES:
         chunks.append(_PADDING_COMMENT)
         size += len(_PADDING_COMMENT)
 
     return b"".join(chunks)
 
 
-def _streaming_response(payload: bytes) -> StreamingHttpResponse:
-    """Yield payload in small chunks so the connection stays open longer."""
-    def _gen(data):
-        for i in range(0, len(data), STREAM_CHUNK):
-            yield data[i : i + STREAM_CHUNK]
-            time.sleep(0.05)  # 50ms per chunk → ~1s per 20 KB
+async def _async_streaming_response(path: str) -> StreamingHttpResponse:
+    """
+    Slow-drip the payload in small chunks using asyncio.sleep so the worker
+    coroutine suspends between chunks — costs virtually nothing under ASGI.
+    600 KB / 1 KB chunks × 50 ms ≈ 30 s of connection time per bot.
+    """
+    payload = _build_payload(path)
 
-    resp = StreamingHttpResponse(_gen(payload), status=200, content_type="text/html; charset=utf-8")
+    async def _gen():
+        for i in range(0, len(payload), STREAM_CHUNK):
+            yield payload[i : i + STREAM_CHUNK]
+            await asyncio.sleep(STREAM_DELAY)
+
+    resp = StreamingHttpResponse(_gen(), status=200, content_type="text/html; charset=utf-8")
     resp["X-Content-Type-Options"] = "nosniff"
     return resp
 
@@ -420,7 +377,10 @@ class HoneypotMiddleware:
     WhiteNoiseMiddleware in MIDDLEWARE so it intercepts 404-bound requests
     before Django's URL resolver raises a 404.
 
-    Recommended position in settings.py MIDDLEWARE list:
+    Requires ASGI (uvicorn workers) — the async tarpit uses asyncio.sleep
+    so each held bot connection costs virtually nothing server-side.
+
+    Position in settings.py MIDDLEWARE list:
         'django.middleware.security.SecurityMiddleware',
         'whitenoise.middleware.WhiteNoiseMiddleware',
         'setup.honeypot.HoneypotMiddleware',      ← here
@@ -431,26 +391,23 @@ class HoneypotMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
 
-    def __call__(self, request):
+    async def __acall__(self, request):
         path = request.path
 
         # Fast-path: path belongs to our app → pass through immediately.
         if _is_legitimate_path(path):
-            return self.get_response(request)
+            return await self.get_response(request)
 
-        # Known scanner pattern → honeypot / tarpit.
+        # Known scanner pattern → async tarpit, always max payload.
         if _is_scanner_path(path):
-            ip = _get_ip(request)
-            hits = _record_hit(ip)
             logger.debug(
-                "honeypot: ip=%s hits=%d path=%s ua=%s",
-                ip, hits, path,
+                "honeypot: path=%s ua=%s",
+                path,
                 request.META.get("HTTP_USER_AGENT", "")[:120],
             )
-            payload = _build_payload(hits, path)
-            return _streaming_response(payload)
+            return await _async_streaming_response(path)
 
         # Unknown path that looks like a real app route (broken link, typo).
         # Let Django handle it normally so handler404 fires and we get a
         # WARNING log to catch our own broken links.
-        return self.get_response(request)
+        return await self.get_response(request)
