@@ -391,7 +391,7 @@ class HoneypotMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
 
-    async def __acall__(self, request):
+    async def __call__(self, request):
         path = request.path
 
         # Fast-path: path belongs to our app → pass through immediately.

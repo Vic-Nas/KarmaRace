@@ -3,7 +3,7 @@ from karma.services import get_balance
 
 
 def navbar_karma(request):
-    if not request.user.is_authenticated:
+    if not hasattr(request, 'user') or not request.user.is_authenticated:
         return {'navbar_karma': None}
 
     try:
