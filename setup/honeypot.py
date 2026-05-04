@@ -349,15 +349,15 @@ def _build_payload(path: str) -> bytes:
     return b"".join(chunks)
 
 
-async def _async_streaming_response(path: str) -> StreamingHttpResponse:
+def _streaming_response(path: str) -> StreamingHttpResponse:
     """
-    Slow-drip the payload in small chunks using asyncio.sleep so the worker
-    coroutine suspends between chunks — costs virtually nothing under ASGI.
+    Returns a StreamingHttpResponse immediately (sync) but streams the payload
+    via an async generator so asyncio.sleep suspends the coroutine between
+    chunks — costs virtually nothing under ASGI.
     600 KB / 1 KB chunks × 50 ms ≈ 30 s of connection time per bot.
     """
-    payload = _build_payload(path)
-
     async def _gen():
+        payload = _build_payload(path)
         for i in range(0, len(payload), STREAM_CHUNK):
             yield payload[i : i + STREAM_CHUNK]
             await asyncio.sleep(STREAM_DELAY)
@@ -405,7 +405,7 @@ class HoneypotMiddleware:
                 path,
                 request.META.get("HTTP_USER_AGENT", "")[:120],
             )
-            return await _async_streaming_response(path)
+            return _streaming_response(path)
 
         # Unknown path that looks like a real app route (broken link, typo).
         # Let Django handle it normally so handler404 fires and we get a
