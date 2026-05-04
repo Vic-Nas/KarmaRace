@@ -1,6 +1,7 @@
 # tasks/services/validate.py
 """Task configuration validation (GitHub and Webhook checks)."""
 import logging
+import requests
 from .github import get_public_repo
 from urllib.parse import urlparse
 

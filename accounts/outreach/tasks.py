@@ -83,7 +83,7 @@ def send_outreach_emails(timestamp=None):
 		logger.info('send_outreach_emails: monthly cap reached, skipping.')
 		return
 
-	from accounts.models import OutreachRecord, OutreachContactedEmail, OutreachDailyStats
+	from accounts.models import OutreachRecord, OutreachContactedEmail
 
 	daily_reach = getattr(settings, "DAILY_REACH", 50)
 	domain      = settings.DOMAIN
@@ -124,6 +124,6 @@ def send_outreach_emails(timestamp=None):
 	)
 
 	logger.info(
-		"send_outreach_emails: sent=%d failed=%d pending_after=%d",
-		sent, failed, pending_after,
+		"send_outreach_emails: sent=%d failed=%d",
+		sent, failed,
 	)

@@ -72,7 +72,7 @@ class Command(BaseCommand):
 
         # --- Queue mode ---
         from django.utils import timezone
-        from accounts.models import OutreachRecord, OutreachContactedEmail, OutreachDailyStats
+        from accounts.models import OutreachRecord, OutreachContactedEmail
 
         daily_reach = getattr(settings, 'DAILY_REACH', 50)
         limit = options['limit'] if options['limit'] is not None else daily_reach
@@ -115,6 +115,7 @@ class Command(BaseCommand):
             pending_after=OutreachRecord.objects.count(),
         )
 
+        pending_after = OutreachRecord.objects.count()
         self.stdout.write(self.style.SUCCESS(
             f'✓ Sent {sent} emails, {failed} failed. {pending_after} pending remaining.'
         ))

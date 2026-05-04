@@ -77,6 +77,22 @@ def verify_email_start(request):
 	return redirect(auth_url)
 
 
+def _try_exchange_email(request, code):
+	try:
+		redirect_uri = request.build_absolute_uri(reverse('verify_email_callback'))
+		return _exchange_google_code_for_email(code, redirect_uri)
+	except (GoogleAuthError, ValueError):
+		messages.error(request, 'Could not reach Google right now. Please try again.')
+		return None
+	except Exception as exc:
+		logger.exception('verify_email_callback: unexpected error for user %s', request.user.pk)
+		if settings.DEBUG:
+			messages.error(request, f'Email verification failed: {exc}')
+		else:
+			messages.error(request, 'Something went wrong during email verification. Please try again.')
+		return None
+
+
 @login_required
 def verify_email_callback(request):
 	"""Handle Google email verification callback."""
@@ -95,22 +111,6 @@ def verify_email_callback(request):
 	if existing:
 		messages.error(request, f'{email} is already linked to another account.')
 		return redirect('linked_accounts')
-
-
-	def _try_exchange_email(request, code):
-		try:
-			redirect_uri = request.build_absolute_uri(reverse('verify_email_callback'))
-			return _exchange_google_code_for_email(code, redirect_uri)
-		except (GoogleAuthError, ValueError):
-			messages.error(request, 'Could not reach Google right now. Please try again.')
-			return None
-		except Exception as exc:
-			logger.exception('verify_email_callback: unexpected error for user %s', request.user.pk)
-			if settings.DEBUG:
-				messages.error(request, f'Email verification failed: {exc}')
-			else:
-				messages.error(request, 'Something went wrong during email verification. Please try again.')
-			return None
 	_, created = VerifiedEmail.objects.get_or_create(user=request.user, email=email)
 	if created:
 		messages.success(request, f'{email} verified and added.')
