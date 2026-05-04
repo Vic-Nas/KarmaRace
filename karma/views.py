@@ -1,7 +1,8 @@
 # karma/views.py
+import asyncio
 import json
-import time
 
+from asgiref.sync import sync_to_async
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.db.models import Sum, Value
@@ -46,14 +47,17 @@ def leaderboard(request):
     })
 
 
-def leaderboard_stream(request):
+async def leaderboard_stream(request):
     """SSE — pushes fresh top-10 JSON every STREAM_INTERVAL_SECONDS."""
-    def event_stream():
+    _leaderboard_rows_async = sync_to_async(_leaderboard_rows)
+
+    async def event_stream():
         while True:
-            yield f'data: {json.dumps(_leaderboard_rows())}\n\n'
-            time.sleep(STREAM_INTERVAL_SECONDS)
+            rows = await _leaderboard_rows_async()
+            yield f'data: {json.dumps(rows)}\n\n'
+            await asyncio.sleep(STREAM_INTERVAL_SECONDS)
 
     response = StreamingHttpResponse(event_stream(), content_type='text/event-stream')
-    response['Cache-Control']    = 'no-cache'
+    response['Cache-Control']     = 'no-cache'
     response['X-Accel-Buffering'] = 'no'
     return response
