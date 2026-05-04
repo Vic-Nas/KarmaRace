@@ -1,9 +1,34 @@
 # setup/views.py
+from django.http import HttpResponse
 from django.shortcuts import render, redirect
 
 
 def account_login_redirect(request):
     return redirect('/accounts/google/login/?process=login')
+
+
+def robots_txt(request):
+    lines = [
+        "User-agent: *",
+        # Keep bots out of auth, admin, and private app areas
+        "Disallow: /admin/",
+        "Disallow: /accounts/",
+        "Disallow: /app/accounts/",
+        "Disallow: /billing/",
+        "Disallow: /notifications/",
+        # Feed interaction endpoints — not useful to index
+        "Disallow: /check/",
+        "Disallow: /check-status/",
+        "Disallow: /done/",
+        # Task management (private) — but public task slugs are fine
+        "Disallow: /tasks/mine/",
+        "Disallow: /tasks/new/",
+        "Disallow: /tasks/reorder/",
+        "Disallow: /tasks/slug-available/",
+        "",
+        "Sitemap: https://karmarace.io/sitemap.xml",
+    ]
+    return HttpResponse("\n".join(lines), content_type="text/plain")
 
 
 def help_index(request):
@@ -38,4 +63,3 @@ def handler403(request, exception=None):
 def handler500(request):
     """Handle 500 — server error."""
     return render(request, '500.html', status=500)
-

@@ -207,4 +207,19 @@ LOGGING = {
         'handlers': ['console', 'github'],
         'level': 'INFO',
     },
+    'loggers': {
+        # Procrastinate registers tasks at INFO on every worker boot — noise.
+        # WARNING still surfaces real problems (failed jobs, connector errors).
+        'procrastinate': {
+            'handlers': ['console'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        # Honeypot scanner hits are DEBUG-only — don't pollute WARNING stream.
+        'setup.honeypot': {
+            'handlers': ['console'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+    },
 }

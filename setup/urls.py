@@ -5,6 +5,7 @@ from . import views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('robots.txt', views.robots_txt, name='robots_txt'),
     path('accounts/login/', views.account_login_redirect, name='account_login_redirect'),
     path('accounts/', include('allauth.urls')),
     path('app/accounts/', include('accounts.urls')),
@@ -24,4 +25,3 @@ urlpatterns = [
 handler404 = views.handler404
 handler403 = views.handler403
 handler500 = views.handler500
-
