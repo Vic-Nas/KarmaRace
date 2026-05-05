@@ -59,7 +59,7 @@ class Command(BaseCommand):
             self.stdout.write(self.style.SUCCESS(f'✓ Sent {sent}, failed {failed}.'))
         else:
             from accounts.outreach.tasks import send_outreach_emails
-            send_outreach_emails.defer()
+            send_outreach_emails.defer(limit=options["limit"])
             self.stdout.write(self.style.SUCCESS(
                 '✓ Send job deferred to worker. '
                 'Use --now to run inline with progress output.'

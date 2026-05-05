@@ -1,6 +1,7 @@
 # accounts/outreach/tasks.py
 """Periodic outreach tasks (harvest and send)."""
 import logging
+import re
 import random
 
 from django.conf import settings
@@ -51,7 +52,7 @@ def run_harvest(limit=None, log=None):
 			break
 		last_idx = idx
 		email = (profile.get("email") or "").strip().lower()
-		if not email or email in skip:
+		if not email or email in skip or not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
 			continue
 		score = score_user(profile, repos)
 		skip.add(email)
@@ -140,13 +141,13 @@ def run_send(limit=None, log=None):
 
 @app.periodic(cron="0 2 * * *")
 @app.task
-def harvest_outreach_emails(timestamp=None):
+def harvest_outreach_emails(timestamp=None, limit=None):
 	"""Periodic task: harvest GitHub candidates into the queue."""
-	run_harvest()
+	run_harvest(limit=limit)
 
 
 @app.periodic(cron="0 */2 * * *")
 @app.task
-def send_outreach_emails(timestamp=None):
+def send_outreach_emails(timestamp=None, limit=None):
 	"""Periodic task: send top-scored pending records via SendPulse."""
-	run_send()
+	run_send(limit=limit)
