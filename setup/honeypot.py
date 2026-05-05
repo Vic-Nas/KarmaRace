@@ -48,8 +48,8 @@ logger = logging.getLogger(__name__)
 # Tuning
 # ---------------------------------------------------------------------------
 
-STREAM_CHUNK      = 1_024
-STREAM_DELAY      = 0.05   # seconds between chunks — yields event loop each time
+STREAM_CHUNK      = 256
+STREAM_DELAY      = 2.0    # seconds between chunks — bots wait, event loop stays free
 TRIE_DEPTH_CAP    = 5      # beyond this depth all paths are treated as legitimate
 
 
@@ -100,30 +100,48 @@ def _build_trie() -> _Node:
 
 def _walk_resolver(resolver, prefix: list, root: _Node) -> None:
     from django.urls import URLPattern, URLResolver
+    from django.urls.resolvers import RoutePattern
 
     for pattern in resolver.url_patterns:
         if isinstance(pattern, URLResolver):
-            seg = _resolver_segment(pattern.pattern)
-            new_prefix = prefix + [seg] if seg else prefix
-            _walk_resolver(pattern, new_prefix, root)
+            segs = _resolver_segments(pattern.pattern)
+            new_prefix = prefix + segs
+            if not isinstance(pattern.pattern, RoutePattern):
+                # Regex-based resolver (e.g. admin, allauth) — we can't
+                # walk its internals meaningfully.  Insert a wildcard at
+                # this prefix so all sub-paths are treated as legitimate.
+                if new_prefix:
+                    _insert(root, new_prefix + [_WILDCARD])
+            else:
+                _walk_resolver(pattern, new_prefix, root)
         elif isinstance(pattern, URLPattern):
-            seg = _resolver_segment(pattern.pattern)
-            full = prefix + ([seg] if seg else [])
+            segs = _resolver_segments(pattern.pattern)
+            full = prefix + segs
             if full:
                 _insert(root, full)
 
 
-def _resolver_segment(pattern) -> str | None:
+def _resolver_segments(pattern) -> list:
     """
-    Extract the literal string or _WILDCARD from a single URL pattern
-    component (RoutePattern or RegexPattern).
+    Convert a URL pattern component into a list of trie segments.
+
+    Django's RoutePattern str() can contain slashes for multi-segment
+    routes like 'notifications/unread/' or 'app/accounts/'.  Split on
+    '/' and map each part: empty parts are dropped, '<...>' becomes
+    _WILDCARD, literals stay as-is.
+
+    RegexPattern (used by admin and third-party apps) produces raw regex
+    strings like '^(?P<app_label>[^/]+)/'.  These are useless for trie
+    purposes — skip them entirely so admin internals don't pollute the trie.
     """
+    from django.urls.resolvers import RoutePattern
+    if not isinstance(pattern, RoutePattern):
+        return []
     raw = str(pattern).rstrip("/")
     if not raw:
-        return None
-    if raw.startswith("<"):
-        return _WILDCARD
-    return raw
+        return []
+    parts = [p for p in raw.split("/") if p]
+    return [_WILDCARD if p.startswith("<") else p for p in parts]
 
 
 def _insert(root: _Node, segments: list) -> None:
