@@ -1,6 +1,6 @@
 # accounts/adapter.py
 from allauth.socialaccount.adapter import DefaultSocialAccountAdapter
-from allauth.exceptions import ImmediateHttpResponse
+from allauth.core.exceptions import ImmediateHttpResponse
 from django.shortcuts import render
 
 from accounts.models import VerifiedEmail
