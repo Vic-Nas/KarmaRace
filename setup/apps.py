@@ -10,22 +10,16 @@ class SetupConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
 
     def ready(self) -> None:
-        _warm_trie()
+        # Do NOT warm the trie here — get_resolver() called during ready()
+        # can corrupt the admin namespace if admin.autodiscover() hasn't
+        # completed yet (setup is first in INSTALLED_APPS).  The trie builds
+        # lazily on the first request instead, which is always post-init.
         _build_honeypot_payload()
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-def _warm_trie() -> None:
-    """Pre-build the URL trie so the first real request pays no cost."""
-    try:
-        from setup.honeypot import _trie
-        _trie()
-    except Exception:
-        pass  # non-fatal — trie builds lazily on first request if this fails
-
 
 def _build_honeypot_payload() -> None:
     """
