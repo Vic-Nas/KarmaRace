@@ -1,6 +1,9 @@
 # setup/urls.py
+from django.conf import settings
 from django.contrib import admin
 from django.urls import path, include
+from django.views.static import serve
+import os
 from . import views
 
 urlpatterns = [
@@ -15,6 +18,10 @@ urlpatterns = [
     path('help/', views.help_index, name='help_index'),
     path('legal/privacy/', views.legal_privacy, name='legal_privacy'),
     path('legal/terms/', views.legal_terms, name='legal_terms'),
+    path('favicon.ico', serve, {
+    'path': 'manual/assets/favicon.ico',
+    'document_root': os.path.join(settings.BASE_DIR, 'setup/static'),
+    }),
     path('', include('feed.urls')),
     path('tasks/', include('tasks.urls')),
     path('', include('notifications.urls')),
