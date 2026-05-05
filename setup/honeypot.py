@@ -104,7 +104,8 @@ def _walk_resolver(resolver, prefix: list, root: _Node) -> None:
     for pattern in resolver.url_patterns:
         if isinstance(pattern, URLResolver):
             seg = _resolver_segment(pattern.pattern)
-            _walk_resolver(pattern, prefix + ([seg] if seg else []), root)
+            new_prefix = prefix + [seg] if seg else prefix
+            _walk_resolver(pattern, new_prefix, root)
         elif isinstance(pattern, URLPattern):
             seg = _resolver_segment(pattern.pattern)
             full = prefix + ([seg] if seg else [])
@@ -170,6 +171,12 @@ _HONEYPOT   = "HONEYPOT"
 
 
 def _classify(path: str) -> str:
+    # Static files and favicon are served by ServeStatic/WhiteNoise before
+    # reaching Django's URL router — they will never appear in the trie.
+    # Pass them through explicitly so the middleware doesn't intercept them.
+    if path.startswith("/static/") or path == "/favicon.ico":
+        return _LEGITIMATE
+
     if path == "/":
         return _LEGITIMATE
 
