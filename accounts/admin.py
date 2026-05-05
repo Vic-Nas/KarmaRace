@@ -12,7 +12,7 @@ from accounts.models import (
     VerifiedEmail,
     OutreachRecord,
     OutreachContactedEmail,
-    OutreachDailyStats,
+
 )
 from karma.services import get_balance, adjust_karma_by_staff
 from django.shortcuts import render, redirect
@@ -91,13 +91,3 @@ class OutreachContactedEmailAdmin(admin.ModelAdmin):
     list_display  = ("email", "contacted_at")
     search_fields = ("email",)
     ordering      = ("-contacted_at",)
-
-
-@admin.register(OutreachDailyStats)
-class OutreachDailyStatsAdmin(admin.ModelAdmin):
-    list_display = (
-        "date", "harvested", "queued_count", "sent_count",
-        "failed_count", "pending_after", "updated_at",
-    )
-    ordering = ("-date",)
-

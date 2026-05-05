@@ -10,7 +10,7 @@ from procrastinate.contrib.django import app
 from .config import (
 	BATCH, SUBJECT, LANGUAGES, SEARCH_BASE,
 	score_user, iter_candidates,
-	sendpulse_post, update_daily_stats,
+	sendpulse_post,
 )
 from .email import build_html, build_plaintext
 
@@ -20,47 +20,61 @@ logger = logging.getLogger(__name__)
 def run_harvest(limit=None, log=None):
 	"""Core harvest logic. Shared by the periodic task and management command.
 
+	Continues from where the last harvest left off using OutreachState.
 	Returns number of records harvested.
-	log: callable for progress output (e.g. print or self.stdout.write). Optional.
+	log: callable for progress output. Optional.
 	"""
 	if not getattr(settings, "REACH", False):
 		logger.info("harvest: REACH is False, skipping.")
 		return 0
 
-	from accounts.models import OutreachRecord, OutreachContactedEmail
+	from accounts.models import OutreachRecord, OutreachContactedEmail, OutreachState
 
 	queued    = set(OutreachRecord.objects.values_list("email", flat=True))
 	contacted = set(OutreachContactedEmail.objects.values_list("email", flat=True))
 	skip      = queued | contacted
 
-	batch     = limit or BATCH
-	lang      = random.choice(LANGUAGES)
-	query     = SEARCH_BASE + " language:" + lang
+	state  = OutreachState.get()
+	batch  = limit or BATCH
+	lang   = state.harvest_lang or random.choice(LANGUAGES)
+	offset = state.harvest_offset
+	query  = SEARCH_BASE + " language:" + lang
 	max_candidates = batch * 20
 
 	if log:
-		log(f"Harvesting (limit={batch}, lang={lang}, skip={len(skip)})...")
+		log(f"Harvesting (limit={batch}, lang={lang}, offset={offset}, skip={len(skip)})...")
 
 	new_records = []
-	for profile, repos in iter_candidates(query, max_candidates, max_repos=60):
+	last_idx    = offset
+	for idx, profile, repos in iter_candidates(query, max_candidates, max_repos=60, offset=offset):
 		if len(new_records) >= batch:
 			break
+		last_idx = idx
 		email = (profile.get("email") or "").strip().lower()
 		if not email or email in skip:
-			continue
-		if not repos or not any(getattr(r, 'homepage', '') for r in repos):
 			continue
 		score = score_user(profile, repos)
 		skip.add(email)
 		new_records.append(OutreachRecord(email=email, score=score))
 		if log:
-			log(f"  +{len(new_records)} {email}")
+			log(f"  +{len(new_records)} {email} (score={score})")
 
 	if new_records:
 		OutreachRecord.objects.bulk_create(new_records, ignore_conflicts=True)
 
-	update_daily_stats(timezone.now().date(), harvested=len(new_records))
-	logger.info("harvest: harvested=%d lang=%s", len(new_records), lang)
+	# Advance offset; rotate language when results are exhausted
+	new_offset = last_idx + 1
+	if len(new_records) < batch:
+		new_offset = 0
+		lang = random.choice([l for l in LANGUAGES if l != lang] or LANGUAGES)
+		if log:
+			log(f"  End of results, rotating lang to {lang}")
+
+	state.harvest_offset = new_offset
+	state.harvest_lang   = lang
+	state.save(update_fields=['harvest_offset', 'harvest_lang', 'updated_at'])
+
+	logger.info("harvest: harvested=%d lang=%s offset=%d->%d", len(new_records), lang, offset, new_offset)
 	return len(new_records)
 
 
@@ -69,19 +83,11 @@ def run_send(limit=None, log=None):
 
 	Sends top-scored pending OutreachRecords via SendPulse.
 	Only deletes a record from the queue after a successful send.
-	On failure, leaves the record in place for the next run.
 	Returns (sent, failed).
 	log: callable for progress output. Optional.
 	"""
 	if not getattr(settings, "REACH", False):
 		logger.info("send: REACH is False, skipping.")
-		return 0, 0
-
-	from accounts.models import monthly_sent_count, increment_monthly_sent
-	monthly_cap = getattr(settings, 'MONTHLY_REACH', 12000)
-	already_sent = monthly_sent_count()
-	if already_sent >= monthly_cap:
-		logger.info('send: monthly cap reached (%d/%d), skipping.', already_sent, monthly_cap)
 		return 0, 0
 
 	from accounts.models import OutreachRecord, OutreachContactedEmail
@@ -117,7 +123,6 @@ def run_send(limit=None, log=None):
 			}
 		})
 		if ok:
-			# Only mark contacted and remove from queue on success
 			OutreachContactedEmail.objects.get_or_create(email=record.email)
 			record.delete()
 			sent += 1
@@ -129,16 +134,6 @@ def run_send(limit=None, log=None):
 			if log:
 				log(f"  ✗ {record.email}")
 
-	if sent:
-		increment_monthly_sent(sent)
-
-	update_daily_stats(
-		timezone.now().date(),
-		queued_count=len(pending),
-		sent_count=sent,
-		failed_count=failed,
-		pending_after=OutreachRecord.objects.count(),
-	)
 	logger.info("send: sent=%d failed=%d", sent, failed)
 	return sent, failed
 

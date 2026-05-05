@@ -53,12 +53,18 @@ def score_user(profile: dict, repos: list) -> int:
 	return score
 
 
-def iter_candidates(query: str, max_candidates: int, max_repos: int = 100):
-	"""Yield (profile, repos) for GitHub users matching the query."""
+def iter_candidates(query: str, max_candidates: int, max_repos: int = 100, offset: int = 0):
+	"""Yield (index, profile, repos) for GitHub users matching the query, starting at offset."""
+	import random
+	sort_options = ["joined", "repositories", "followers"]
+	sort  = random.choice(sort_options)
+	order = random.choice(["asc", "desc"])
 	try:
 		gh = Github(settings.GITHUB_TOKEN)
-		for idx, user in enumerate(gh.search_users(query)):
-			if idx >= max_candidates:
+		for idx, user in enumerate(gh.search_users(query, sort=sort, order=order)):
+			if idx < offset:
+				continue
+			if idx >= offset + max_candidates:
 				break
 			username = (getattr(user, 'login', '') or '').strip()
 			if not username:
@@ -71,7 +77,7 @@ def iter_candidates(query: str, max_candidates: int, max_repos: int = 100):
 					if r_idx >= max_repos:
 						break
 					repos.append(repo)
-				yield profile, repos
+				yield idx, profile, repos
 			except GithubException as exc:
 				logger.error("GitHub user error %s: %s", username, exc)
 				continue
@@ -133,31 +139,3 @@ def sendpulse_post(payload: dict) -> bool:
 	except Exception as exc:
 		logger.error("SendPulse error: %s", exc)
 		return False
-
-
-def update_daily_stats(date, harvested=None, queued_count=None, sent_count=None,
-				   failed_count=None, pending_after=None):
-	from django.db.models import F
-	from accounts.models import OutreachDailyStats
-	stats, _ = OutreachDailyStats.objects.get_or_create(date=date)
-	update_fields = []
-	# Cumulative counters: accumulate across multiple runs per day
-	if harvested is not None:
-		stats.harvested = F('harvested') + harvested
-		update_fields.append("harvested")
-	if queued_count is not None:
-		stats.queued_count = F('queued_count') + queued_count
-		update_fields.append("queued_count")
-	if sent_count is not None:
-		stats.sent_count = F('sent_count') + sent_count
-		update_fields.append("sent_count")
-	if failed_count is not None:
-		stats.failed_count = F('failed_count') + failed_count
-		update_fields.append("failed_count")
-	# Snapshot: always reflects current state
-	if pending_after is not None:
-		stats.pending_after = pending_after
-		update_fields.append("pending_after")
-	if update_fields:
-		update_fields.append("updated_at")
-		stats.save(update_fields=update_fields)

@@ -33,11 +33,6 @@ class Command(BaseCommand):
         if options['email']:
             from accounts.outreach.config import SUBJECT, sendpulse_post
             from accounts.outreach.email import build_html, build_plaintext
-            from accounts.models import monthly_sent_count, increment_monthly_sent
-
-            if monthly_sent_count() >= getattr(settings, 'MONTHLY_REACH', 12000):
-                self.stdout.write(self.style.WARNING('Monthly send cap reached.'))
-                return
 
             domain = settings.DOMAIN
             target = options['email']
@@ -52,7 +47,6 @@ class Command(BaseCommand):
                 }
             })
             if ok:
-                increment_monthly_sent(1)
                 self.stdout.write(self.style.SUCCESS(f'✓ Sent to {target}.'))
             else:
                 self.stdout.write(self.style.ERROR(f'✗ Failed to send to {target}.'))

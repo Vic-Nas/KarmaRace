@@ -69,7 +69,7 @@ class VerifiedEmail(models.Model):
 
 
 class OutreachRecord(models.Model):
-    """Pending outreach queue. Ephemeral; deleted after send attempt."""
+    """Pending outreach queue. Ephemeral; deleted after successful send."""
 
     email      = models.EmailField(unique=True)
     score      = models.IntegerField(default=0)
@@ -83,7 +83,7 @@ class OutreachRecord(models.Model):
 
 
 class OutreachContactedEmail(models.Model):
-    """Permanent dedup log: emails we've already attempted to reach."""
+    """Permanent dedup log: emails we've successfully reached."""
 
     email        = models.EmailField(unique=True)
     contacted_at = models.DateTimeField(auto_now_add=True)
@@ -92,54 +92,20 @@ class OutreachContactedEmail(models.Model):
         return self.email
 
 
-class OutreachDailyStats(models.Model):
-    """Latest daily outreach results. One row per date, updated each run."""
+class OutreachState(models.Model):
+    """Persistent harvest state. Single-row singleton (pk=1)."""
 
-    date           = models.DateField(unique=True)
-    queued_count   = models.IntegerField(default=0)
-    sent_count     = models.IntegerField(default=0)
-    failed_count   = models.IntegerField(default=0)
-    pending_after  = models.IntegerField(default=0)
-    harvested      = models.IntegerField(default=0)
+    harvest_offset = models.IntegerField(default=0)
+    harvest_lang   = models.CharField(max_length=50, blank=True, default='')
     updated_at     = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ['-date']
+        verbose_name = 'Outreach State'
+
+    @classmethod
+    def get(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
 
     def __str__(self):
-        return f'{self.date}: sent={self.sent_count} failed={self.failed_count}'
- 
-
-class OutreachMonthlyStats(models.Model):
-    year       = models.IntegerField()
-    month      = models.IntegerField()  # 1-12
-    sent_count = models.IntegerField(default=0)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        unique_together = ('year', 'month')
-        ordering = ['-year', '-month']
-
-    def __str__(self):
-        return f'{self.year}-{self.month:02d}: sent={self.sent_count}'
-
-
-def monthly_sent_count() -> int:
-    """Return total emails sent this calendar month."""
-    from django.utils import timezone
-    now = timezone.now()
-    obj = OutreachMonthlyStats.objects.filter(
-        year=now.year, month=now.month
-    ).first()
-    return obj.sent_count if obj else 0
-
-
-def increment_monthly_sent(count: int) -> None:
-    """Add count to this month's sent total (upsert)."""
-    from django.utils import timezone
-    now = timezone.now()
-    obj, _ = OutreachMonthlyStats.objects.get_or_create(
-        year=now.year, month=now.month
-    )
-    obj.sent_count = models.F('sent_count') + count
-    obj.save(update_fields=['sent_count', 'updated_at'])
+        return f'OutreachState(offset={self.harvest_offset}, lang={self.harvest_lang})'
