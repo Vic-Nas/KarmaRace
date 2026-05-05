@@ -111,7 +111,7 @@ def _walk_resolver(resolver, prefix: list, root: _Node) -> None:
                 # walk its internals meaningfully.  Insert a wildcard at
                 # this prefix so all sub-paths are treated as legitimate.
                 if new_prefix:
-                    _insert(root, new_prefix + [_WILDCARD])
+                    _insert_open_wildcard(root, new_prefix)
             else:
                 _walk_resolver(pattern, new_prefix, root)
         elif isinstance(pattern, URLPattern):
@@ -142,6 +142,23 @@ def _resolver_segments(pattern) -> list:
         return []
     parts = [p for p in raw.split("/") if p]
     return [_WILDCARD if p.startswith("<") else p for p in parts]
+
+
+def _insert_open_wildcard(root: _Node, prefix: list) -> None:
+    """Insert prefix into the trie, then make the final wildcard node
+    point to itself — so any depth of sub-path is classified as legitimate.
+    Used for regex-based resolvers (admin, allauth) whose internals we
+    can't walk but whose entire subtree should be passed through.
+    """
+    node = root
+    for seg in prefix:
+        if seg not in node.children:
+            node.children[seg] = _Node()
+        node = node.children[seg]
+    # Create a wildcard child that loops back to itself.
+    wildcard_node = _Node(is_terminal=True)
+    wildcard_node.children[_WILDCARD] = wildcard_node  # self-referential
+    node.children[_WILDCARD] = wildcard_node
 
 
 def _insert(root: _Node, segments: list) -> None:
@@ -245,20 +262,26 @@ def _classify(path: str) -> str:
 # ---------------------------------------------------------------------------
 # Honeypot payload
 #
-# The help page is rendered once at startup (in SetupConfig.ready()) and
-# stored in setup.apps.HONEYPOT_PAYLOAD.  We import it lazily here so that
-# module-level import order doesn't matter — apps.py is always ready before
-# the first request triggers _tarpit_response().
-#
-# If the render failed at startup (e.g. staticfiles manifest missing in dev),
-# HONEYPOT_PAYLOAD is an empty bytes object and the tarpit stream completes
-# instantly — bots still get no useful response, just without delay.
+# Rendered lazily on first honeypot hit — never during app startup — so
+# the URL resolver and template engine are fully initialised before we
+# touch them.  lru_cache means the render happens exactly once.
 # ---------------------------------------------------------------------------
 
+@lru_cache(maxsize=1)
 def _get_payload() -> bytes:
-    """Return the pre-rendered help page payload from apps.py."""
-    from setup.apps import HONEYPOT_PAYLOAD  # noqa: PLC0415
-    return HONEYPOT_PAYLOAD
+    """Render the help page to bytes on first call, cache forever."""
+    try:
+        from django.test import RequestFactory
+        from django.template.loader import render_to_string
+        from django.contrib.auth.models import AnonymousUser
+        rf = RequestFactory()
+        request = rf.get("/help/")
+        request.user = AnonymousUser()
+        html = render_to_string("help/index.html", request=request)
+        return html.encode("utf-8")
+    except Exception as exc:
+        logger.warning("honeypot: could not render help page: %s", exc)
+        return b""
 
 
 def _tarpit_response() -> StreamingHttpResponse:
