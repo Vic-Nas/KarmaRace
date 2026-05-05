@@ -49,6 +49,7 @@ body.is-pro .kr-page {
   justify-content: center;
   gap: 1.5rem;
   font-size: .8rem;
+  -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
 }
 .kr-footer a { color: var(--footer-text); transition: color var(--transition); }
