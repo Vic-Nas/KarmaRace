@@ -137,21 +137,24 @@ def sendpulse_post(payload: dict) -> bool:
 
 def update_daily_stats(date, harvested=None, queued_count=None, sent_count=None,
 				   failed_count=None, pending_after=None):
+	from django.db.models import F
 	from accounts.models import OutreachDailyStats
 	stats, _ = OutreachDailyStats.objects.get_or_create(date=date)
 	update_fields = []
+	# Cumulative counters: accumulate across multiple runs per day
 	if harvested is not None:
-		stats.harvested = harvested
+		stats.harvested = F('harvested') + harvested
 		update_fields.append("harvested")
 	if queued_count is not None:
-		stats.queued_count = queued_count
+		stats.queued_count = F('queued_count') + queued_count
 		update_fields.append("queued_count")
 	if sent_count is not None:
-		stats.sent_count = sent_count
+		stats.sent_count = F('sent_count') + sent_count
 		update_fields.append("sent_count")
 	if failed_count is not None:
-		stats.failed_count = failed_count
+		stats.failed_count = F('failed_count') + failed_count
 		update_fields.append("failed_count")
+	# Snapshot: always reflects current state
 	if pending_after is not None:
 		stats.pending_after = pending_after
 		update_fields.append("pending_after")

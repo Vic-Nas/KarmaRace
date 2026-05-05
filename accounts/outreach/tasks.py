@@ -17,20 +17,15 @@ from .email import build_html, build_plaintext
 logger = logging.getLogger(__name__)
 
 
-@app.periodic(cron="0 2 * * *")
-@app.task
-def harvest_outreach_emails(timestamp=None):
-	"""Harvest scored GitHub user candidates into OutreachRecord queue.
+def run_harvest(limit=None, log=None):
+	"""Core harvest logic. Shared by the periodic task and management command.
 
-	Only includes users who:
-	- Match SEARCH_BASE filters (followers/repos in target range)
-	- Have at least one repo with a homepage URL (active project promotion)
-	- Have a public email
-	- Have not already been contacted (per OutreachContactedEmail)
+	Returns number of records harvested.
+	log: callable for progress output (e.g. print or self.stdout.write). Optional.
 	"""
 	if not getattr(settings, "REACH", False):
-		logger.info("harvest_outreach_emails: REACH is False, skipping.")
-		return
+		logger.info("harvest: REACH is False, skipping.")
+		return 0
 
 	from accounts.models import OutreachRecord, OutreachContactedEmail
 
@@ -38,13 +33,17 @@ def harvest_outreach_emails(timestamp=None):
 	contacted = set(OutreachContactedEmail.objects.values_list("email", flat=True))
 	skip      = queued | contacted
 
-	new_records = []
-	lang = random.choice(LANGUAGES)
-	query = SEARCH_BASE + " language:" + lang
-	max_candidates = BATCH * 20
+	batch     = limit or BATCH
+	lang      = random.choice(LANGUAGES)
+	query     = SEARCH_BASE + " language:" + lang
+	max_candidates = batch * 20
 
+	if log:
+		log(f"Harvesting (limit={batch}, lang={lang}, skip={len(skip)})...")
+
+	new_records = []
 	for profile, repos in iter_candidates(query, max_candidates, max_repos=60):
-		if len(new_records) >= BATCH:
+		if len(new_records) >= batch:
 			break
 		email = (profile.get("email") or "").strip().lower()
 		if not email or email in skip:
@@ -54,50 +53,57 @@ def harvest_outreach_emails(timestamp=None):
 		score = score_user(profile, repos)
 		skip.add(email)
 		new_records.append(OutreachRecord(email=email, score=score))
+		if log:
+			log(f"  +{len(new_records)} {email}")
 
 	if new_records:
 		OutreachRecord.objects.bulk_create(new_records, ignore_conflicts=True)
 
-	# Stats: track harvest count for today's row
 	update_daily_stats(timezone.now().date(), harvested=len(new_records))
-
-	logger.info(
-		"harvest_outreach_emails: harvested=%d (lang=%s)", len(new_records), lang
-	)
+	logger.info("harvest: harvested=%d lang=%s", len(new_records), lang)
+	return len(new_records)
 
 
-@app.periodic(cron="0 */2 * * *")
-@app.task
-def send_outreach_emails(timestamp=None):
-	"""Send top-scored pending records (up to DAILY_REACH) via SendPulse.
+def run_send(limit=None, log=None):
+	"""Core send logic. Shared by the periodic task and management command.
 
-	After each attempt: delete OutreachRecord, log email in OutreachContactedEmail,
-	and upsert today's OutreachDailyStats row.
+	Sends top-scored pending OutreachRecords via SendPulse.
+	Only deletes a record from the queue after a successful send.
+	On failure, leaves the record in place for the next run.
+	Returns (sent, failed).
+	log: callable for progress output. Optional.
 	"""
 	if not getattr(settings, "REACH", False):
-		logger.info("send_outreach_emails: REACH is False, skipping.")
-		return
+		logger.info("send: REACH is False, skipping.")
+		return 0, 0
 
 	from accounts.models import monthly_sent_count, increment_monthly_sent
-	if monthly_sent_count() >= getattr(settings, 'MONTHLY_REACH', 12000):
-		logger.info('send_outreach_emails: monthly cap reached, skipping.')
-		return
+	monthly_cap = getattr(settings, 'MONTHLY_REACH', 12000)
+	already_sent = monthly_sent_count()
+	if already_sent >= monthly_cap:
+		logger.info('send: monthly cap reached (%d/%d), skipping.', already_sent, monthly_cap)
+		return 0, 0
 
 	from accounts.models import OutreachRecord, OutreachContactedEmail
 
-	daily_reach = getattr(settings, "DAILY_REACH", 50)
-	domain    = settings.DOMAIN
+	domain = settings.DOMAIN
 	try:
 		html      = build_html(domain)
 		plaintext = build_plaintext(domain)
-		logger.info('send_outreach_emails: html=%d chars plaintext=%d chars', len(html), len(plaintext))
+		logger.info('send: html=%d chars plaintext=%d chars', len(html), len(plaintext))
 	except Exception as exc:
-		logger.error('send_outreach_emails: failed to build email templates: %s', exc)
-		return
+		logger.error('send: failed to build email templates: %s', exc)
+		return 0, 0
 
-	pending = list(
-		OutreachRecord.objects.order_by("-score", "created_at")[:daily_reach]
-	)
+	batch   = limit or getattr(settings, "SEND_BATCH", 50)
+	pending = list(OutreachRecord.objects.order_by("-score", "created_at")[:batch])
+
+	if not pending:
+		logger.info("send: queue empty, nothing to send.")
+		return 0, 0
+
+	if log:
+		log(f"Sending {len(pending)} emails...")
 
 	sent = failed = 0
 	for record in pending:
@@ -110,17 +116,21 @@ def send_outreach_emails(timestamp=None):
 				'text':    plaintext,
 			}
 		})
-		OutreachContactedEmail.objects.get_or_create(email=record.email)
-		record.delete()
 		if ok:
+			# Only mark contacted and remove from queue on success
+			OutreachContactedEmail.objects.get_or_create(email=record.email)
+			record.delete()
 			sent += 1
+			if log:
+				log(f"  ✓ {record.email}")
 		else:
 			failed += 1
+			logger.error("send: failed for %s", record.email)
+			if log:
+				log(f"  ✗ {record.email}")
 
 	if sent:
 		increment_monthly_sent(sent)
-	if failed:
-		logger.error('send_outreach_emails: %d send failures out of %d attempted', failed, len(pending))
 
 	update_daily_stats(
 		timezone.now().date(),
@@ -129,8 +139,19 @@ def send_outreach_emails(timestamp=None):
 		failed_count=failed,
 		pending_after=OutreachRecord.objects.count(),
 	)
+	logger.info("send: sent=%d failed=%d", sent, failed)
+	return sent, failed
 
-	logger.info(
-		"send_outreach_emails: sent=%d failed=%d",
-		sent, failed,
-	)
+
+@app.periodic(cron="0 2 * * *")
+@app.task
+def harvest_outreach_emails(timestamp=None):
+	"""Periodic task: harvest GitHub candidates into the queue."""
+	run_harvest()
+
+
+@app.periodic(cron="0 */2 * * *")
+@app.task
+def send_outreach_emails(timestamp=None):
+	"""Periodic task: send top-scored pending records via SendPulse."""
+	run_send()
