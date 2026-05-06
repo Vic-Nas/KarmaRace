@@ -133,10 +133,12 @@ def ensure_role(discord_user_id: str, local_user: Optional[object] = None) -> No
 
 
 def sync_nickname(discord_user_id: str, nickname: str) -> None:
+    # Discord returns 204 (no content) on success, 403 if the target is the
+    # server owner or has a higher role than the bot (un-patchable by design).
     _request_ok(
         'PATCH', f"/guilds/{settings.DISCORD_GUILD_ID}/members/{discord_user_id}",
         json={'nick': nickname},
-        ok_statuses={200},
+        ok_statuses={200, 204},
     )
 
 

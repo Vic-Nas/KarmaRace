@@ -53,7 +53,17 @@ def _sync_discord_membership(request, linked):
     """Verify Discord membership and sync role. Delete if membership expired."""
     try:
         if discord_api.is_member(linked.platform_id):
-            discord_api.sync_nickname(linked.platform_id, request.user.username)
+            try:
+                discord_api.sync_nickname(linked.platform_id, request.user.username)
+            except requests.HTTPError as exc:
+                if exc.response.status_code != 403:
+                    raise
+                # 403 on nickname patch = server owner or higher role than the bot;
+                # Discord won't allow it regardless of permissions — skip silently.
+                logger.debug(
+                    '_sync_discord_membership: nickname patch forbidden for user %s (owner or higher role)',
+                    request.user.pk,
+                )
             discord_api.ensure_role(linked.platform_id)
             return True
     except requests.RequestException as exc:
