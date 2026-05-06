@@ -7,4 +7,10 @@
 .billing-card__header h2 { margin: 0; font-size: 1.35rem; color: var(--primary); }
 .billing-card__desc { color: var(--text-muted); font-size: .91rem; line-height: 1.65; margin-bottom: 1.2rem; }
 .billing-card form { margin-top: 1rem; }
+.billing-card stripe-buy-button {
+  display: block;
+  margin-top: 1rem;
+  text-align: center;
+  min-height: 280px;  /* reserve space while Stripe script loads */
+}
 .billing-status { font-size: .8rem; color: var(--text-muted); margin-top: 1rem; font-style: italic; }

@@ -6,6 +6,7 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'css/billing.css' %}">
+<script async src="https://js.stripe.com/v3/buy-button.js"></script>
 {% endblock %}
 
 {% block content %}
@@ -34,7 +35,6 @@
       <button class="btn btn-secondary" type="submit">Manage Subscription</button>
     </form>
   {% else %}
-    <script async src="https://js.stripe.com/v3/buy-button.js"></script>
     <stripe-buy-button
       buy-button-id="{{ stripe_buy_button_id }}"
       publishable-key="{{ stripe_publishable_key }}"
