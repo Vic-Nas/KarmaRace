@@ -34,10 +34,14 @@
       <button class="btn btn-secondary" type="submit">Manage Subscription</button>
     </form>
   {% else %}
-    <form method="post" action="{% url 'billing_checkout' %}">
-      {% csrf_token %}
-      <button class="btn btn-primary" type="submit">Upgrade to Pro</button>
-    </form>
+    <script async src="https://js.stripe.com/v3/buy-button.js"></script>
+    <stripe-buy-button
+      buy-button-id="buy_btn_1TTtL3KEPRXKFoIz5ggJKUVb"
+      publishable-key="{{ stripe_publishable_key }}"
+      client-reference-id="{{ request.user.pk }}"
+      customer-email="{{ request.user.email }}"
+    >
+    </stripe-buy-button>
   {% endif %}
 
   {% if subscription_status %}
