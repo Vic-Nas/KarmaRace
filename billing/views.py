@@ -24,6 +24,7 @@ def billing_plan(request):
 
     return render(request, 'billing/plan.html', {
         'subscription_status': subscription.status if subscription else '',
+        'stripe_buy_button_id': settings.STRIPE_BUY_BUTTON_ID,
         'stripe_publishable_key': settings.STRIPE_PUBLISHABLE_KEY,
     })
 
