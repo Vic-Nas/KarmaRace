@@ -60,8 +60,15 @@ def get_user_github_repo_choices_cached(user, user_token, username, force_reload
         collect_repos(gh_user.get_repos(type='member', sort='updated', direction='desc'))
         collect_repos(gh_user.get_repos(affiliation='owner,collaborator,organization_member',
                                         sort='updated', direction='desc'))
-        for org in gh_user.get_orgs():
-            collect_repos(org.get_repos(type='all', sort='updated', direction='desc'))
+        try:
+            for org in gh_user.get_orgs():
+                collect_repos(org.get_repos(type='all', sort='updated', direction='desc'))
+        except GithubException as exc:
+            if exc.status == 403:
+                # Token lacks read:org scope — org repos unavailable, personal repos still returned.
+                logger.debug('get_user_github_repo_choices: read:org not granted for user %s, skipping org repos', user.pk)
+            else:
+                raise
     except GithubException as exc:
         if exc.status in (401, 403):
             return [], 'Cannot load GitHub repositories. Reconnect your GitHub account in Accounts.'

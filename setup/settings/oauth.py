@@ -36,7 +36,7 @@ SOCIALACCOUNT_PROVIDERS = {
 			'client_id': GITHUB_CLIENT_ID,
 			'secret': GITHUB_CLIENT_SECRET,
 		},
-		'SCOPE': ['read:user'],
+		'SCOPE': ['read:user', 'read:org'],
 	},
 	'discord': {
 		'APP': {
