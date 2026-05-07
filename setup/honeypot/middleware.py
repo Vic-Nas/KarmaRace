@@ -49,7 +49,7 @@ class HoneypotMiddleware:
             )
             messages.info(
                 request,
-                f"\"{request.path}\" isn't a known page — redirecting you to {redirect_path}.",
+                f"\"{request.path}\" isn't a known page => redirecting you to {redirect_path}.",
             )
             return redirect(redirect_path, permanent=False)
 
