@@ -22,7 +22,7 @@ def _leaderboard_rows(search=''):
     qs = (
         User.objects
         .annotate(karma=Coalesce(Sum('karma_transactions__delta'), Value(0)))
-        .filter(karma__gt=0)
+        .filter(karma__gte=0)
         .order_by('-karma')
     )
     if search:
