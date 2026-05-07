@@ -1,0 +1,17 @@
+[build]
+watchPatterns = [
+  "feed/tasks.py",
+  "notifications/tasks.py",
+  "accounts/outreach/tasks.py",
+  "tasks/services/**",
+  "tasks/check_feedback.py",
+  "karma/services.py",
+  "karma/models.py",
+  "notifications/services.py",
+  "notifications/models.py",
+  "accounts/discord.py",
+  "accounts/models.py",
+  "setup/platform_rules.py",
+  "setup/settings/**",
+  "requirements*.txt"
+]

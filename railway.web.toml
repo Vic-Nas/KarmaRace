@@ -1,0 +1,8 @@
+[build]
+watchPatterns = [
+  "**/*.py",
+  "requirements*.txt",
+  "templates/**",
+  "static/**",
+  "**/migrations/**"
+]
