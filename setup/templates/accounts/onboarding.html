@@ -10,40 +10,68 @@
 
 {% block content %}
 <div class="onboarding-wrap">
-  <h1>Welcome, {{ user.username }}.</h1>
-  <p class="onboarding-sub">Three ways to earn and spend karma.</p>
+
+  <div class="ob-header">
+    <h1>Welcome, <span class="ob-username">{{ user.username }}</span>.</h1>
+    <p class="onboarding-sub">Here is what you can do on KarmaRace.</p>
+  </div>
 
   <div class="onboarding-cards" id="ob-cards">
 
     <div class="onboarding-card onboarding-card--stars" data-ob-delay="0">
-      <span class="onboarding-card__icon">&#11088;</span>
+      <div class="onboarding-card__icon-wrap">
+        <svg class="onboarding-card__icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M12 2l2.9 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l7.1-1.01L12 2z" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/>
+        </svg>
+        <div class="onboarding-card__icon-bg"></div>
+      </div>
       <div class="onboarding-card__title">GitHub Stars</div>
       <p class="onboarding-card__desc">
-        Post a repo. Developers earn karma by starring it. The more karma they hold, the more visible their own tasks get.
+        Post your repository. Developers earn karma by starring it. The more karma they hold, the more visible their tasks become.
       </p>
     </div>
 
-    <div class="onboarding-card onboarding-card--forks" data-ob-delay="150">
-      <span class="onboarding-card__icon">&#127860;</span>
+    <div class="onboarding-card onboarding-card--forks" data-ob-delay="120">
+      <div class="onboarding-card__icon-wrap">
+        <svg class="onboarding-card__icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <circle cx="12" cy="3" r="2" stroke="currentColor" stroke-width="1.75"/>
+          <circle cx="6"  cy="21" r="2" stroke="currentColor" stroke-width="1.75"/>
+          <circle cx="18" cy="21" r="2" stroke="currentColor" stroke-width="1.75"/>
+          <path d="M12 5v5m0 0c0 3-3 4-6 5.5M12 10c0 3 3 4 6 5.5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+        </svg>
+        <div class="onboarding-card__icon-bg"></div>
+      </div>
       <div class="onboarding-card__title">GitHub Forks</div>
       <p class="onboarding-card__desc">
-        Same deal, higher bar. Forks take more effort, so they pay out more karma.
+        Same idea, deeper engagement. Get real forks from active developers in the community.
       </p>
     </div>
 
-    <div class="onboarding-card onboarding-card--webhook" data-ob-delay="300">
-      <span class="onboarding-card__icon">&#128279;</span>
+    <div class="onboarding-card onboarding-card--webhook" data-ob-delay="240">
+      <div class="onboarding-card__icon-wrap">
+        <svg class="onboarding-card__icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div class="onboarding-card__icon-bg"></div>
+      </div>
       <div class="onboarding-card__title">Webhook Tasks</div>
       <p class="onboarding-card__desc">
-        Pick any action on your platform: sign up, complete a flow, hit a button. We verify it happened before karma moves.
+        Define any action on your app: sign up, click a button, complete a flow. We verify it actually happened.
       </p>
     </div>
 
   </div>
 
   <div class="onboarding-cta" id="ob-cta">
-    <a href="{% url 'task_create' %}" class="btn btn-primary btn-lg">Create my first task</a>
+    <a href="{% url 'task_create' %}" class="btn btn-primary btn-lg ob-btn">
+      Create my first task
+      <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" class="ob-btn__arrow" aria-hidden="true">
+        <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </a>
   </div>
+
 </div>
 {% endblock %}
 
@@ -52,14 +80,15 @@
 (function () {
   var cards = document.querySelectorAll('#ob-cards .onboarding-card');
   var cta   = document.getElementById('ob-cta');
+  var lastDelay = 0;
 
   cards.forEach(function (card) {
     var delay = parseInt(card.getAttribute('data-ob-delay') || '0', 10);
-    setTimeout(function () { card.classList.add('ob-visible'); }, 120 + delay);
+    if (delay > lastDelay) lastDelay = delay;
+    setTimeout(function () { card.classList.add('ob-visible'); }, 80 + delay);
   });
 
-  // Show CTA after the last card has appeared
-  setTimeout(function () { cta.classList.add('ob-visible'); }, 120 + 300 + 450);
+  setTimeout(function () { cta.classList.add('ob-visible'); }, 80 + lastDelay + 380);
 })();
 </script>
 {% endblock %}
