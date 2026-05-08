@@ -180,33 +180,54 @@
           </p>
         {% endif %}
       {% endif %}
-
-      <div class="card__actions">
-        <button
-          type="submit"
-          class="btn btn-primary"
-          id="feed-check-btn"
-          {% if task.type == 'WEBHOOK' and not verified_emails %} disabled{% endif %}
-        >Check</button>
-      </div>
-
     </form>
 
-    {# Archive form sits alongside check button #}
-    <form method="post" action="{% url 'feed_done' task.id %}">
-      {% csrf_token %}
-      <input type="hidden" name="completion" value="{{ completion }}">
-      <input type="hidden" name="archive" value="{{ archive }}">
-      <input type="hidden" name="task_types" value="{{ selected_task_types_csv }}">
-      <div class="card__actions">
-        <button type="submit" class="btn btn-secondary">Archive</button>
+    <div class="card__actions">
+
+      <div class="card__actions-left">
+
+        <button type="submit" form="feed-check-form" class="btn btn-primary" id="feed-check-btn"
+          {% if task.type == 'WEBHOOK' and not verified_emails %} disabled{% endif %}>
+
+          <i class="ti ti-circle-check" aria-hidden="true"></i> Check
+
+        </button>
+
+        {% if request.user.is_authenticated and request.user.id == task.owner_id %}
+
+          <a href="{% url 'task_edit' task.slug %}" class="btn btn-sm">Edit</a>
+
+        {% endif %}
+
       </div>
-    </form>
+
+      <div class="card__actions-right">
+
+        <form method="post" action="{% url 'feed_done' task.id %}" style="margin:0">
+
+          {% csrf_token %}
+
+          <input type="hidden" name="completion" value="{{ completion }}">
+
+          <input type="hidden" name="archive" value="{{ archive }}">
+
+          <input type="hidden" name="task_types" value="{{ selected_task_types_csv }}">
+
+          <button type="submit" class="btn btn-archive">
+
+            <i class="ti ti-archive" aria-hidden="true"></i> Archive
+
+          </button>
+
+        </form>
+
+      </div>
+
+    </div>
 
     {# Owner controls #}
     {% if request.user.is_authenticated and request.user.id == task.owner_id %}
       <div class="card__actions">
-        <a href="{% url 'task_edit' task.slug %}" class="btn btn-secondary btn-sm">Edit</a>
         <form method="post" action="{% url 'task_delete' task.slug %}"
           onsubmit="return confirm('Delete this task?')">
           {% csrf_token %}
