@@ -2,7 +2,7 @@
 watchPatterns = [
   "**/*.py",
   "requirements*.txt",
-  "templates/**",
-  "static/**",
+  "setup/templates/**",
+  "setup/static/**",
   "**/migrations/**"
 ]
