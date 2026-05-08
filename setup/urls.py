@@ -9,7 +9,7 @@ from . import views
 urlpatterns = [
     path('admin/', admin.site.urls),
     path("ads.txt", serve, {
-        "path": "ads.txt",
+        "path": "manual/assets/ads.txt",
         "document_root": os.path.join(settings.BASE_DIR, "setup/static"),
     }),
     path('robots.txt', views.robots_txt, name='robots_txt'),
