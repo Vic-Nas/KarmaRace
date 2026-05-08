@@ -25,7 +25,8 @@
 .filter-group { display: flex; align-items: center; gap: .35rem; }
 .filter-group--apply { margin-left: auto; gap: .4rem; }
 
-/* Segmented toggle — pill track with floating active thumb */
+/* ── Segmented control (replaces .btn-group radio ugliness) ── */
+.btn-group,
 .seg-group {
   display: flex;
   background: color-mix(in srgb, var(--border) 25%, transparent);
@@ -34,7 +35,10 @@
   padding: 3px;
   gap: 2px;
 }
+.btn-group input[type="radio"],
 .seg-group input[type="radio"] { display: none; }
+
+.btn-group label,
 .seg-group label {
   padding: .25rem .65rem;
   font-size: .8rem;
@@ -46,14 +50,17 @@
   line-height: 1.5;
   white-space: nowrap;
   transition: background .15s, color .15s, box-shadow .15s;
+  /* kill any browser default margin/padding bleed */
+  margin: 0;
 }
+.btn-group input[type="radio"]:checked + label,
 .seg-group input[type="radio"]:checked + label {
   background: var(--surface);
   color: var(--text);
   box-shadow: 0 1px 3px rgba(0,0,0,.1);
 }
 
-/* Type chips */
+/* ── Type chips ── */
 .type-chip-group { display: flex; flex-wrap: wrap; gap: .3rem; }
 .type-chip-input { display: none; }
 .type-chip {
@@ -70,7 +77,7 @@
 .type-chip-input:checked + .type-chip { background: var(--primary); color: #fff; border-color: var(--primary); }
 .type-chip:hover { border-color: var(--primary); color: var(--primary); }
 
-/* Task card */
+/* ── Task card ── */
 .task-card { border-left: 3px solid var(--primary); padding: 1.5rem 1.75rem; }
 .task-card__type {
   font-size: .7rem;
@@ -91,7 +98,7 @@
 .task-card__owner a:hover { color: var(--primary); }
 .task-card__divider { border: none; border-top: 1px solid var(--border); margin: 1rem 0 .9rem; }
 
-/* Difficulty dots — shared between badge and picker */
+/* ── Difficulty dots ── */
 .diff-dot { display: inline-block; width: .42rem; height: .42rem; border-radius: 50%; flex-shrink: 0; }
 .task-difficulty--1 .diff-dot, .diff-radio-label--1::before { background: #22c55e; }
 .task-difficulty--2 .diff-dot, .diff-radio-label--2::before { background: #84cc16; }
@@ -100,14 +107,14 @@
 .task-difficulty--5 .diff-dot, .diff-radio-label--5::before { background: #ef4444; }
 .task-difficulty { display: inline-flex; align-items: center; gap: .28rem; font-size: .75rem; font-weight: 600; color: var(--text-muted); }
 
-/* Email picker */
+/* ── Email picker ── */
 .feed-email-picker { display: flex; align-items: center; gap: .55rem; flex-wrap: wrap; margin-bottom: .6rem; }
 .feed-email-picker label, .feed-difficulty-picker > label {
   font-size: .78rem; font-weight: 600; color: var(--text-muted); white-space: nowrap; margin: 0;
 }
 .feed-email-picker select { width: auto; flex: 1 1 200px; }
 
-/* Difficulty picker */
+/* ── Difficulty picker ── */
 .feed-difficulty-picker { display: flex; align-items: center; gap: .55rem; flex-wrap: wrap; margin-bottom: .75rem; }
 .diff-radios { display: flex; gap: .25rem; flex-wrap: wrap; }
 .diff-radio-input { display: none; }
@@ -131,22 +138,23 @@
 .diff-radio-input:checked + .diff-radio-label { background: var(--primary); border-color: var(--primary); color: #fff; }
 .diff-radio-input:checked + .diff-radio-label::before { filter: brightness(1.5); }
 
-/* Card actions — Check left, Archive right */
+/* ── Card actions — Check LEFT, Archive RIGHT, same row ── */
 .card__actions {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: .6rem;
   margin-top: 1rem;
 }
+/* Any form sitting directly inside .card__actions loses its default block display */
 .card__actions form { margin: 0; }
 .card__actions-left  { display: flex; align-items: center; gap: .5rem; }
+/* Push archive (and owner controls) to the far right */
 .card__actions-right { display: flex; align-items: center; gap: .5rem; margin-left: auto; }
 
-/* Empty state */
+/* ── Empty state ── */
 .feed-empty { padding: 4rem 0; text-align: center; color: var(--text-muted); }
 
-/* Karma animations */
+/* ── Karma animations ── */
 .karma-float {
   position: fixed;
   font-family: var(--font-body);
