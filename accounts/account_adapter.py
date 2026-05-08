@@ -8,4 +8,4 @@ class AccountAdapter(DefaultAccountAdapter):
         from tasks.models import Task
         if request.user.is_authenticated and not Task.objects.filter(owner=request.user).exists():
             return reverse('onboarding')
-        return super().get_login_redirect_url(request)
+        return reverse('feed')
