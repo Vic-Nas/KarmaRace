@@ -8,6 +8,10 @@ from . import views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path("ads.txt", serve, {
+        "path": "ads.txt",
+        "document_root": os.path.join(settings.BASE_DIR, "setup/static"),
+    }),
     path('robots.txt', views.robots_txt, name='robots_txt'),
     path('accounts/login/', views.account_login_redirect, name='account_login_redirect'),
     path('accounts/', include('allauth.urls')),
