@@ -17,6 +17,9 @@ from .queries import get_feed_task, get_pinned_task, webhook_stats
 
 def feed(request):
     """Main feed view: display next task and manage filters."""
+    if not request.user.is_authenticated:
+        return redirect('help_index')
+
     check_result = (request.GET.get('check_result') or '').strip().upper()
     check_detail = (request.GET.get('check_detail') or '').strip()
     if check_result == TaskCompletion.State.CONFIRMED:
