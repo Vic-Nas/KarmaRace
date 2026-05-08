@@ -1,14 +1,227 @@
 {# setup/templates/feed/index.html #}
 {% extends "base.html" %}
 {% load static %}
+
 {% block title %}KarmaRace Feed{% endblock %}
-{% block extra_css %}<link rel="stylesheet" href="{% static 'css/feed.css' %}">{% endblock %}
-{% block content %}
-<form method="get" class="feed-filters"><div class="filter-row filter-row--top"><div class="filter-group"><label>Completion</label><div class="btn-group"><input type="radio" name="completion" id="c_not" value="not_completed" {% if completion == 'not_completed' %}checked{% endif %}><label for="c_not">Not done</label><input type="radio" name="completion" id="c_done" value="completed" {% if completion == 'completed' %}checked{% endif %}><label for="c_done">Done</label></div></div><div class="filter-group"><label>Archive</label><div class="btn-group"><input type="radio" name="archive" id="a_not" value="not_archived" {% if archive == 'not_archived' %}checked{% endif %}><label for="a_not">Active</label><input type="radio" name="archive" id="a_arch" value="archived" {% if archive == 'archived' %}checked{% endif %}><label for="a_arch">Archived</label></div></div><div class="filter-group filter-group--apply"><button type="submit" class="btn btn-primary btn-sm">Apply</button><a href="{% url 'feed' %}" class="btn btn-ghost btn-sm">Reset</a></div></div><div class="filter-row filter-row--types"><span class="filter-row__title">Type</span><div class="type-chip-group">{% for type_option in all_task_types %}<input type="checkbox" class="type-chip-input" id="tt_{{ forloop.counter }}" name="task_types" value="{{ type_option.value }}" {% if type_option.value in selected_task_types %}checked{% endif %}><label class="type-chip" for="tt_{{ forloop.counter }}">{{ type_option.label }}</label>{% endfor %}</div></div></form>
-{% if feed_empty %}<div class="feed-empty"><p>No tasks to test right now. <a href="{% url 'task_create' %}">Post your own</a>.</p></div>{% else %}
-<div class="card task-card"><div class="task-card__type">{% if task.target_url %}<a href="{{ task.target_url }}" target="_blank" rel="noopener noreferrer">{{ task.get_type_display }}</a>{% else %}{{ task.get_type_display }}{% endif %}</div><div class="task-card__desc">{{ task.description }}</div><div class="task-card__reward">Reward: <strong>{{ task_reward }}</strong> karma{% if task.id in completed_task_ids %}&nbsp;<span class="badge badge-success">Completed</span>{% endif %}{% if task.type == 'WEBHOOK' and task.difficulty_count > 0 %}&nbsp;<span class="task-difficulty" title="Difficulty: {{ task.difficulty }}/5 ({{ task.difficulty_count }} rating{{ task.difficulty_count|pluralize }})">{% if task.difficulty == 1 %}🟢{% elif task.difficulty == 2 %}🟡{% elif task.difficulty == 3 %}🟠{% elif task.difficulty == 4 %}🔴{% else %}💀{% endif %}</span>{% endif %}</div>{% if webhook_stats %}<p class="small text-muted mt-1">Webhook failure rate: {{ webhook_stats.failure_rate_percent }}%</p>{% endif %}<p class="small text-muted mt-1">by <a href="/u/{{ task.owner.username }}/">{{ task.owner.username }}</a></p><div class="alert alert-info" id="check-loading-banner"{% if not checking_task_id %} style="display:none"{% endif %}>{% if checking_task_id %}Verification in progress. This card will refresh automatically&hellip;{% endif %}</div>
-<form method="post" action="{% url 'feed_check' task.id %}" id="feed-check-form" data-check-url="{% url 'feed_check' task.id %}" data-status-url="{% url 'feed_check_status' task.id %}" data-checking-status-url="{% if checking_task_id %}{% url 'feed_check_status' checking_task_id %}{% endif %}">{% csrf_token %}<input type="hidden" name="completion" value="{{ completion }}"><input type="hidden" name="archive" value="{{ archive }}"><input type="hidden" name="task_types" value="{{ selected_task_types_csv }}">{% if task.type == 'WEBHOOK' %}{% if verified_emails %}<div class="feed-email-picker"><label for="webhook-email-select">Your email on this platform:</label><select name="google_email" id="webhook-email-select" required><option value="">Select an email</option>{% for email in verified_emails %}<option value="{{ email }}">{{ email }}</option>{% endfor %}</select><a href="{% url 'verify_email_start' %}" class="btn btn-ghost btn-sm">+ Add email</a></div><div class="feed-difficulty-picker"><label>How hard was this?</label><div class="diff-radios" id="diff-radios"><input type="radio" name="difficulty" id="diff_1" value="1" class="diff-radio-input"><label for="diff_1" class="diff-radio-label" title="Very easy">🟢</label><input type="radio" name="difficulty" id="diff_2" value="2" class="diff-radio-input"><label for="diff_2" class="diff-radio-label" title="Easy">🟡</label><input type="radio" name="difficulty" id="diff_3" value="3" class="diff-radio-input"><label for="diff_3" class="diff-radio-label" title="Medium">🟠</label><input type="radio" name="difficulty" id="diff_4" value="4" class="diff-radio-input"><label for="diff_4" class="diff-radio-label" title="Hard">🔴</label><input type="radio" name="difficulty" id="diff_5" value="5" class="diff-radio-input"><label for="diff_5" class="diff-radio-label" title="Very hard">💀</label></div></div>{% else %}<p class="small text-muted"><a href="{% url 'linked_accounts' %}">Verify an email</a> to check webhook tasks.</p>{% endif %}{% endif %}
-<div class="card__actions"><button type="submit" class="btn btn-primary" id="feed-check-btn"{% if task.type == 'WEBHOOK' and not verified_emails %} disabled{% endif %}>Check</button></form><form method="post" action="{% url 'feed_done' task.id %}">{% csrf_token %}<input type="hidden" name="completion" value="{{ completion }}"><input type="hidden" name="archive" value="{{ archive }}"><input type="hidden" name="task_types" value="{{ selected_task_types_csv }}"><button type="submit" class="btn btn-secondary">Archive</button></form></div>
-{% if request.user.is_authenticated and request.user.id == task.owner_id %}<div class="card__actions"><a href="{% url 'task_edit' task.slug %}" class="btn btn-secondary btn-sm">Edit</a><form method="post" action="{% url 'task_delete' task.slug %}" onsubmit="return confirm('Delete this task?')">{% csrf_token %}<button type="submit" class="btn btn-danger btn-sm">Delete</button></form></div>{% endif %}</div>{% endif %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/feed.css' %}">
 {% endblock %}
-{% block extra_js %}<script src="{% static 'js/feed-check.js' %}"></script><script src="{% static 'js/feed-check-poll.js' %}"></script><script src="{% static 'js/feed-page.js' %}"></script>{% endblock %}
+
+{% block content %}
+
+{# ---- Filters ---- #}
+<form method="get" class="feed-filters">
+
+  <div class="filter-row filter-row--top">
+
+    <div class="filter-group">
+      <label>Completion</label>
+      <div class="btn-group">
+        <input type="radio" name="completion" id="c_not" value="not_completed"
+          {% if completion == 'not_completed' %}checked{% endif %}>
+        <label for="c_not">Not done</label>
+
+        <input type="radio" name="completion" id="c_done" value="completed"
+          {% if completion == 'completed' %}checked{% endif %}>
+        <label for="c_done">Done</label>
+      </div>
+    </div>
+
+    <div class="filter-group">
+      <label>Archive</label>
+      <div class="btn-group">
+        <input type="radio" name="archive" id="a_not" value="not_archived"
+          {% if archive == 'not_archived' %}checked{% endif %}>
+        <label for="a_not">Active</label>
+
+        <input type="radio" name="archive" id="a_arch" value="archived"
+          {% if archive == 'archived' %}checked{% endif %}>
+        <label for="a_arch">Archived</label>
+      </div>
+    </div>
+
+    <div class="filter-group filter-group--apply">
+      <button type="submit" class="btn btn-primary btn-sm">Apply</button>
+      <a href="{% url 'feed' %}" class="btn btn-ghost btn-sm">Reset</a>
+    </div>
+
+  </div>
+
+  <div class="filter-row filter-row--types">
+    <span class="filter-row__title">Type</span>
+    <div class="type-chip-group">
+      {% for type_option in all_task_types %}
+        <input
+          type="checkbox"
+          class="type-chip-input"
+          id="tt_{{ forloop.counter }}"
+          name="task_types"
+          value="{{ type_option.value }}"
+          {% if type_option.value in selected_task_types %}checked{% endif %}
+        >
+        <label class="type-chip" for="tt_{{ forloop.counter }}">{{ type_option.label }}</label>
+      {% endfor %}
+    </div>
+  </div>
+
+</form>
+
+{# ---- Empty state ---- #}
+{% if feed_empty %}
+  <div class="feed-empty">
+    <p>Nothing left to verify. <a href="{% url 'task_create' %}">Post your own task.</a></p>
+  </div>
+
+{# ---- Task card ---- #}
+{% else %}
+  <div class="card task-card">
+
+    <div class="task-card__type">
+      {% if task.target_url %}
+        <a href="{{ task.target_url }}" target="_blank" rel="noopener noreferrer">
+          {{ task.get_type_display }}
+        </a>
+      {% else %}
+        {{ task.get_type_display }}
+      {% endif %}
+    </div>
+
+    <div class="task-card__desc">{{ task.description }}</div>
+
+    <div class="task-card__reward">
+      Reward: <strong>{{ task_reward }}</strong> karma
+
+      {% if task.id in completed_task_ids %}
+        &nbsp;<span class="badge badge-success">Completed</span>
+      {% endif %}
+
+      {% if task.type == 'WEBHOOK' and task.difficulty_count > 0 %}
+        &nbsp;<span class="task-difficulty task-difficulty--{{ task.difficulty }}"
+          title="Difficulty: {{ task.difficulty }}/5 ({{ task.difficulty_count }} rating{{ task.difficulty_count|pluralize }})">
+          <span class="diff-dot"></span>
+          {% if task.difficulty == 1 %}Very easy
+          {% elif task.difficulty == 2 %}Easy
+          {% elif task.difficulty == 3 %}Medium
+          {% elif task.difficulty == 4 %}Hard
+          {% else %}Very hard
+          {% endif %}
+        </span>
+      {% endif %}
+    </div>
+
+    {% if webhook_stats %}
+      <p class="small text-muted mt-1">Webhook failure rate: {{ webhook_stats.failure_rate_percent }}%</p>
+    {% endif %}
+
+    <p class="small text-muted mt-1">
+      by <a href="/u/{{ task.owner.username }}/">{{ task.owner.username }}</a>
+    </p>
+
+    {# Verification status banner #}
+    <div class="alert alert-info" id="check-loading-banner"
+      {% if not checking_task_id %} style="display:none"{% endif %}>
+      {% if checking_task_id %}
+        Verifying your submission. This will update automatically.
+      {% endif %}
+    </div>
+
+    {# Check form #}
+    <form
+      method="post"
+      action="{% url 'feed_check' task.id %}"
+      id="feed-check-form"
+      data-check-url="{% url 'feed_check' task.id %}"
+      data-status-url="{% url 'feed_check_status' task.id %}"
+      data-checking-status-url="{% if checking_task_id %}{% url 'feed_check_status' checking_task_id %}{% endif %}"
+    >
+      {% csrf_token %}
+      <input type="hidden" name="completion" value="{{ completion }}">
+      <input type="hidden" name="archive" value="{{ archive }}">
+      <input type="hidden" name="task_types" value="{{ selected_task_types_csv }}">
+
+      {% if task.type == 'WEBHOOK' %}
+        {% if verified_emails %}
+
+          <div class="feed-email-picker">
+            <label for="webhook-email-select">Your email on this platform:</label>
+            <select name="google_email" id="webhook-email-select" required>
+              <option value="">Select an email</option>
+              {% for email in verified_emails %}
+                <option value="{{ email }}">{{ email }}</option>
+              {% endfor %}
+            </select>
+            <a href="{% url 'verify_email_start' %}" class="btn btn-ghost btn-sm">+ Add email</a>
+          </div>
+
+          <div class="feed-difficulty-picker">
+            <label>Difficulty:</label>
+            <div class="diff-radios" id="diff-radios">
+              <input type="radio" name="difficulty" id="diff_1" value="1" class="diff-radio-input">
+              <label for="diff_1" class="diff-radio-label diff-radio-label--1" title="Very easy">Very easy</label>
+
+              <input type="radio" name="difficulty" id="diff_2" value="2" class="diff-radio-input">
+              <label for="diff_2" class="diff-radio-label diff-radio-label--2" title="Easy">Easy</label>
+
+              <input type="radio" name="difficulty" id="diff_3" value="3" class="diff-radio-input">
+              <label for="diff_3" class="diff-radio-label diff-radio-label--3" title="Medium">Medium</label>
+
+              <input type="radio" name="difficulty" id="diff_4" value="4" class="diff-radio-input">
+              <label for="diff_4" class="diff-radio-label diff-radio-label--4" title="Hard">Hard</label>
+
+              <input type="radio" name="difficulty" id="diff_5" value="5" class="diff-radio-input">
+              <label for="diff_5" class="diff-radio-label diff-radio-label--5" title="Very hard">Very hard</label>
+            </div>
+          </div>
+
+        {% else %}
+          <p class="small text-muted">
+            <a href="{% url 'linked_accounts' %}">Verify an email address</a> to check webhook tasks.
+          </p>
+        {% endif %}
+      {% endif %}
+
+      <div class="card__actions">
+        <button
+          type="submit"
+          class="btn btn-primary"
+          id="feed-check-btn"
+          {% if task.type == 'WEBHOOK' and not verified_emails %} disabled{% endif %}
+        >Check</button>
+      </div>
+
+    </form>
+
+    {# Archive form sits alongside check button #}
+    <form method="post" action="{% url 'feed_done' task.id %}">
+      {% csrf_token %}
+      <input type="hidden" name="completion" value="{{ completion }}">
+      <input type="hidden" name="archive" value="{{ archive }}">
+      <input type="hidden" name="task_types" value="{{ selected_task_types_csv }}">
+      <div class="card__actions">
+        <button type="submit" class="btn btn-secondary">Archive</button>
+      </div>
+    </form>
+
+    {# Owner controls #}
+    {% if request.user.is_authenticated and request.user.id == task.owner_id %}
+      <div class="card__actions">
+        <a href="{% url 'task_edit' task.slug %}" class="btn btn-secondary btn-sm">Edit</a>
+        <form method="post" action="{% url 'task_delete' task.slug %}"
+          onsubmit="return confirm('Delete this task?')">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+        </form>
+      </div>
+    {% endif %}
+
+  </div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/feed-check.js' %}"></script>
+<script src="{% static 'js/feed-check-poll.js' %}"></script>
+<script src="{% static 'js/feed-page.js' %}"></script>
+{% endblock %}
