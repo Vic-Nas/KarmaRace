@@ -16,4 +16,5 @@ urlpatterns = [
     path('verify/', views.verify_karmarace_hook, name='verify_karmarace_hook'),
     path('pick-username/', views.pick_username, name='pick_username'),
     path('pick-username/check/', views.username_check, name='username_check'),
+    path('onboarding/', views.onboarding, name='onboarding'),
 ]

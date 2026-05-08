@@ -1,0 +1,65 @@
+{# setup/templates/accounts/onboarding.html #}
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Get started – KarmaRace{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/onboarding.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="onboarding-wrap">
+  <h1>Welcome, {{ user.username }}.</h1>
+  <p class="onboarding-sub">Here's what you can do on KarmaRace.</p>
+
+  <div class="onboarding-cards" id="ob-cards">
+
+    <div class="onboarding-card onboarding-card--stars" data-ob-delay="0">
+      <span class="onboarding-card__icon">⭐</span>
+      <div class="onboarding-card__title">GitHub Stars</div>
+      <p class="onboarding-card__desc">
+        Post your repository. Developers earn karma by starring it — the more karma they earn, the more visible their own tasks become.
+      </p>
+    </div>
+
+    <div class="onboarding-card onboarding-card--forks" data-ob-delay="150">
+      <span class="onboarding-card__icon">🍴</span>
+      <div class="onboarding-card__title">GitHub Forks</div>
+      <p class="onboarding-card__desc">
+        Same idea, deeper engagement. Get real forks from active developers in the community.
+      </p>
+    </div>
+
+    <div class="onboarding-card onboarding-card--webhook" data-ob-delay="300">
+      <span class="onboarding-card__icon">🔗</span>
+      <div class="onboarding-card__title">Webhook Tasks</div>
+      <p class="onboarding-card__desc">
+        Define any action on your app — sign up, click a button, complete a flow — and verify it actually happened.
+      </p>
+    </div>
+
+  </div>
+
+  <div class="onboarding-cta" id="ob-cta">
+    <a href="{% url 'task_create' %}" class="btn btn-primary btn-lg">Create my first task →</a>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  var cards = document.querySelectorAll('#ob-cards .onboarding-card');
+  var cta   = document.getElementById('ob-cta');
+
+  cards.forEach(function (card) {
+    var delay = parseInt(card.getAttribute('data-ob-delay') || '0', 10);
+    setTimeout(function () { card.classList.add('ob-visible'); }, 120 + delay);
+  });
+
+  // Show CTA after the last card has appeared
+  setTimeout(function () { cta.classList.add('ob-visible'); }, 120 + 300 + 450);
+})();
+</script>
+{% endblock %}

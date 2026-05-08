@@ -5,7 +5,7 @@ from .email import verify_email_start, verify_email_callback, remove_verified_em
 from .preferences import preferences
 from .profile import edit_profile, public_profile
 from .verify import verify_karmarace_hook
-from .username import pick_username, username_check
+from .username import pick_username, username_check, onboarding
 
 __all__ = [
     'linked_accounts', 'connect_account', 'discord_entry', 'discord_callback', 'unlink_account',
@@ -13,5 +13,5 @@ __all__ = [
     'preferences',
     'edit_profile', 'public_profile',
     'verify_karmarace_hook',
-    'pick_username', 'username_check',
+    'pick_username', 'username_check', 'onboarding',
 ]

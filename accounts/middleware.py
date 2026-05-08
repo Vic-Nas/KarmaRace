@@ -28,9 +28,12 @@ class RequireUsernameMiddleware:
     async def _should_redirect(self, user, path):
         if not hasattr(self, '_pick_url'):
             self._pick_url = reverse('pick_username')
+        if not hasattr(self, '_onboarding_url'):
+            self._onboarding_url = reverse('onboarding')
         return (
             user.is_authenticated
             and path != self._pick_url
+            and path != self._onboarding_url
             and not any(seg in path for seg in _PASSTHROUGH_SEGMENTS)
             and await _async_username_needs_picking(user)
         )

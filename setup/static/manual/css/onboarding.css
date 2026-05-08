@@ -1,0 +1,102 @@
+/* onboarding.css: Task type showcase on first login */
+
+.onboarding-wrap {
+  max-width: 680px;
+  margin: 4rem auto 2rem;
+  text-align: center;
+  padding: 0 1rem;
+}
+
+.onboarding-wrap h1 {
+  font-size: 1.6rem;
+  margin-bottom: .4rem;
+  color: var(--text);
+}
+
+.onboarding-wrap .onboarding-sub {
+  color: var(--text-muted);
+  font-size: .98rem;
+  margin-bottom: 2.5rem;
+}
+
+/* Cards row */
+.onboarding-cards {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 2.5rem;
+}
+
+.onboarding-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.75rem 1.4rem 1.5rem;
+  flex: 1 1 180px;
+  max-width: 210px;
+  box-shadow: var(--shadow-sm);
+  text-align: left;
+
+  /* start hidden, JS drives the animation */
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity .45s ease, transform .45s ease,
+              box-shadow var(--transition), border-color var(--transition);
+}
+
+.onboarding-card.ob-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.onboarding-card:hover {
+  box-shadow: var(--shadow);
+  border-color: var(--border-strong);
+}
+
+/* Accent stripe per card type */
+.onboarding-card--stars  { border-top: 3px solid var(--karma); }
+.onboarding-card--forks  { border-top: 3px solid var(--primary); }
+.onboarding-card--webhook { border-top: 3px solid var(--accent); }
+
+.onboarding-card__icon {
+  font-size: 1.9rem;
+  margin-bottom: .85rem;
+  line-height: 1;
+  display: block;
+}
+
+.onboarding-card__title {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: .4rem;
+  color: var(--text);
+}
+
+.onboarding-card__desc {
+  font-size: .84rem;
+  color: var(--text-muted);
+  line-height: 1.55;
+  margin: 0;
+}
+
+/* CTA */
+.onboarding-cta {
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity .4s ease .1s, transform .4s ease .1s;
+}
+.onboarding-cta.ob-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+.onboarding-cta .btn {
+  font-size: 1rem;
+  padding: .65rem 2rem;
+}
+
+@media (max-width: 520px) {
+  .onboarding-cards { flex-direction: column; align-items: center; }
+  .onboarding-card  { max-width: 100%; }
+}

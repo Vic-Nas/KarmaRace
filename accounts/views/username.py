@@ -5,7 +5,7 @@ import re
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
-from django.views.decorators.http import require_GET, require_POST
+from django.views.decorators.http import require_GET
 
 from accounts.models import UserPreference
 from accounts.models import User
@@ -41,12 +41,25 @@ def pick_username(request):
                 user=request.user, key=USERNAME_SET_KEY,
                 defaults={'value': '1'},
             )
-            return redirect('feed')
+            return redirect('onboarding')
 
     return render(request, 'accounts/pick_username.html', {
         'suggestion': suggestion,
         'error': error,
     })
+
+
+@login_required
+def onboarding(request):
+    """One-time task showcase shown after username is picked.
+
+    If the user already has tasks, skip straight to the feed —
+    this page is only meaningful before they've created anything.
+    """
+    from tasks.models import Task
+    if Task.objects.filter(owner=request.user).exists():
+        return redirect('feed')
+    return render(request, 'accounts/onboarding.html')
 
 
 @require_GET
