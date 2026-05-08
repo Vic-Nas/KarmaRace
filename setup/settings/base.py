@@ -71,12 +71,10 @@ ACCOUNT_SIGNUP_FIELDS = []
 SOCIALACCOUNT_ONLY = True
 SOCIALACCOUNT_STORE_TOKENS = True
 SOCIALACCOUNT_LOGIN_ON_GET = True
-
 ACCOUNT_ADAPTER = 'accounts.account_adapter.AccountAdapter'
 SOCIALACCOUNT_ADAPTER = 'accounts.adapter.SocialAccountAdapter'
 
 ACCOUNT_EMAIL_VERIFICATION = 'none'
-LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/'
 
 # Respect reverse-proxy scheme/host (e.g., Tailscale Funnel) so OAuth callbacks
@@ -176,8 +174,6 @@ LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
     'filters': {
-        # Suppress duplicate log records with identical (logger, level, message).
-        # Useful for warnings that fire once per worker process on startup.
         'dedup': {
             '()': 'setup.log_filters.DedupFilter',
         },
@@ -197,31 +193,21 @@ LOGGING = {
         'level': 'INFO',
     },
     'loggers': {
-        # Procrastinate registers tasks at INFO on every worker boot; mostly noise.
-        # WARNING still surfaces real problems (failed jobs, connector errors).
         'procrastinate': {
             'handlers': ['console'],
             'level': 'WARNING',
             'propagate': False,
         },
-        # Honeypot scanner hits are DEBUG-only; don't pollute WARNING stream.
-        # setup.honeypot propagates to setup.honeypot.middleware naturally.
         'setup.honeypot': {
             'handlers': ['console'],
             'level': 'DEBUG',
             'propagate': False,
         },
-        # Gunicorn worker boot lines (Started server process, Waiting for
-        # application startup, etc.) are too verbose with 8 workers; one
-        # summary line per boot is enough. ERROR still surfaces real crashes.
         'gunicorn.error': {
             'handlers': ['console'],
             'level': 'WARNING',
             'propagate': False,
         },
-        # py.warnings captures Python warnings module output (e.g.
-        # StreamingHttpResponse sync iterator warning). Dedup filter on the
-        # console handler above already collapses per-worker repeats.
         'py.warnings': {
             'handlers': ['console'],
             'propagate': False,
